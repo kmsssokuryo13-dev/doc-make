@@ -1,0 +1,3110 @@
+/* eslint-disable */
+// @ts-nocheck
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { 
+  HashRouter, Routes, Route, useNavigate, useSearchParams 
+} from 'react-router-dom';
+import { 
+  FileText, Map as MapIcon, Users, Plus, Trash2, Minus, Save, FileSearch, 
+  Copy, Layout, UserPlus, Building, X, AlertCircle, Info, ChevronLeft, 
+  ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, 
+  Upload, Printer, ArrowLeft, Download, CheckCircle, CheckCircle2, Briefcase, Settings2, Move,
+  BookOpen, Building2, ExternalLink
+} from 'lucide-react';
+const ResetIcon = RotateCcw;
+
+/**
+ * 土地家屋調査士用アプリ「書類作成アプリ（建物）」 v8.7 改
+ * * デバッグ検索ワード:
+ * - activeInstance is not defined Docs
+ * - activeInstanceKey allInstances useMemo
+ * - Step3 left panel activeInstance guard
+ * - handlePickChange docPick optional chaining
+ * - contractors master localStorage CRUD modal
+ * - scriveners master localStorage CRUD modal
+ * - dropdown select updateActiveSite
+ * - proposedBuildings registrationCause registrationDate wareki unknown
+ * - DocTemplate 委任状（表題） targetPropBuildingId
+ * - contractors tradeName representative address localStorage migrate
+ * - scriveners address name localStorage migrate
+ * - MasterManagerModal form fields order
+ * - docPick default add field backward compatible
+ * - Step3 書類設定 予定家屋番号 select proposedBuildings
+ * - registrationCause registrationDate formatWareki use
+ */
+
+// ==========================================
+// Section 1: Constants & Definitions
+// ==========================================
+
+const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// Storage Keys
+const CONTRACTORS_STORAGE_KEY = "building_app_contractors_v1";
+const SCRIVENERS_STORAGE_KEY = "building_app_scriveners_v1";
+const SITES_STORAGE_KEY = "building_app_sites_v1";
+const APP_STATE_STORAGE_KEY = "building_app_state_v1";
+const DEFAULT_DELEGATION_TEXT = "私は上記の者を代理人と定め、下記に記載の登記を管轄法務局へ申請の全権及び登記識別情報の暗号化、復号化並びに登記識別情報通知書代理受領の件、原本還付請求並びに受領の件、申請の補正又は取下に関する件、復代理人選任の件を委任する。";
+
+// ★追加：書類ごとのデフォルト委任文（ここを好きな文言に直してください）
+const DEFAULT_DELEGATION_TEXT_SAVE = "私は上記の者を代理人と定め、下記に記載の登記を管轄法務局へ申請の全権及び登記識別情報代理受領の件、原本還付請求並びに受領の件、申請の補正又は取下に関する件、復代理人選任の件を委任する。";
+const DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE = "私は上記の者を代理人と定め、下記に記載の登記を管轄法務局へ申請の全権及び登記識別情報代理受領の件、原本還付請求並びに受領の件、申請の補正又は取下に関する件、復代理人選任の件を委任する。";
+// A4 余白：上25mm / 右15mm / 下15mm / 左15mm
+const DOC_PAGE_PADDING = "25mm 15mm 15mm 15mm";
+
+const ROLE_OPTIONS = ["申請人", "土地所有者", "建物所有者", "建築申請人", "工事人", "その他"];
+
+const APPLICATION_TYPES = [
+  "建物表題登記", "土地地目変更登記", "建物滅失登記", 
+  "建物表題部変更登記", "建物表題部更正登記", 
+  "建物合併登記", "建物分割登記", "建物合体登記"
+];
+
+const APPLICATION_TO_DOCS = {
+  "建物表題登記": { required: ["委任状（表題）"], optional: ["委任状（保存）", '委任状（住所変更）', "工事完了引渡証明書（表題）", "申述書（共有）", "申述書（単独）", "売渡証明書"] },
+  "土地地目変更登記": { required: ["委任状（地目変更）"], optional: [] },
+  "建物滅失登記": { required: ["委任状（滅失）"], optional: ["滅失証明書（滅失）", "非登載証明書"] },
+  "建物表題部変更登記": { required: ["委任状（表題部変更）"], optional: ["委任状（住所変更）", "工事完了引渡証明書（表題部変更）", "売渡証明書", "滅失証明書（表題部変更）", "非登載証明書"] },
+  "建物表題部更正登記": { required: ["委任状（表題部更正）"], optional: [] },
+  "建物合併登記": { required: ["委任状（合併）"], optional: [] },
+  "建物分割登記": { required: ["委任状（分割）"], optional: [] },
+  "建物合体登記": { required: ["委任状（合体）"], optional: ["工事完了引渡証明書（表題部変更）"] }
+};
+
+// ==========================================
+// Section 2: Utilities
+// ==========================================
+
+const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + Math.random()).toString(36);
+
+const toHalfWidth = (str) => str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+
+const toFullWidthDigits = (str) =>
+  (str ?? "").toString().replace(/[0-9]/g, (s) => String.fromCharCode(s.charCodeAt(0) + 0xFEE0));
+
+const naturalSortList = (list, key) => {
+  const parseNum = (str) => {
+    const hw = toHalfWidth(str || "");
+    const matches = hw.match(/\d+/g);
+    return matches ? matches.map(Number) : [];
+  };
+  return [...(list || [])].sort((a, b) => {
+    const valA = a[key] || "";
+    const valB = b[key] || "";
+    if (!valA && valB) return 1;
+    if (valA && !valB) return -1;
+    const na = parseNum(valA);
+    const nb = parseNum(valB);
+    for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+      if (na[i] === undefined) return -1;
+      if (nb[i] === undefined) return 1;
+      if (na[i] !== nb[i]) return na[i] - nb[i];
+    }
+    return valA.localeCompare(valB, 'ja');
+  });
+};
+
+const stableSortKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  return Object.keys(obj).sort().reduce((acc, key) => {
+    acc[key] = obj[key];
+    return acc;
+  }, {});
+};
+
+const getOrderedDocs = (applications = {}) => {
+  const map = new Map();
+  let order = 0;
+  const add = (docName, appType, isRequired) => {
+    if (!docName) return;
+    const existing = map.get(docName);
+    if (!existing) {
+      map.set(docName, { name: docName, isRequired: !!isRequired, sources: [appType], order: order++ });
+      return;
+    }
+    if (isRequired) existing.isRequired = true;
+    if (!existing.sources.includes(appType)) existing.sources.push(appType);
+  };
+  APPLICATION_TYPES.forEach((appType) => {
+    const cnt = Number(applications?.[appType] || 0);
+    if (cnt <= 0) return;
+    const def = APPLICATION_TO_DOCS?.[appType];
+    if (!def) return;
+    (def.required || []).forEach((d) => add(d, appType, true));
+    (def.optional || []).forEach((d) => add(d, appType, false));
+  });
+  return Array.from(map.values()).sort((a, b) => a.order - b.order).map(({ order, ...rest }) => rest);
+};
+
+const parseStructureToFloors = (struct) => {
+  const hwStruct = toHalfWidth(struct || "");
+  let groundCount = 1; let basementCount = 0;
+  const groundMatch = hwStruct.match(/(\d+)階建/);
+  if (groundMatch) groundCount = parseInt(groundMatch[1], 10);
+  else if (hwStruct.includes("平家建")) groundCount = 1;
+  const basementMatch = hwStruct.match(/地下(\d+)階付/);
+  if (basementMatch) basementCount = parseInt(basementMatch[1], 10);
+  const floors = [];
+  for (let i = 1; i <= groundCount; i++) floors.push(toFullWidthDigits(`${i}階`));
+  for (let i = 1; i <= basementCount; i++) floors.push(toFullWidthDigits(`地下${i}階`));
+
+  return floors;
+};
+
+const parseAnnexStructureToFloors = (struct) => {
+  const hwStruct = toHalfWidth(struct || "");
+  let groundCount = 1;
+  const groundMatch = hwStruct.match(/(\d+)階建/);
+  if (groundMatch) groundCount = parseInt(groundMatch[1], 10);
+  else if (hwStruct.includes("平家建")) groundCount = 1;
+  const floors = [];
+  for (let i = 1; i <= groundCount; i++) floors.push(toFullWidthDigits(`${i}階`));
+  return floors;
+};
+
+const createNewSite = (name) => ({
+  id: generateId(),
+  name: name || '新規現場',
+  address: '', land: [], buildings: [], proposedBuildings: [], people: [],
+  applications: APPLICATION_TYPES.reduce((acc, type) => ({ ...acc, [type]: 0 }), {}),
+  documents: {}, docPick: {},
+  contractorId: "", scrivenerId: ""
+});
+
+const createNewBuilding = () => ({
+  id: generateId(),
+  address: '', symbol: '', houseNum: '', kind: '', struct: '', owner: '',
+  floorAreas: [{ id: generateId(), floor: '1階', area: '' }], annexes: [],
+  registrationCause: "",
+  registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
+  confirmationCert: null // ★追加：確認済証情報（申述書用）。未追加は null。
+});
+
+const createNewAnnex = () => ({
+  id: generateId(), symbol: '', kind: '', struct: '', includeBasement: false,
+  floorAreas: [{ id: generateId(), floor: '1階', area: '' }]
+});
+
+// ★追加：関係人（people）新規作成
+// - PeopleSection で createNewPerson() を使っているため必須
+const createNewPerson = (patch = {}) => {
+  const base = {
+    id: generateId(),
+    address: "",
+    name: "",
+    representative: "",
+    share: "",
+    roles: ["申請人"],
+    role: "申請人",
+    contractorMasterId: ""
+  };
+
+  const merged = { ...base, ...(patch || {}) };
+
+  // roles / role の後方互換（どちらでもOKにする）
+  let roles = [];
+  if (Array.isArray(merged.roles)) roles = merged.roles;
+  else if (merged.role) roles = String(merged.role).split(/[、,]/).map(x => x.trim()).filter(Boolean);
+
+  if (!roles.length) roles = ["申請人"];
+
+  return {
+    ...merged,
+    roles,
+    role: roles.join("、")
+  };
+};
+
+// ==========================================
+// ★追加：確認済証（申述書用）ユーティリティ
+// ==========================================
+const compareYMD = (y, m, d, sy, sm, sd) => {
+  if (y !== sy) return y - sy;
+  if (m !== sm) return m - sm;
+  return d - sd;
+};
+
+const getTodayWarekiEraYear = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+
+  const ERAS = [
+    { era: "令和", start: [2019, 5, 1] },
+    { era: "平成", start: [1989, 1, 8] },
+    { era: "昭和", start: [1926, 12, 25] },
+    { era: "大正", start: [1912, 7, 30] },
+    { era: "明治", start: [1868, 1, 25] },
+  ];
+
+  for (const e of ERAS) {
+    const [sy, sm, sd] = e.start;
+    if (compareYMD(y, m, d, sy, sm, sd) >= 0) {
+      const yearNum = y - sy + 1;
+      return { era: e.era, year: toFullWidthDigits(String(yearNum)) };
+    }
+  }
+  // 念のためフォールバック
+  return { era: "令和", year: toFullWidthDigits("1") };
+};
+
+const createDefaultConfirmationCert = () => {
+  const today = getTodayWarekiEraYear();
+  return {
+    rNo: "01",                 // 二桁プルダウン（値は 01〜99）
+    code: "確認建築富建セ",     // 自由入力（デフォルト）
+    number: "",                // 数字の自由入力
+    date: {
+      era: today.era,          // 自由入力（デフォルト：現元号）
+      year: today.year,        // 数字入力（デフォルト：現元号年）
+      month: "",               // 数字入力
+      day: ""                  // 数字入力
+    }
+  };
+};
+
+const sanitizeConfirmationCert = (cc) => {
+  if (!cc || typeof cc !== "object") return null;
+  const today = getTodayWarekiEraYear();
+  return {
+    rNo: cc.rNo || "01",
+    code: (cc.code ?? "確認建築富建セ"),
+    number: (cc.number ?? ""),
+    date: {
+      era: (cc.date?.era ?? today.era) || "",
+      year: toFullWidthDigits((cc.date?.year ?? today.year) || ""),
+      month: (cc.date?.month ?? ""),
+      day: (cc.date?.day ?? ""),
+    }
+  };
+};
+
+// ==========================================
+// ★追加：確認済証（申述書表示用）フォーマット
+// ==========================================
+// PDFに合わせて調整しやすいようにラベル列(mm)を定数化（DocTemplate側で使用）
+const STATEMENT_CONFIRM_LABEL_COL_MM = 60; // ←PDFを見て微調整（例: 55〜70）
+
+const formatConfirmationCertNo = (cc) => {
+  if (!cc) return "";
+  const rNo = toFullWidthDigits(toHalfWidth(cc.rNo || "01"));
+  const code = (cc.code || "").trim();
+  const num = toFullWidthDigits(toHalfWidth(cc.number || ""));
+  // 「第Ｒ○○ 確認建築富建セ ○○号」形式（スペースは見た目調整用）
+  const parts = [];
+  parts.push(`第Ｒ${rNo}`);
+  if (code) parts.push(code);
+  if (num) parts.push(num);
+  return `${parts.join(" ")}号`.trim();
+};
+
+const formatConfirmationCertDate = (d) => {
+  if (!d) return "";
+  const era = (d.era || "").trim();
+  const y = toFullWidthDigits(toHalfWidth(d.year || ""));
+  const m = toFullWidthDigits(toHalfWidth(d.month || ""));
+  const day = toFullWidthDigits(toHalfWidth(d.day || ""));
+  // 「令和○年○月○日」形式（空欄はそのまま空欄で出す）
+  const yPart = era || y ? `${era}${y}年` : "";
+  const mPart = m ? `${m}月` : "";
+  const dPart = day ? `${day}日` : "";
+  return `${yPart}${mPart}${dPart}`.trim();
+};
+
+// ==========================================
+// ★追加：確認済証 表示整形（申述書用）
+// ==========================================
+const formatConfirmationCertNumber = (cc) => {
+  if (!cc) return "";
+  const rNo = toFullWidthDigits(cc.rNo || "");
+  const code = (cc.code ?? "");
+  const num = toFullWidthDigits(cc.number || "");
+  // 例：第Ｒ０１確認建築富建セ１２３号
+  return `第Ｒ${rNo}${code}${num}号`;
+};
+
+const formatWarekiYMD = (d) => {
+  if (!d) return "";
+  const era = d.era ?? "";
+  const y = toFullWidthDigits(d.year ?? "");
+  const m = toFullWidthDigits(d.month ?? "");
+  const day = toFullWidthDigits(d.day ?? "");
+  // 空でも「年/月/日」は出してPDFっぽい余白にしやすくする
+  return `${era}${y}年${m}月${day}日`;
+};
+
+const formatConfirmationCertLine = (cc) => {
+  if (!cc) return "";
+  const no = formatConfirmationCertNumber(cc);
+  const dt = formatWarekiYMD(cc.date);
+  // 「番号  日付」並び（間は全角スペース）
+  return `${no}　${dt}`;
+};
+
+
+// ==========================================
+// Section 3: Data Sanitization
+// ==========================================
+
+const sanitizeSiteData = (raw = {}) => {
+  const sanitizeLand = (l = {}) => ({
+    id: l.id || generateId(),
+    address: l.address || "",
+    lotNumber: l.lotNumber || "",
+    category: l.category || "",
+    area: l.area || "",
+    owner: l.owner || "",
+  });
+
+  const sanitizeAnnex = (a = {}) => {
+    const struct = a.struct || "";
+    const includeBasement = !!a.includeBasement;
+    const baseFloors = parseAnnexStructureToFloors(struct);
+    const basementFloors = includeBasement ? ["地下1階"] : [];
+    const labels = [...baseFloors, ...basementFloors];
+    const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
+    const floorAreas = labels.map(floor => {
+      const ex = map.get(floor);
+      return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
+    });
+    return {
+      id: a.id || generateId(),
+      symbol: a.symbol || "",
+      kind: a.kind || "",
+      struct,
+      includeBasement,
+      floorAreas,
+    };
+  };
+
+  const sanitizeBuilding = (b = {}) => {
+    const struct = b.struct || "";
+    const labels = parseStructureToFloors(struct);
+    const map = new Map((b.floorAreas || []).map(f => [f.floor, f]));
+    const floorAreas = labels.map(floor => {
+      const ex = map.get(floor);
+      return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
+    });
+    return {
+      id: b.id || generateId(),
+      address: b.address || "",
+      symbol: b.symbol || "",
+      houseNum: b.houseNum || "",
+      kind: b.kind || "",
+      struct,
+      owner: b.owner || "",
+      floorAreas,
+      annexes: Array.isArray(b.annexes) ? b.annexes.map(sanitizeAnnex) : [],
+      registrationCause: b.registrationCause || "",
+      registrationDate: {
+        era: b.registrationDate?.era || "令和",
+        year: b.registrationDate?.year || "",
+        month: b.registrationDate?.month || "",
+        day: b.registrationDate?.day || "",
+        unknown: !!b.registrationDate?.unknown
+      },
+      confirmationCert: sanitizeConfirmationCert(b.confirmationCert) // ★追加
+    };
+  };
+
+  const rolesFromLegacy = (p = {}) => {
+    if (Array.isArray(p.roles)) return p.roles;
+    if (p.role) return p.role.split(/[、,]/).map(x => x.trim()).filter(Boolean);
+    return [];
+  };
+
+  const baseApplications = APPLICATION_TYPES.reduce((acc, t) => {
+    acc[t] = 0;
+    return acc;
+  }, {});
+
+  return {
+    id: raw.id || generateId(),
+    name: raw.name || "新規現場",
+    address: raw.address || "",
+    land: Array.isArray(raw.land) ? raw.land.map(sanitizeLand) : [],
+    buildings: Array.isArray(raw.buildings) ? raw.buildings.map(sanitizeBuilding) : [],
+    proposedBuildings: Array.isArray(raw.proposedBuildings) ? raw.proposedBuildings.map(sanitizeBuilding) : [],
+    people: Array.isArray(raw.people)
+      ? raw.people.map(p => ({
+          ...p,
+          id: p.id || generateId(),
+          roles: Array.isArray(p.roles) ? p.roles : (p.role ? p.role.split(/[、,]/).map(x => x.trim()).filter(Boolean) : []),
+          contractorMasterId: p.contractorMasterId || ""
+        }))
+      : [],
+    applications: stableSortKeys({ ...baseApplications, ...(raw.applications || {}) }),
+    documents: stableSortKeys(typeof raw.documents === "object" && raw.documents ? raw.documents : {}),
+    docPick: stableSortKeys(typeof raw.docPick === "object" && raw.docPick ? raw.docPick : {}),
+    contractorId: raw.contractorId || "",
+    scrivenerId: raw.scrivenerId || ""
+  };
+};
+
+// ==========================================
+// Section 4: Shared UI Components
+// ==========================================
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 bg-red-50 border-4 border-red-200 m-4 rounded-xl text-red-900 font-sans">
+          <h1 className="text-2xl font-bold mb-4 flex items-center gap-2 text-black"><AlertCircle /> アプリがクラッシュしました</h1>
+          <pre className="bg-red-100 p-4 rounded mb-4 text-sm text-black">{this.state.error?.message}</pre>
+          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg font-bold shadow-lg text-white">再読み込み</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function FormField({ label, value, onChange, placeholder, type = "text", readOnly = false }) {
+  return (
+    <div className="flex-1 min-w-[120px]">
+      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 font-sans">{label}</label>
+      <input
+        type={type}
+        className={`w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm transition-all font-sans ${readOnly ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-white hover:border-gray-400 text-black'}`}
+        value={toFullWidthDigits(value || '')}
+        onChange={(e) => !readOnly && onChange(toFullWidthDigits(e.target.value))}
+        placeholder={placeholder}
+        readOnly={readOnly}
+      />
+    </div>
+  );
+}
+
+function Modal({ isOpen, onClose, title, children, footer, maxWidth = "max-w-md" }) {
+  useEffect(() => {
+    const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
+    if (isOpen) window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen]);
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans text-black">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 text-black">
+          <h3 className="font-bold text-gray-800 tracking-tight">{title}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"><X size={20} /></button>
+        </div>
+        <div className="p-6 overflow-y-auto flex-1 text-black">{children}</div>
+        {footer && <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 shrink-0 text-black">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+function TabBtn({ active, label, onClick, icon }) {
+  return (
+    <button onClick={onClick} className={`flex items-center gap-2 px-4 py-3 text-[11px] font-bold rounded-t-md transition-all border-b-2 shrink-0 ${active ? 'bg-white text-blue-600 border-blue-600 shadow-[0_-2px_4px_rgba(0,0,0,0.02)]' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>
+      {icon} {label}
+    </button>
+  );
+}
+
+// ==========================================
+// Section 5: Specialized Doc Components
+// ==========================================
+
+const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, children }) => {
+  const containerRef = useRef(null);
+  const draftRef = useRef(null);
+  const focusedRef = useRef(false);
+  const isBlankHtml = (html) => {
+    if (html === null || html === undefined) return true;
+    const s = String(html)
+      // ありがちな空表現を除去
+      .replace(/<br\s*\/?>/gi, "")
+      .replace(/&nbsp;/gi, "")
+      // タグ除去
+      .replace(/<[^>]*>/g, "")
+      // 全角空白やゼロ幅など含む空白除去
+      .replace(/[\s\u3000\u00A0\u2000-\u200B\u202F\u205F\uFEFF]/g, "");
+    return s.length === 0;
+  };
+
+  const hasCustom = !isBlankHtml(customHtml);
+
+  const flush = useCallback(() => {
+    if (!onCustomHtmlChange || draftRef.current == null) return;
+    onCustomHtmlChange(draftRef.current);
+    draftRef.current = null;
+  }, [onCustomHtmlChange]);
+
+  const handleInput = () => {
+    if (!containerRef.current) return;
+    draftRef.current = containerRef.current.innerHTML;
+  };
+
+  const handleFocus = () => { focusedRef.current = true; };
+  const handleBlur = () => { focusedRef.current = false; flush(); };
+
+  useEffect(() => {
+    return () => { if (focusedRef.current) flush(); };
+  }, [flush]);
+
+  if (!editable) {
+    if (hasCustom) return <div className="doc-editable" dangerouslySetInnerHTML={{ __html: customHtml }} />;
+    return <div className="doc-editable">{children}</div>;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      contentEditable
+      suppressContentEditableWarning
+      onInput={handleInput}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className="doc-editable focus:outline-none min-h-[50mm]"
+      dangerouslySetInnerHTML={hasCustom ? { __html: customHtml || "" } : undefined}
+    >
+      {!hasCustom && children}
+    </div>
+  );
+};
+
+const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const baseRightMm = 15 + index * (26.6 + 2);
+  const baseTopMm = 5;
+
+  const handlePointerDown = (e) => {
+    if (!editable) return;
+    e.preventDefault(); e.stopPropagation();
+    setIsDragging(true); startPos.current = { x: e.clientX, y: e.clientY };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging || !editable) return;
+    const diffX = e.clientX - startPos.current.x;
+    const diffY = e.clientY - startPos.current.y;
+    onChange?.(index, dx + diffX, dy + diffY);
+    startPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const stopDrag = () => setIsDragging(false);
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={stopDrag}
+      onPointerCancel={stopDrag}
+      className={`stamp-circle ${editable ? 'stamp-drag-handle' : ''} ${isDragging ? 'stamp-dragging' : ''}`}
+      style={{
+        position: 'absolute',
+        top: `calc(${baseTopMm}mm + ${dy}px)`,
+        right: `calc(${baseRightMm}mm - ${dx}px)`,
+        width: '26.6mm', height: '26.6mm',
+        border: '0.3mm dotted #666', borderRadius: '50%',
+        zIndex: 2000, touchAction: 'none',
+        pointerEvents: 'auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: isDragging ? 'rgba(96, 165, 250, 0.1)' : 'transparent'
+      }}
+    >
+      {editable && !isDragging && <Move size={16} className="text-blue-500" />}
+    </div>
+  );
+};
+
+const DraggableSignerStamp = ({ index, dx = 0, dy = 0, editable, onChange }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const startPos = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e) => {
+    if (!editable) return;
+    e.preventDefault(); e.stopPropagation();
+    setIsDragging(true); startPos.current = { x: e.clientX, y: e.clientY };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging || !editable) return;
+    const diffX = e.clientX - startPos.current.x;
+    const diffY = e.clientY - startPos.current.y;
+    onChange?.(index, dx + diffX, dy + diffY);
+    startPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  return (
+    <div
+      contentEditable={false}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={() => setIsDragging(false)}
+      onPointerCancel={() => setIsDragging(false)}
+      className={`${editable ? 'stamp-drag-handle' : ''} ${isDragging ? 'stamp-dragging' : ''}`}
+      style={{
+        position: 'absolute',
+        left: `${dx}px`, top: `${dy}px`,
+        width: '26.6mm', height: '26.6mm',
+        border: '0.3mm dotted #666', borderRadius: '50%',
+        zIndex: 100, touchAction: 'none',
+        pointerEvents: 'auto',
+        background: isDragging ? 'rgba(96, 165, 250, 0.1)' : 'transparent',
+      }}
+    >
+      {editable && !isDragging && <Move size={16} className="text-blue-500" />}
+    </div>
+  );
+};
+
+// ==========================================
+// Section 6: Master Manager Modal Component
+// ==========================================
+
+const MasterManagerModal = ({ isOpen, onClose, contractors, setContractors, scriveners, setScriveners }) => {
+  const [activeMasterTab, setActiveMasterTab] = useState('contractor');
+
+  const addContractor = () => setContractors([...contractors, { id: generateId(), address: '', tradeName: '', representative: '' }]);
+  const updateContractor = (id, field, val) => setContractors(prev => prev.map(c => c.id === id ? { ...c, [field]: val } : c));
+  const deleteContractor = (id) => setContractors(prev => prev.filter(c => c.id !== id));
+
+  const addScrivener = () => setScriveners([...scriveners, { id: generateId(), address: '', name: '' }]);
+  const updateScrivener = (id, field, val) => setScriveners(prev => prev.map(s => s.id === id ? { ...s, [field]: val } : s));
+  const deleteScrivener = (id) => setScriveners(prev => prev.filter(s => s.id !== id));
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="マスタ管理設定" maxWidth="max-w-4xl" footer={<button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold text-white">閉じる</button>}>
+      <div className="flex flex-col gap-4 text-black">
+        <div className="flex border-b border-gray-200">
+          <button onClick={() => setActiveMasterTab('contractor')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-all ${activeMasterTab === 'contractor' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            <div className="flex items-center gap-2"><Briefcase size={16} /> 工事人マスタ</div>
+          </button>
+          <button onClick={() => setActiveMasterTab('scrivener')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-all ${activeMasterTab === 'scrivener' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            <div className="flex items-center gap-2"><BookOpen size={16} /> 司法書士マスタ</div>
+          </button>
+        </div>
+
+        <div className="min-h-[400px]">
+          {activeMasterTab === 'contractor' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-gray-500 font-bold">工事完了引渡証明書等に使用する工事会社を登録します。</p>
+                <button onClick={addContractor} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm transition-all text-white"><Plus size={14} /> 新規登録</button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {contractors.map(c => (
+                  <div key={c.id} className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm flex items-start gap-4 hover:border-blue-200 transition-colors">
+                    <div className="flex-1 grid grid-cols-1 gap-3">
+                      <FormField label="住所" value={c.address} onChange={v => updateContractor(c.id, 'address', v)} />
+                      <div className="flex gap-3">
+                        <FormField label="商号又は名称" value={c.tradeName} onChange={v => updateContractor(c.id, 'tradeName', v)} />
+                        <FormField label="代表者" value={c.representative} onChange={v => updateContractor(c.id, 'representative', v)} />
+                      </div>
+                    </div>
+                    <button onClick={() => deleteContractor(c.id)} className="text-gray-300 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                  </div>
+                ))}
+                {contractors.length === 0 && <div className="text-center py-12 text-gray-400 italic">工事会社が登録されていません</div>}
+              </div>
+            </div>
+          )}
+
+          {activeMasterTab === 'scrivener' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-gray-500 font-bold">保存登記等の書類作成先・連携先を登録します。</p>
+                <button onClick={addScrivener} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm transition-all text-white"><Plus size={14} /> 新規登録</button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {scriveners.map(s => (
+                  <div key={s.id} className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm flex items-start gap-4 hover:border-blue-200 transition-colors">
+                    <div className="flex-1 grid grid-cols-1 gap-3">
+                      <FormField label="住所" value={s.address} onChange={v => updateScrivener(s.id, 'address', v)} />
+                      <FormField label="氏名" value={s.name} onChange={v => updateScrivener(s.id, 'name', v)} />
+                    </div>
+                    <button onClick={() => deleteScrivener(s.id)} className="text-gray-300 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                  </div>
+                ))}
+                {scriveners.length === 0 && <div className="text-center py-12 text-gray-400 italic">司法書士が登録されていません</div>}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ==========================================
+// Section 7: Editor Sub-Sections
+// ==========================================
+
+const LandSection = ({ site, update }) => (
+  <div className="space-y-4 font-sans text-black">
+    <div className="flex justify-between items-center px-1 font-bold">
+      <h3 className="text-gray-700 text-sm flex items-center gap-2"><MapIcon size={16} className="text-blue-500" /> 既登記土地情報</h3>
+      <button onClick={() => update({ land: [...(site.land||[]), { id: generateId(), address: '', lotNumber: '', category: '', area: '', owner: '' }] })} className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm text-white">
+        <Plus size={12} /> 筆を追加
+      </button>
+    </div>
+    {naturalSortList(site.land || [], 'lotNumber').map((item) => (
+      <div key={item.id} className="p-4 border border-gray-200 rounded-xl bg-white relative group shadow-sm hover:shadow-md transition-all font-sans text-black">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-black">
+          <FormField label="所在" value={item.address} onChange={(v) => update({ land: site.land.map(l => l.id === item.id ? {...l, address: v} : l)})} />
+          <FormField label="地番" value={item.lotNumber} onChange={(v) => update({ land: site.land.map(l => l.id === item.id ? {...l, lotNumber: v} : l)})} />
+          <FormField label="地目" value={item.category} onChange={(v) => update({ land: site.land.map(l => l.id === item.id ? {...l, category: v} : l)})} />
+          <FormField label="地積" value={item.area} onChange={(v) => update({ land: site.land.map(l => l.id === item.id ? {...l, area: v} : l)})} />
+          <FormField label="所有者" value={item.owner} onChange={(v) => update({ land: site.land.map(l => l.id === item.id ? {...l, owner: v} : l)})} />
+        </div>
+        <button onClick={() => update({ land: site.land.filter(l => l.id !== item.id)})} className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-md border border-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    ))}
+  </div>
+);
+
+const BuildingSection = ({ type, site, update }) => {
+  const isReg = type === 'registered';
+  const dataKey = isReg ? 'buildings' : 'proposedBuildings';
+  const buildings = site[dataKey] || [];
+    const CONFIRM_R2_OPTIONS = Array.from({ length: 99 }, (_, i) => String(i + 1).padStart(2, "0"));
+
+  const updateBuild = (bid, field, val) => {
+    update({ [dataKey]: buildings.map(b => {
+      if (b.id === bid) {
+        let up = { ...b, [field]: val };
+        if (field === 'struct') {
+          const newFloorLabels = parseStructureToFloors(val);
+          const currentMap = new Map((b.floorAreas || []).map(fa => [fa.floor, fa]));
+          up.floorAreas = newFloorLabels.map(l => currentMap.get(l) || { id: generateId(), floor: l, area: '' });
+        }
+        return up;
+      }
+      return b;
+    })});
+  };
+  const updateAnnex = (bid, aid, field, val) => {
+    update({
+      [dataKey]: buildings.map(b => {
+        if (b.id !== bid) return b;
+        const annexes = (b.annexes || []).map(a => {
+          if (a.id !== aid) return a;
+          let up = { ...a, [field]: val };
+          if (field === "struct" || field === "includeBasement") {
+            const nextStruct = field === "struct" ? val : (a.struct || "");
+            const nextIncludeBasement = field === "includeBasement" ? !!val : !!a.includeBasement;
+            const baseFloors = parseAnnexStructureToFloors(nextStruct);
+            const basementFloors = [];
+            if (nextIncludeBasement) {
+              const hw = toHalfWidth(nextStruct || "");
+              const m = hw.match(/地下(\d+)階/);
+              const n = m ? parseInt(m[1], 10) : 1;
+              for (let i = 1; i <= n; i++) basementFloors.push(`地下${i}階`);
+            }
+            const labels = [...baseFloors, ...basementFloors];
+            const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
+            up.floorAreas = labels.map(l => map.get(l) || { id: generateId(), floor: l, area: "" });
+            up.struct = nextStruct;
+            up.includeBasement = nextIncludeBasement;
+          }
+          return up;
+        });
+        return { ...b, annexes };
+      })
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300 text-black font-sans">
+      <div className="flex justify-between items-center px-1 font-bold">
+        <h3 className="text-gray-700 text-sm flex items-center gap-2"><Building size={16} className={isReg ? "text-amber-500" : "text-emerald-500"} /> {isReg ? '既登記建物情報' : '申請建物情報'}</h3>
+        <button onClick={() => update({ [dataKey]: [...buildings, createNewBuilding()] })} className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-700 font-bold transition-all active:scale-95 shadow-sm text-white">
+          <Plus size={12} /> 物件を追加
+        </button>
+      </div>
+      {naturalSortList(buildings, 'houseNum').map(b => (
+        <div key={b.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white relative group">
+          <button onClick={() => update({ [dataKey]: buildings.filter(x => x.id !== b.id)})} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-1 rounded transition-colors"><Trash2 size={16} /></button>
+          <div className="bg-slate-50/80 p-4 border-b border-gray-200 text-black">
+            <div className="flex items-center gap-2 mb-4 font-bold text-black font-sans">
+              <span className="text-xs font-black text-slate-500 uppercase font-sans font-bold">主である建物</span>
+              {isReg && <button onClick={() => update({ proposedBuildings: [...(site.proposedBuildings || []), {...b, id: generateId()}] })} className="text-[10px] bg-emerald-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-emerald-700 transition-colors font-bold shadow-sm active:scale-95 shadow-emerald-100 text-white">
+                <Copy size={12} /> 申請へ転写
+              </button>}
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-black">
+              <FormField label="所在" value={b.address} onChange={v => updateBuild(b.id, 'address', v)} />
+              <FormField label="家屋番号" value={b.houseNum} onChange={v => updateBuild(b.id, 'houseNum', v)} />
+              <FormField label="符号" value={b.annexes?.length > 0 ? '主' : ''} readOnly />
+              <FormField label="所有者" value={b.owner} onChange={v => updateBuild(b.id, 'owner', v)} />
+              <FormField label="種類" value={b.kind} onChange={v => updateBuild(b.id, 'kind', v)} />
+              <FormField label="構造" value={b.struct} onChange={v => updateBuild(b.id, 'struct', v)} placeholder="例: 木造2階建" />
+              {(b.floorAreas || []).map((fa, i) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = [...b.floorAreas]; n[i].area = v; updateBuild(b.id, 'floorAreas', n); }} />))}
+            </div>
+
+            {!isReg && (
+              <div className="mt-4 pt-4 border-t border-slate-200 flex flex-col gap-3 text-black">
+                <div className="flex items-center gap-3">
+                  <div className="flex-[1.5]">
+                    <FormField label="登記原因" value={b.registrationCause} onChange={v => updateBuild(b.id, 'registrationCause', v)} placeholder="例: 新築" />
+                  </div>
+                  <div className="flex-[3] flex flex-col">
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
+                    <div className="flex items-center gap-1 text-black">
+                      <select 
+                        className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                        value={b.registrationDate?.era || "令和"}
+                        onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, era: e.target.value })}
+                      >
+                        {["令和","平成","昭和","大正","明治"].map(e => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                      <input 
+                        type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(b.registrationDate?.year || "")} placeholder="年" 
+                        onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, year: toFullWidthDigits(e.target.value) })}
+                        disabled={b.registrationDate?.unknown}
+                      />
+                      <span className="text-[10px] font-bold text-gray-400">年</span>
+                      <input 
+                        type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={b.registrationDate?.month || ""} placeholder="月" 
+                        onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, month: e.target.value })}
+                        disabled={b.registrationDate?.unknown}
+                      />
+                      <span className="text-[10px] font-bold text-gray-400">月</span>
+                      <input 
+                        type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={b.registrationDate?.day || ""} placeholder="日" 
+                        onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, day: e.target.value })}
+                        disabled={b.registrationDate?.unknown}
+                      />
+                      <span className="text-[10px] font-bold text-gray-400">日</span>
+                      <label className="ml-2 flex items-center gap-1 cursor-pointer">
+                        <input 
+                          type="checkbox" className="w-3 h-3 rounded" checked={b.registrationDate?.unknown || false}
+                          onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: e.target.checked })} 
+                        />
+                        <span className="text-[10px] font-bold text-slate-500">不詳</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ★追加：確認済証情報（申述書用） */}
+                <div className="pt-3 mt-3 border-t border-slate-200">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">
+                    確認済証情報（申述書用）
+                  </label>
+
+                  {!b.confirmationCert ? (
+                    <button
+                      onClick={() => updateBuild(b.id, "confirmationCert", createDefaultConfirmationCert())}
+                      className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm text-white"
+                    >
+                      <Plus size={12} /> 確認済証情報追加
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      {/* 確認済証番号： "第Ｒ" [2桁プルダウン] [自由入力(デフォルト)] [数字自由入力] "号" */}
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="text-xs font-bold text-slate-600">第Ｒ</span>
+
+                        <select
+                          className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                          value={b.confirmationCert?.rNo || "01"}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { ...b.confirmationCert, rNo: e.target.value })}
+                        >
+                          {CONFIRM_R2_OPTIONS.map(v => (
+                            <option key={v} value={v}>{toFullWidthDigits(v)}</option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="text"
+                          className="min-w-[140px] flex-1 text-sm p-1 border rounded text-black bg-white"
+                          value={b.confirmationCert?.code ?? ""}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { ...b.confirmationCert, code: e.target.value })}
+                        />
+
+                        <input
+                          type="text"
+                          className="w-24 text-center text-sm p-1 border rounded text-black bg-white"
+                          value={toFullWidthDigits(b.confirmationCert?.number ?? "")}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { ...b.confirmationCert, number: toFullWidthDigits(e.target.value) })}
+                        />
+
+                        <span className="text-xs font-bold text-slate-600">号</span>
+                      </div>
+
+                      {/* 日付：[元号(自由・デフォルト現元号)] [年(数字・デフォルト現元号年)] [月(数字)]"月" [日(数字)]"日" */}
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <input
+                          type="text"
+                          className="w-16 text-center text-sm p-1 border rounded text-black bg-white"
+                          value={b.confirmationCert?.date?.era ?? ""}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { 
+                            ...b.confirmationCert, 
+                            date: { ...(b.confirmationCert?.date || {}), era: e.target.value } 
+                          })}
+                        />
+
+                        <input
+                          type="text"
+                          className="w-10 text-center text-sm p-1 border rounded text-black bg-white"
+                          value={toFullWidthDigits(b.confirmationCert?.date?.year ?? "")}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { 
+                            ...b.confirmationCert, 
+                            date: { ...(b.confirmationCert?.date || {}), year: toFullWidthDigits(e.target.value) } 
+                          })}
+                        />
+
+                        <input
+                          type="text"
+                          className="w-8 text-center text-sm p-1 border rounded text-black bg-white"
+                          value={toFullWidthDigits(b.confirmationCert?.date?.month ?? "")}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { 
+                            ...b.confirmationCert, 
+                            date: { ...(b.confirmationCert?.date || {}), month: toFullWidthDigits(e.target.value) } 
+                          })}
+                        />
+                        <span className="text-[10px] font-bold text-gray-400">月</span>
+
+                        <input
+                          type="text"
+                          className="w-8 text-center text-sm p-1 border rounded text-black bg-white"
+                          value={toFullWidthDigits(b.confirmationCert?.date?.day ?? "")}
+                          onChange={e => updateBuild(b.id, "confirmationCert", { 
+                            ...b.confirmationCert, 
+                            date: { ...(b.confirmationCert?.date || {}), day: toFullWidthDigits(e.target.value) } 
+                          })}
+                        />
+                        <span className="text-[10px] font-bold text-gray-400">日</span>
+
+                        <button
+                          onClick={() => updateBuild(b.id, "confirmationCert", null)}
+                          className="ml-2 text-[10px] text-red-600 font-bold hover:underline flex items-center gap-1"
+                          title="確認済証情報を削除"
+                        >
+                          <X size={12} /> 削除
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="p-4 bg-white">
+            <div className="flex justify-between items-center mb-3 text-black font-sans font-bold">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Plus size={10} /> 附属建物</h4>
+              <button onClick={() => update({ [dataKey]: buildings.map(x => x.id === b.id ? {...x, annexes: [...(x.annexes||[]), createNewAnnex()]} : x)})} className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-1 transition-all">
+                <Plus size={12} /> 附属追加
+              </button>
+            </div>
+            <div className="space-y-4 text-black">
+              {(b.annexes || []).map(a => (
+                <div key={a.id} className="relative bg-gray-50/50 p-3 rounded-lg border border-dashed border-gray-200 font-sans text-black">
+                  <div className="grid grid-cols-3 lg:grid-cols-4 gap-3 pr-8 text-black">
+                    <FormField label="符号" value={a.symbol} onChange={v => updateAnnex(b.id, a.id, 'symbol', v)} />
+                    <FormField label="種類" value={a.kind} onChange={v => updateAnnex(b.id, a.id, 'kind', v)} />
+                    <FormField label="構造" value={a.struct} onChange={v => updateAnnex(b.id, a.id, 'struct', v)} />
+                    <div className="flex flex-col justify-center text-black font-sans font-bold">
+                      <label className="flex items-center gap-2 cursor-pointer mt-2 text-[9px] font-bold text-gray-500 uppercase tracking-tighter">
+                        <input type="checkbox" className="w-3 h-3 rounded" checked={a.includeBasement} onChange={e => updateAnnex(b.id, a.id, 'includeBasement', e.target.checked)} />地下階も入力
+                      </label>
+                    </div>
+                    {(a.floorAreas || []).map((fa, i) => (<FormField key={fa.id} label={`面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = [...a.floorAreas]; n[i].area = v; updateAnnex(b.id, a.id, 'floorAreas', n); }} />))}
+                  </div>
+                  <button onClick={() => update({ [dataKey]: buildings.map(x => x.id === b.id ? {...x, annexes: x.annexes.filter(z => z.id !== a.id)} : x)})} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-1 transition-colors font-sans font-bold">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const PeopleSection = ({ site, update, contractors = [], openMasterModal }) => {
+  const people = Array.isArray(site?.people) ? site.people : [];
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+
+  const updatePerson = (id, field, val) => { 
+    update({ people: people.map(p => { 
+      if (p.id === id) { 
+        const up = { ...p, [field]: val }; 
+        if (field === "roles") up.role = (val || []).join("、"); 
+        return up; 
+      } 
+      return p; 
+    }) }); 
+  };
+
+  const applyContractorMaster = (pId, masterId) => {
+    const master = (contractors || []).find(c => c.id === masterId);
+    if (!master) return;
+    update({ people: people.map(p => {
+      if (p.id === pId) {
+        return {
+          ...p,
+          contractorMasterId: masterId,
+          address: p.address || master.address,
+          name: p.name || master.tradeName,
+          representative: p.representative || master.representative
+        };
+      }
+      return p;
+    })});
+  };
+
+  const handleAddFromMaster = (master) => {
+    const newP = createNewPerson({
+      roles: ["工事人"],
+      role: "工事人",
+      contractorMasterId: master ? master.id : "",
+      address: master ? master.address : "",
+      name: master ? master.tradeName : "",
+      representative: master ? master.representative : ""
+    });
+    update({ people: [...people, newP] });
+    setIsSelectModalOpen(false);
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300 font-sans text-black">
+      <div className="flex gap-2 font-sans font-bold mb-4 text-black">
+        <button onClick={() => update({ people: [...people, createNewPerson()] })} className="flex-1 text-[10px] bg-purple-600 text-white px-3 py-2.5 rounded-xl font-bold hover:bg-purple-700 active:scale-95 shadow-md flex items-center justify-center gap-2 text-white"><UserPlus size={14} /> 申請人を追加</button>
+        <button onClick={() => setIsSelectModalOpen(true)} className="flex-1 text-[10px] bg-blue-600 text-white px-3 py-2.5 rounded-xl font-bold hover:bg-blue-700 active:scale-95 shadow-md flex items-center justify-center gap-2 text-white"><Briefcase size={14} /> 工事人を追加</button>
+      </div>
+
+      {(people || []).map((p) => {
+        const isContractor = (p.roles || []).includes("工事人");
+        return (
+          <div key={p.id} className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm relative group flex gap-4 items-start hover:shadow-md transition-all text-black font-sans text-black">
+            <div className={`p-2 rounded-lg shrink-0 ${isContractor ? "bg-blue-50 text-blue-400" : "bg-purple-50 text-purple-400"}`}>{isContractor ? <Briefcase size={18} /> : <Users size={18} />}</div>
+            <div className="flex-1 grid grid-cols-1 gap-3 text-black">
+              {isContractor && (
+                <div className="flex items-end gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100 text-black">
+                  <div className="flex-1 text-black">
+                    <label className="block text-[9px] font-black text-blue-500 uppercase mb-1 text-black">工事人マスタ連携</label>
+                    <select 
+                      className="w-full text-xs p-1 bg-white border border-blue-200 rounded outline-none text-black"
+                      value={p.contractorMasterId || ""}
+                      onChange={e => applyContractorMaster(p.id, e.target.value)}
+                    >
+                      <option value="">(未連携・直接入力)</option>
+                      {(contractors || []).map(c => <option key={c.id} value={c.id}>{c.tradeName}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={openMasterModal} className="p-1.5 text-blue-400 hover:text-blue-600 transition-colors" title="マスタ管理を開く">
+                    <Settings2 size={16} />
+                  </button>
+                </div>
+              )}
+
+              <FormField label="住所" value={p.address} onChange={(v) => updatePerson(p.id, "address", v)} />
+              <div className="flex gap-3 text-black">
+                <FormField label="氏名・会社名" value={p.name} onChange={(v) => updatePerson(p.id, "name", v)} />
+                <FormField label="代表者" value={p.representative} onChange={(v) => updatePerson(p.id, "representative", v)} placeholder="法人の場合のみ" />
+              </div>
+              <div className="flex gap-3 items-end text-black">
+                <FormField label="持分" value={p.share} onChange={(v) => updatePerson(p.id, "share", v)} />
+                <div className="flex-1 text-black">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 text-black">役割</label>
+                  <div className="grid grid-cols-2 gap-1 text-black">
+                    {ROLE_OPTIONS.map((r) => {
+                      const checked = (p.roles || []).includes(r);
+                      return (
+                        <label key={r} className={`flex items-center gap-2 p-1 rounded border cursor-pointer text-[9px] ${checked ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-slate-500"}`}>
+                          <input type="checkbox" className="w-3 h-3 text-black" checked={checked} onChange={() => {
+                            const set = new Set(p.roles || []);
+                            if (set.has(r)) set.delete(r); else set.add(r);
+                            updatePerson(p.id, "roles", Array.from(set));
+                          }} /> {r}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button onClick={() => update({ people: people.filter((x) => x.id !== p.id)})} className="text-gray-300 hover:text-red-500 p-1 shrink-0 transition-colors text-black"><Trash2 size={16} /></button>
+          </div>
+        );
+      })}
+
+      <Modal isOpen={isSelectModalOpen} onClose={() => setIsSelectModalOpen(false)} title="工事人を追加" maxWidth="max-w-lg">
+        <div className="space-y-4 text-black text-black">
+          <button 
+            onClick={() => handleAddFromMaster(null)}
+            className="w-full p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all flex justify-between items-center group bg-white shadow-sm text-black"
+          >
+            <div className="text-left text-black">
+              <p className="font-bold text-sm text-slate-800 text-black">工事人マスタから追加しない</p>
+              <p className="text-[10px] text-slate-400 text-black">役割「工事人」のみ設定し、内容は後で入力します。</p>
+            </div>
+            <UserPlus size={18} className="text-slate-400 group-hover:text-slate-600" />
+          </button>
+
+          <div className="relative py-2 text-black">
+            <div className="absolute inset-0 flex items-center text-black"><span className="w-full border-t border-gray-200"></span></div>
+            <div className="relative flex justify-center text-[10px] uppercase text-black"><span className="bg-white px-2 text-slate-400 font-black tracking-widest text-black">or マスタから選択</span></div>
+          </div>
+
+          {(!contractors || contractors.length === 0) ? (
+            <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-black">
+              <p className="text-xs text-gray-500 mb-4 text-black">マスタが登録されていません。</p>
+              <button onClick={() => { setIsSelectModalOpen(false); openMasterModal(); }} className="bg-white border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-[10px] font-bold shadow-sm hover:bg-slate-50 text-black text-black">マスタ管理を開く</button>
+            </div>
+          ) : (
+            <div className="space-y-2 text-black">
+              {contractors.map(c => (
+                <button 
+                  key={c.id} 
+                  onClick={() => handleAddFromMaster(c)}
+                  className="w-full text-left p-4 border border-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-all flex justify-between items-center bg-white shadow-sm group text-black"
+                >
+                  <div className="text-black">
+                    <p className="font-bold text-sm text-slate-800 text-black">{c.tradeName}</p>
+                    <p className="text-[10px] text-slate-500 text-black">{c.address}</p>
+                  </div>
+                  <Plus size={18} className="text-blue-400 group-hover:text-blue-600" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+// ==========================================
+// Section 8: Editor Main Component
+// ==========================================
+
+const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contractors, setContractors, scriveners, setScriveners }) => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('land_reg');
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
+
+  const handlePdfUpload = useCallback((e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    e.target.value = "";
+  }, []);
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newSiteName, setNewSiteName] = useState('');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [siteToDelete, setSiteToDelete] = useState(null);
+
+  const activeSite = sites.find(s => s.id === activeSiteId);
+  
+  const updateActiveSite = useCallback((fields) => { 
+    if (!activeSiteId) return; 
+    setSites(prev => prev.map(s => s.id === activeSiteId ? sanitizeSiteData({ ...s, ...fields }) : s)); 
+  }, [activeSiteId, setSites]);
+
+  const exportToJson = () => { 
+    const data = { schemaVersion: 5, exportedAt: new Date().toISOString(), app: "document-builder-building", activeSiteId, sites };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `survey_docs_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const importFromJson = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (!data || !Array.isArray(data.sites)) throw new Error("JSON形式不正");
+        const sanitized = data.sites.map(sanitizeSiteData);
+        setSites(sanitized); setActiveSiteId(sanitized.find(x => x.id === data.activeSiteId) ? data.activeSiteId : sanitized[0].id);
+      } catch (err) { alert("読込失敗: " + err.message); }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-100 text-gray-900 overflow-hidden font-sans text-black">
+      <aside className="w-64 bg-slate-800 text-white flex flex-col shrink-0 shadow-xl font-sans text-white text-white">
+        <div className="p-4 bg-slate-900 border-b border-slate-700 text-white text-white">
+          <div className="flex items-center justify-between mb-4 text-white text-white text-white text-white text-white">
+            <div className="flex items-center gap-2 text-blue-400 font-bold text-white text-white text-white text-white"><Building size={18} /><h1 className="text-sm truncate text-white text-white">書類作成アプリ</h1></div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-4 text-white text-white">
+            <button onClick={exportToJson} className="flex items-center justify-center gap-1 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-[10px] font-bold border border-slate-600 transition-colors text-white text-white text-white text-white text-white"><Download size={12} /> JSON保存</button>
+            <label className="flex items-center justify-center gap-1 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-[10px] font-bold border border-slate-600 cursor-pointer transition-colors text-white text-white text-white text-white text-white text-white text-white"><Upload size={12} /> JSON読込<input type="file" accept=".json" className="hidden" onChange={importFromJson} /></label>
+          </div>
+          <button onClick={() => setIsMasterModalOpen(true)} className="w-full mb-2 flex items-center justify-center gap-2 py-2 bg-slate-700 hover:bg-slate-600 rounded text-[10px] font-bold border border-slate-600 transition-all text-white text-white text-white text-white text-white"><Settings2 size={14} /> マスタ管理</button>
+          <button onClick={() => { setNewSiteName(''); setIsAddModalOpen(true); }} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold shadow-lg active:scale-95 transition-all text-white text-white text-white text-white text-white text-white"><Plus size={18} /> 新規現場作成</button>
+        </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar text-white text-white">
+          {(sites || []).map(site => (
+            <div key={site.id} onClick={() => setActiveSiteId(site.id)} className={`group px-4 py-4 cursor-pointer border-b border-slate-700/50 flex flex-col gap-1 transition-all relative ${activeSiteId === site.id ? 'bg-blue-600/20 border-l-4 border-l-blue-500' : 'hover:bg-slate-700/50 border-l-4 border-l-transparent'}`}>
+              <div className="flex justify-between items-start text-sm truncate font-bold text-white text-white text-white"><span className={activeSiteId === site.id ? 'text-white' : 'text-slate-300'}>{site.name}</span><button onClick={(e) => { e.stopPropagation(); setSiteToDelete(site); setIsDeleteModalOpen(true); }} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity text-black text-black text-black"><Trash2 size={14} /></button></div>
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-widest text-white text-white text-white text-white">
+                <span className="text-white text-white text-white text-white text-white">{site.land?.length||0}筆 / {site.proposedBuildings?.length||0}物件</span>
+                <button onClick={(e) => { e.stopPropagation(); navigate(`/docs?siteId=${site.id}`); }} className="bg-slate-700 px-2 py-0.5 rounded text-slate-300 hover:text-white transition-colors text-white text-white text-white text-white">作成</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      <div className="flex-1 flex overflow-hidden text-black text-black">
+        <div className="w-1/2 flex flex-col bg-white border-r border-gray-200 text-black text-black text-black text-black">
+          {activeSite ? (
+            <>
+              <div className="bg-white border-b border-gray-200 shadow-sm z-10 px-4 py-1 flex items-center gap-1 overflow-x-auto no-scrollbar font-bold text-black text-black text-black text-black text-black text-black text-black">
+                <TabBtn active={activeTab === 'land_reg'} label="土地情報" onClick={() => setActiveTab('land_reg')} icon={<MapIcon size={14}/>} />
+                <TabBtn active={activeTab === 'build_reg'} label="既登記建物" onClick={() => setActiveTab('build_reg')} icon={<Building size={14}/>} />
+                <TabBtn active={activeTab === 'build_prop'} label="申請建物" onClick={() => setActiveTab('build_prop')} icon={<FileText size={14}/>} />
+                <TabBtn active={activeTab === 'people'} label="関係人" onClick={() => setActiveTab('people')} icon={<Users size={14}/>} />
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30 custom-scrollbar text-black text-black text-black text-black text-black text-black text-black">
+                <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm space-y-4 text-black text-black text-black text-black text-black text-black text-black text-black">
+                  <h3 className="text-gray-700 text-sm font-bold flex items-center gap-2 border-b pb-2 text-black text-black text-black text-black text-black text-black text-black text-black text-black"><Info size={16} className="text-blue-500" /> 案件基本設定</h3>
+                  <div className="grid grid-cols-2 gap-4 text-black text-black text-black text-black text-black text-black text-black text-black">
+                    <div className="flex-1 col-span-2 text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 text-black text-black text-black text-black text-black text-black">連携司法書士</label>
+                      <select className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white text-black text-black text-black text-black text-black text-black text-black text-black text-black" value={activeSite.scrivenerId || ""} onChange={e => updateActiveSite({ scrivenerId: e.target.value })}>
+                        <option value="">(未選択)</option>
+                        {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {activeTab === 'land_reg' && <LandSection site={activeSite} update={updateActiveSite} />}
+                {activeTab === 'build_reg' && <BuildingSection type="registered" site={activeSite} update={updateActiveSite} />}
+                {activeTab === 'build_prop' && <BuildingSection type="proposed" site={activeSite} update={updateActiveSite} />}
+                {activeTab === 'people' && <PeopleSection site={activeSite} update={updateActiveSite} contractors={contractors} openMasterModal={() => setIsMasterModalOpen(true)} />}
+              </div>
+            </>
+          ) : <div className="flex-1 flex items-center justify-center text-gray-400 font-bold italic text-black text-black text-black text-black text-black text-black text-black">案件を選択してください</div>}
+        </div>
+        <div className="w-1/2 bg-gray-200 text-black text-black text-black text-black text-black text-black text-black text-black">
+          <PdfViewer pdfUrl={pdfUrl} onFileChange={handlePdfUpload} />
+        </div>
+      </div>
+
+      <MasterManagerModal isOpen={isMasterModalOpen} onClose={() => setIsMasterModalOpen(false)} contractors={contractors} setContractors={setContractors} scriveners={scriveners} setScriveners={setScriveners} />
+
+      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="新規現場の追加" footer={<><button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-medium text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">キャンセル</button><button onClick={() => { if(!newSiteName.trim()) return; const s = createNewSite(newSiteName); setSites([...sites, s]); setActiveSiteId(s.id); setIsAddModalOpen(false); }} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold text-white text-white text-white text-white text-white text-white text-white text-white text-white">追加</button></>}><input autoFocus type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-black font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black" placeholder="案件名を入力" value={newSiteName} onChange={(e) => setNewSiteName(e.target.value)} onKeyDown={e => e.key === 'Enter' && newSiteName.trim() && (function(){ const s = createNewSite(newSiteName); setSites([...sites, s]); setActiveSiteId(s.id); setIsAddModalOpen(false); })()} /></Modal>
+      <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="現場の削除確認" footer={<><button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 text-sm font-medium text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">キャンセル</button><button onClick={() => { const ns = sites.filter(s => s.id !== siteToDelete.id); setSites(ns); if(activeSiteId === siteToDelete.id) setActiveSiteId(ns[0]?.id || null); setIsDeleteModalOpen(false); }} className="bg-red-500 text-white px-6 py-2 rounded-lg font-bold text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white">削除</button></>}><p className="text-sm font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">「{siteToDelete?.name}」を削除しますか？</p></Modal>
+    </div>
+  );
+};
+
+// ==========================================
+// Section 9: Docs & PDF Previewer
+// ==========================================
+
+const PdfViewer = ({ pdfUrl, onFileChange }) => {
+  const canvasRef = useRef(null);
+  const containerRef = useRef(null);
+  const [pdfDoc, setPdfDoc] = useState(null);
+  const [pageNum, setPageNum] = useState(1);
+  const [numPages, setNumPages] = useState(0);
+  const [zoom, setZoom] = useState(1.0);
+  const [baseFitScale, setBaseFitScale] = useState(1.0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [pdfjsReady, setPdfjsReady] = useState(false);
+
+  useEffect(() => {
+    const loadPdfJs = () => {
+      if (typeof window !== 'undefined' && window.pdfjsLib) { setPdfjsReady(true); return; }
+      const script = document.createElement('script');
+      script.id = 'pdfjs-script'; script.src = PDFJS_CDN;
+      script.onload = () => { if (window.pdfjsLib) { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN; setPdfjsReady(true); } };
+      document.head.appendChild(script);
+    };
+    loadPdfJs();
+  }, []);
+
+  const calculateBaseScale = useCallback(async () => {
+    if (!pdfDoc || !containerRef.current) return;
+    try {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.0 });
+      const containerWidth = containerRef.current.clientWidth - 32;
+      setBaseFitScale(containerWidth / viewport.width);
+    } catch (err) { console.error(err); }
+  }, [pdfDoc, pageNum]);
+
+  useEffect(() => {
+    if (!containerRef.current || !pdfUrl || !pdfDoc) return;
+    const resizeObserver = new ResizeObserver(() => calculateBaseScale());
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [calculateBaseScale, pdfUrl, pdfDoc]);
+
+  useEffect(() => {
+    if (!pdfUrl || !pdfjsReady) { setPdfDoc(null); setNumPages(0); setPageNum(1); return; }
+    const loadDoc = async () => {
+      setLoading(true);
+      try {
+        const pdf = await window.pdfjsLib.getDocument(pdfUrl).promise;
+        setPdfDoc(pdf); setNumPages(pdf.numPages); setPageNum(1); setZoom(1.0);
+      } catch (err) { console.error(err); }
+      setLoading(false);
+    };
+    loadDoc();
+  }, [pdfUrl, pdfjsReady]);
+
+  const handleZoomChange = (newZoom) => {
+    if (!containerRef.current || !pdfUrl) return;
+    setZoom(newZoom);
+  };
+
+  const renderPage = useCallback(async () => {
+    if (!pdfDoc || !canvasRef.current || baseFitScale === 0 || !pdfUrl) return;
+    try {
+      setLoading(true);
+      const page = await pdfDoc.getPage(pageNum);
+      const finalScale = baseFitScale * zoom;
+      const viewport = page.getViewport({ scale: finalScale });
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height; canvas.width = viewport.width;
+      await page.render({ canvasContext: context, viewport: viewport }).promise;
+    } catch (err) { console.error(err); } finally { setLoading(false); }
+  }, [pdfDoc, pageNum, zoom, baseFitScale, pdfUrl]);
+
+  useEffect(() => { renderPage(); }, [renderPage]);
+
+  return (
+    <div className="flex flex-col h-full bg-slate-100 overflow-hidden text-black font-sans text-black text-black text-black">
+      <div className="bg-slate-800 text-white p-2 flex items-center justify-between shadow-lg z-20 text-white text-white text-white text-white text-white text-white">
+        <div className="flex items-center gap-1 text-white text-white text-white text-white text-white text-white text-white">
+          <button disabled={!pdfUrl || pageNum <= 1} onClick={() => setPageNum(p => Math.max(1, p - 1))} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white text-white text-white text-white text-white text-white text-white"><ChevronLeft size={18} /></button>
+          <span className="text-[11px] font-bold w-12 text-center select-none">{pdfUrl ? `${pageNum} / ${numPages}` : "0 / 0"}</span>
+          <button disabled={!pdfUrl || pageNum >= numPages} onClick={() => setPageNum(p => Math.min(numPages, p + 1))} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white text-white text-white text-white text-white text-white text-white"><ChevronRight size={18} /></button>
+        </div>
+        <div className="flex items-center gap-1 border-x border-slate-600 px-2 mx-2 text-white text-white text-white text-white text-white text-white text-white text-white">
+          <button disabled={!pdfUrl} onClick={() => handleZoomChange(Math.max(0.5, zoom - 0.1))} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white text-white text-white text-white text-white text-white text-white"><ZoomOut size={18} /></button>
+          <span className="text-[10px] font-mono w-12 text-center select-none text-white text-white text-white text-white text-white text-white text-white text-white text-white">{pdfUrl ? Math.round(zoom * 100) : 0}%</span>
+          <button disabled={!pdfUrl} onClick={() => handleZoomChange(Math.min(3.0, zoom + 0.1))} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white text-white text-white text-white text-white text-white text-white"><ZoomIn size={18} /></button>
+          <button disabled={!pdfUrl} onClick={() => handleZoomChange(1.0)} className="p-1.5 hover:bg-slate-700 rounded ml-1 disabled:opacity-20 text-white text-white text-white text-white text-white text-white text-white text-white text-white"><Maximize size={16} /></button>
+          <button disabled={!pdfUrl} onClick={() => handleZoomChange(1.0 / baseFitScale)} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white"><RotateCcw size={16} /></button>
+        </div>
+        <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer active:scale-95 transition-all text-white font-bold text-white text-white text-white text-white text-white text-white text-white text-white text-white"><Upload size={14} /> <span>PDF読込</span><input type="file" accept="application/pdf" className="hidden" onChange={onFileChange} /></label>
+      </div>
+      <div ref={containerRef} className="flex-1 overflow-auto bg-slate-200 shadow-inner relative select-none text-black text-black text-black text-black text-black text-black">
+        {pdfUrl ? (
+          <div className="flex min-w-full min-h-full p-4 text-black text-black text-black text-black text-black text-black text-black"><div className="m-auto relative shadow-2xl bg-white text-black text-black text-black text-black text-black text-black text-black text-black text-black"><canvas ref={canvasRef} className="block transition-opacity duration-200 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black" style={{ opacity: loading ? 0.6 : 1 }} /></div></div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-gray-400 p-4 text-center text-black text-black text-black text-black text-black text-black text-black text-black">
+            <div className="p-12 border-4 border-dashed border-gray-300 rounded-[2rem] flex flex-col items-center bg-white shadow-inner max-w-sm w-full text-black text-black text-black text-black text-black text-black text-black text-black">
+              <FileSearch size={64} className="mb-4 opacity-10" />
+              <p className="text-sm font-bold text-gray-500 tracking-tight text-black text-black text-black text-black text-black text-black text-black text-black">PDF プレビュー</p>
+              <p className="text-[10px] mt-2 text-gray-400 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">「PDF読込」から登記情報等を選択してください</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// Section 10: Docs Flow Component
+// ==========================================
+
+const Docs = ({ sites, setSites, contractors, scriveners }) => {
+  const [params] = useSearchParams();
+  const siteId = params.get('siteId');
+  const navigate = useNavigate();
+  const siteData = sites.find(s => s.id === siteId);
+  const [step, setStep] = useState(1);
+  const [activeInstanceKey, setActiveInstanceKey] = useState("");
+
+  const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
+  
+  const DOC_TITLE = "委任状（表題）";
+  const DEFAULT_PICK = {
+    applicantPersonIds: [], // この書類で使用する申請人（未指定/空なら全申請人扱い)
+    showMain: true,
+    showAnnex: true,
+    reg: { ids: [] },
+    prop: { ids: [] },
+    customText: null,
+    stampPositions: null,
+    signerStampPositions: null,
+    printOn: true,
+    targetPropBuildingId: "",
+    targetContractorPersonId: "",
+    targetLandIds: [], // ★追加：委任状（住所変更）で表示する既登記土地（空なら全選択扱い）
+    statementPersonIds: [], // ★追加：申述書（共有/単独）の申述人（空なら全選択扱い）
+    statementApplicantPersonId: "", // ★追加：申述書（単独）の申請人（単独出資者）
+    statementConfirmApplicantPersonId: "" // ★追加：申述書（共有/単独）確認済証記載の建築主名義（建築確認申請者）
+  };
+
+  const allInstances = useMemo(() => {
+    if (!siteData) return [];
+    const docs = siteData.documents || {};
+    const instances = [];
+    const orderedNames = (orderedDocs || []).map(d => d.name);
+    const orderedSet = new Set(orderedNames);
+    (orderedDocs || []).forEach((d) => {
+      const name = d.name;
+      const c = Number(docs?.[name] || 0);
+      if (!name || c <= 0) return;
+      for (let i = 1; i <= c; i++) instances.push({ name, index: i, key: `${name}__${i}`, sources: d.sources || [] });
+    });
+    Object.entries(docs).forEach(([name, count]) => {
+      if (!name || orderedSet.has(name)) return;
+      for (let i = 1; i <= (Number(count) || 0); i++) instances.push({ name, index: i, key: `${name}__${i}`, sources: [] });
+    });
+    return instances;
+  }, [siteData, orderedDocs]);
+
+  const activeInstance = useMemo(
+    () => (allInstances || []).find(i => i.key === activeInstanceKey) || null,
+    [allInstances, activeInstanceKey]
+  );
+
+  const activePick = {
+    ...DEFAULT_PICK,
+    ...(siteData?.docPick?.[activeInstanceKey] || {})
+  };
+
+  useEffect(() => {
+    if (!siteId || !siteData) return;
+
+    setSites(prev => {
+      let changedAny = false;
+      const next = prev.map(s => {
+        if (s.id !== siteId) return s;
+
+        const buildings = naturalSortList(s.proposedBuildings || [], "houseNum");
+        const buildingLimit = buildings.length;
+
+        const apps = { ...(s.applications || {}) };
+        const rawTitleCount = Number(apps["建物表題登記"] || 0);
+        const clampedTitleCount = Math.min(rawTitleCount, buildingLimit);
+
+        if (rawTitleCount !== clampedTitleCount) {
+          apps["建物表題登記"] = clampedTitleCount;
+          changedAny = true;
+        }
+
+        const desiredCount = clampedTitleCount;
+        const docs = { ...(s.documents || {}) };
+        const curCount = Number(docs[DOC_TITLE] || 0);
+        if (curCount !== desiredCount) {
+          docs[DOC_TITLE] = desiredCount;
+          changedAny = true;
+        }
+
+        const pickMap = { ...(s.docPick || {}) };
+        const idAt = (i) => (buildings[i] ? buildings[i].id : "");
+        const isValidId = (id) => !!id && buildings.some(b => b.id === id);
+
+        // --- 1) 委任状（表題）は従来どおり「i番目の建物」を自動セット ---
+        for (let i = 1; i <= desiredCount; i++) {
+          const key = `${DOC_TITLE}__${i}`;
+          const before = pickMap[key];
+          const base = { ...DEFAULT_PICK, ...(before || {}) };
+
+          if (!isValidId(base.targetPropBuildingId)) {
+            base.targetPropBuildingId = idAt(i - 1);
+          }
+
+          const beforeStr = before ? JSON.stringify(before) : "";
+          const afterStr = JSON.stringify(base);
+          if (beforeStr !== afterStr) {
+            pickMap[key] = base;
+            changedAny = true;
+          } else {
+            pickMap[key] = before;
+          }
+        }
+
+        // --- 2) ★追加：申述書（共有/単独）も targetPropBuildingId を白紙回避で自動セット ---
+        const STATEMENT_DOCS = ["申述書（共有）", "申述書（単独）"];
+        const fallbackPropId = idAt(0); // 先頭の申請建物
+
+        for (const docName of STATEMENT_DOCS) {
+          const c = Number(docs?.[docName] || 0);
+          if (c <= 0) continue;
+
+          for (let i = 1; i <= c; i++) {
+            const key = `${docName}__${i}`;
+            const before = pickMap[key];
+            const base = { ...DEFAULT_PICK, ...(before || {}) };
+
+            // 未選択 or 不正なら先頭を入れる（対象建物未選択で白紙になるのを防ぐ）
+            if (!isValidId(base.targetPropBuildingId)) {
+              base.targetPropBuildingId = fallbackPropId || "";
+            }
+
+            const beforeStr = before ? JSON.stringify(before) : "";
+            const afterStr = JSON.stringify(base);
+            if (beforeStr !== afterStr) {
+              pickMap[key] = base;
+              changedAny = true;
+            } else {
+              pickMap[key] = before;
+            }
+          }
+        }
+
+        if (!changedAny) return s;
+
+        return {
+          ...s,
+          applications: stableSortKeys(apps),
+          documents: stableSortKeys(docs),
+          docPick: stableSortKeys(pickMap),
+        };
+      });
+      return changedAny ? next : prev;
+    });
+  }, [siteId, siteData?.proposedBuildings, siteData?.applications, siteData?.documents, siteData?.docPick]);
+
+  useEffect(() => {
+    if (!siteId || !siteData) return;
+    if (step < 2) return;
+    const requiredNames = (orderedDocs || []).filter(d => d.isRequired).map(d => d.name);
+    if (requiredNames.length === 0) return;
+    const currentDocs = siteData.documents || {};
+    const nextDocs = { ...currentDocs };
+    let changed = false;
+    for (const name of requiredNames) {
+      if (name === DOC_TITLE) continue; 
+      const c = Number(nextDocs[name] || 0);
+      if (c < 1) { nextDocs[name] = 1; changed = true; }
+    }
+    if (!changed) return;
+    setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: stableSortKeys(nextDocs) } : s));
+  }, [step, siteId, siteData, orderedDocs, setSites]);
+
+  useEffect(() => {
+    if (step !== 3 || !allInstances.length) return;
+    if (!allInstances.some(i => i.key === activeInstanceKey)) {
+      setActiveInstanceKey(allInstances[0].key);
+    }
+  }, [step, allInstances, activeInstanceKey]);
+
+  const handlePickChange = (instanceKey, patch) => {
+    const current = { 
+      ...DEFAULT_PICK, 
+      ...(siteData?.docPick?.[instanceKey] || {}) 
+    };
+    setSites(prev => prev.map(s => s.id === siteId ? { ...s, docPick: { ...s.docPick, [instanceKey]: { ...current, ...patch } } } : s));
+  };
+
+  const handleStampPosChange = (index, nextDx, nextDy) => {
+    const current = siteData?.docPick?.[activeInstanceKey] || {};
+    const list = Array.isArray(current.stampPositions) ? current.stampPositions : [];
+    const next = list.filter(p => p?.i !== index);
+    next.push({ i: index, dx: nextDx, dy: nextDy });
+    handlePickChange(activeInstanceKey, { stampPositions: next });
+  };
+
+  const handleSignerStampPosChange = (index, nextDx, nextDy) => {
+    const current = siteData?.docPick?.[activeInstanceKey] || {};
+    const list = Array.isArray(current.signerStampPositions) ? current.signerStampPositions : [];
+    const next = list.filter(p => p?.i !== index);
+    next.push({ i: index, dx: nextDx, dy: nextDy });
+    handlePickChange(activeInstanceKey, { signerStampPositions: next });
+  };
+
+  const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
+
+  const printSelectedInNewWindow = () => {
+    const el = document.getElementById("print-area");
+    if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(node => node.outerHTML).join("\n");
+    const extraPrintCss = `<style>@page { size: A4; margin: 0; } html, body { margin: 0; padding: 0; background: white; } .break-before-page { break-before: page; page-break-before: always; } .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }</style>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>印刷</title>${styles}${extraPrintCss}</head><body>${el.innerHTML}</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html); w.document.close();
+    w.onload = () => { setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 500); }, 300); };
+  };
+  // Step3「この書類で使う申請人」UIで参照しているため、Docs側で用意する
+  // ※申述書（共有/単独）では「申請人」or「建築申請人」を候補にしたいので、専用の候補も用意する
+  const applicantsInPeople = useMemo(
+    () => (siteData?.people || []).filter(p => (p.roles || []).includes("申請人")),
+    [siteData?.people]
+  );
+
+  // 申述書用：役割が「申請人」または「建築申請人」の人だけ
+  const statementEligiblePeople = useMemo(
+    () => (siteData?.people || []).filter(p => {
+      const roles = p?.roles || [];
+      return roles.includes("申請人") || roles.includes("建築申請人");
+    }),
+    [siteData?.people]
+  );
+
+  const contractorsInPeople = useMemo(() => (siteData?.people || []).filter(p => (p.roles || []).includes("工事人")), [siteData?.people]);
+
+  if (!siteData) return <div className="h-screen flex items-center justify-center text-black font-bold">案件が見つかりません。</div>;
+
+  return (
+    <div className="h-screen flex flex-col bg-slate-50 text-slate-900 overflow-hidden font-sans text-black">
+      <style>{`
+        .doc-editable[contenteditable="true"]:focus { outline: 1px dashed #60a5fa; outline-offset: 4px; border-radius: 4px; }
+        .stamp-drag-handle { cursor: grab; }
+        .stamp-dragging { cursor: grabbing; border: 1px solid #60a5fa !important; }
+        .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }
+        @media print {
+          .doc-editable[contenteditable="true"], .doc-editable[contenteditable="true"]:focus { outline: none !important; }
+          .stamp-drag-handle, .stamp-dragging { cursor: default !important; border: 0.3mm dotted #666 !important; }
+        }
+      `}</style>
+
+      <div className="hidden text-black"><div id="print-area">
+        {printInstances.map((inst, i) => (
+          <div key={inst.key} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative`}>
+            <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={siteData?.docPick?.[inst.key] || DEFAULT_PICK} isPrint={true} scriveners={scriveners} />
+          </div>
+        ))}
+      </div></div>
+
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-30 text-black text-black">
+        <div className="flex items-center gap-4 text-black text-black text-black">
+          <button onClick={() => navigate('/')} className="p-2 hover:bg-slate-100 rounded-full transition-all text-black text-black text-black text-black"><ArrowLeft size={20}/></button>
+          <div className="text-black text-black text-black"><h1 className="font-bold text-slate-800 leading-tight text-black text-black">{siteData.name}</h1><p className="text-[10px] text-slate-500 uppercase tracking-widest font-black text-black text-black">Document Wizard</p></div>
+        </div>
+        <div className="flex items-center gap-2 font-bold text-black text-black text-black">
+          <StepBadge num={1} label="申請選択" active={step === 1} completed={step > 1} />
+          <div className="w-8 h-px bg-slate-200" /><StepBadge num={2} label="書類選定" active={step === 2} completed={step > 2} />
+          <div className="w-8 h-px bg-slate-200" /><StepBadge num={3} label="書類作成" active={step === 3} />
+        </div>
+        <div className="flex gap-2">
+          {step > 1 && <button onClick={() => setStep(step - 1)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg text-black">戻る</button>}
+          {step < 3 ? <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition-all text-white font-bold text-white">次へ進む</button>
+          : <button onClick={printSelectedInNewWindow} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all font-bold text-white text-white text-white"><Printer size={18} /> 印刷実行</button>}
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto p-8 custom-scrollbar text-black text-black text-black">
+        {step === 1 && (
+          <div className="max-w-3xl mx-auto space-y-4 text-black text-black">
+            <h2 className="text-lg font-black text-slate-800 mb-6 text-black text-black">1. 申請する登記を選択</h2>
+            {APPLICATION_TYPES.map(type => (
+              <CountRow key={type} label={type} count={siteData?.applications?.[type] || 0}
+                onChange={(d) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, applications: { ...s.applications, [type]: Math.max(0, (s.applications[type]||0) + d) } } : s))} />
+            ))}
+          </div>
+        )}
+        
+        {step === 2 && (
+          <div className="max-w-4xl mx-auto space-y-4 font-sans font-bold text-black text-black text-black text-black">
+            <h2 className="text-lg font-black text-slate-800 mb-6 text-black text-black text-black">2. 作成する書類を選定</h2>
+            {orderedDocs.length === 0 ? <p className="p-12 text-center text-gray-400 bg-white border border-dashed rounded-2xl text-black text-black">登記申請を選択してください。</p>
+            : <div className="space-y-3 text-black text-black">{orderedDocs.map(d => (
+                <DocRow key={d.name} name={d.name} count={siteData?.documents?.[d.name] || 0} isRequired={d.isRequired} sources={d.sources}
+                  onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.max(0, (s.documents?.[d.name]||0) + delta) } } : s))} />
+              ))}</div>}
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="h-full flex gap-8 animate-in fade-in zoom-in-95 duration-500 text-black text-black text-black">
+            <div className="w-64 shrink-0 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2 text-black text-black text-black text-black">
+              <div><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-2 text-black text-black text-black">作成書類一覧</h3>
+                <div className="space-y-1.5 text-black text-black text-black text-black text-black">{allInstances.map(inst => {
+                    const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                    return (
+                      <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"} text-black text-black text-black text-black text-black`}>
+                        <div className="flex items-center justify-between text-black text-black text-black text-black"><div className="flex items-center gap-2 min-w-0 font-bold text-black text-black text-black text-black text-black"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px] text-black text-black text-black">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold text-black text-black text-black text-black">#{inst.index}</span></div>
+                      </button>
+                    );
+                  })}</div></div>
+              
+              {activeInstance && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold text-black text-black text-black text-black text-black">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-black text-black text-black text-black">書類設定</h4>
+                  <div className="space-y-2 text-xs text-black text-black text-black text-black text-black text-black text-black text-black"><label className="flex items-center gap-2 text-black text-black text-black text-black text-black text-black"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2 text-black text-black text-black text-black text-black text-black"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
+                  {(() => {
+  const all = applicantsInPeople || [];
+  const cur = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
+  const selecting = cur.length > 0;
+  const curSet = new Set(cur);
+
+  const setSelecting = (on) => {
+    if (!on) {
+      // OFF = 未指定（全員扱い）
+      handlePickChange(activeInstanceKey, { applicantPersonIds: [] });
+      return;
+    }
+    // ONにした直後は「全申請人」を選択状態にしておく（0件なら空）
+    handlePickChange(activeInstanceKey, { applicantPersonIds: all.map(p => p.id) });
+  };
+
+  const toggleOne = (id) => {
+    const nextSet = new Set(curSet);
+    if (nextSet.has(id)) nextSet.delete(id);
+    else nextSet.add(id);
+
+    const next = Array.from(nextSet);
+    if (next.length === 0) return; // 0人は不可（最低1人）
+    handlePickChange(activeInstanceKey, { applicantPersonIds: next });
+  };
+
+  return (
+    <div className="border-t pt-4 text-black">
+      <label className="block text-[10px] font-bold text-gray-500 mb-2">
+        この書類で使う申請人
+      </label>
+
+      {all.length === 0 ? (
+        <p className="text-[10px] text-slate-400">申請人が登録されていません。</p>
+      ) : (
+        <>
+          <label className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+            <input
+              type="checkbox"
+              className="w-3 h-3 rounded"
+              checked={selecting}
+              onChange={(e) => setSelecting(e.target.checked)}
+            />
+            申請人を指定する（OFFなら全員）
+          </label>
+
+          {selecting && (
+            <div className="mt-2 grid grid-cols-1 gap-1">
+              {all.map((p) => (
+                <label
+                  key={p.id}
+                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                    curSet.has(p.id)
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                      : "bg-white border-slate-200 text-slate-500"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="w-3 h-3 rounded"
+                    checked={curSet.has(p.id)}
+                    onChange={() => toggleOne(p.id)}
+                  />
+                  <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                </label>
+              ))}
+              <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+})()}
+
+                  {activeInstance.name === "委任状（表題）" && (
+                    <div className="border-t pt-4 text-black text-black text-black text-black">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 text-black text-black">予定家屋番号選択</label>
+                      <select
+                        className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white text-black text-black text-black text-black"
+                        value={activePick.targetPropBuildingId || ""}
+                        onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                      >
+                        <option value="">(未選択)</option>
+                        {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
+                          <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）") && (
+                    <div className="border-t pt-4 text-black">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetPropBuildingId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                          >
+                            <option value="">(未選択)</option>
+                            {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
+                              <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {activeInstance.name === "申述書（単独）" && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                              申請人（単独出資者）
+                            </label>
+                            <select
+                              className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                              value={activePick.statementApplicantPersonId || ""}
+                              onChange={e => handlePickChange(activeInstanceKey, { statementApplicantPersonId: e.target.value })}
+                            >
+                              <option value="">(未選択)</option>
+                              {(applicantsInPeople || []).map(p => (
+                                <option key={p.id} value={p.id}>{p.name || "(氏名未入力)"}</option>
+                              ))}
+                            </select>
+                            <p className="text-[9px] text-slate-400 mt-1">※未選択の場合、文中は「［申請人］」表示になります</p>
+                          </div>
+                        )}
+
+                        {(() => {
+                          let candidates = (siteData?.people || []).filter(p =>
+                            (p.roles || []).includes("建築申請人")
+                          );
+
+                          // 建築申請人が0人なら、申請人にフォールバック
+                          if (candidates.length === 0) {
+                            candidates = (siteData?.people || []).filter(p =>
+                              (p.roles || []).includes("申請人")
+                            );
+                          }
+
+                          if (candidates.length === 0) {
+                            return <p className="text-[10px] text-slate-400">「建築申請人」かつ「申請人」の人が登録されていません。</p>;
+                          }
+
+                          // ★空なら全選択扱い
+                          const cur = Array.isArray(activePick.statementPersonIds) ? activePick.statementPersonIds : [];
+                          const selecting = cur.length > 0;
+                          const curSet = new Set(cur);
+
+                          const setSelecting = (on) => {
+                            if (!on) {
+                              handlePickChange(activeInstanceKey, { statementPersonIds: [] }); // OFF＝全員扱い
+                              return;
+                            }
+                            handlePickChange(activeInstanceKey, { statementPersonIds: candidates.map(p => p.id) });
+                          };
+
+                          const toggleOne = (id) => {
+                            const base = new Set(selecting ? cur : candidates.map(p => p.id));
+                            if (base.has(id)) base.delete(id);
+                            else base.add(id);
+                            if (base.size === 0) return; // 0人不可（押印0を避ける）
+                            handlePickChange(activeInstanceKey, { statementPersonIds: Array.from(base) });
+                          };
+
+                          const setAll = () => handlePickChange(activeInstanceKey, { statementPersonIds: [] }); // 全員扱いに戻す
+
+                          const effectiveSet = new Set(selecting ? cur : candidates.map(p => p.id));
+
+                          return (
+                            <div className="mt-1">
+                              <label className="block text-[10px] font-bold text-gray-500 mb-2">
+                                申述人（署名・押印する人）
+                              </label>
+
+                              <label className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  className="w-3 h-3 rounded"
+                                  checked={selecting}
+                                  onChange={(e) => setSelecting(e.target.checked)}
+                                />
+                                申述人を指定する（OFFなら全員）
+                              </label>
+
+                              {candidates.length >= 2 && (
+                                <button
+                                  type="button"
+                                  onClick={setAll}
+                                  className="mt-2 w-full py-1.5 text-[9px] font-bold rounded bg-slate-100 hover:bg-slate-200"
+                                >
+                                  全て選択に戻す
+                                </button>
+                              )}
+
+                              <div className="mt-2 grid grid-cols-1 gap-1">
+                                {candidates.map((p) => (
+                                  <label
+                                    key={p.id}
+                                    className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                      effectiveSet.has(p.id)
+                                        ? "bg-blue-50 border-blue-200 text-blue-700"
+                                        : "bg-white border-slate-200 text-slate-500"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="w-3 h-3 rounded"
+                                      checked={effectiveSet.has(p.id)}
+                                      onChange={() => toggleOne(p.id)}
+                                    />
+                                    <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                  </label>
+                                ))}
+                                <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeInstance.name === "委任状（住所変更）" && (
+                    <div className="border-t pt-4 text-black">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-2">
+                        表示する地番（複数選択可）
+                      </label>
+
+                      {(() => {
+                        const all = naturalSortList(siteData.land || [], "lotNumber");
+                        if (all.length === 0) {
+                          return <p className="text-[10px] text-slate-400">既登記土地情報が登録されていません。</p>;
+                        }
+
+                        // ★空なら全選択扱い（初期状態が全選択になる）
+                        const cur = Array.isArray(activePick.targetLandIds) ? activePick.targetLandIds : [];
+                        const curSet = new Set(cur.length ? cur : all.map(l => l.id));
+
+                        const toggleOne = (id) => {
+                          const base = new Set(cur.length ? cur : all.map(l => l.id));
+                          if (base.has(id)) base.delete(id);
+                          else base.add(id);
+                          if (base.size === 0) return; // 0件は不可（空表示を避ける）
+                          handlePickChange(activeInstanceKey, { targetLandIds: Array.from(base) });
+                        };
+
+                        const setAll = () => handlePickChange(activeInstanceKey, { targetLandIds: [] }); // 空＝全選択扱いに戻す
+
+                        return (
+                          <>
+                            {all.length >= 2 && (
+                              <button
+                                type="button"
+                                onClick={setAll}
+                                className="mb-2 w-full py-1.5 text-[9px] font-bold rounded bg-slate-100 hover:bg-slate-200"
+                              >
+                                全て選択に戻す
+                              </button>
+                            )}
+
+                            <div className="grid grid-cols-1 gap-1">
+                              {all.map((l) => (
+                                <label
+                                  key={l.id}
+                                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                    curSet.has(l.id)
+                                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                                      : "bg-white border-slate-200 text-slate-500"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="w-3 h-3 rounded"
+                                    checked={curSet.has(l.id)}
+                                    onChange={() => toggleOne(l.id)}
+                                  />
+                                  <span className="truncate">
+                                    {l.lotNumber || "(地番未入力)"}{l.address ? `　${l.address}` : ""}
+                                  </span>
+                                </label>
+                              ))}
+                              <p className="text-[9px] text-slate-400 mt-1">※少なくとも1つは選択してください</p>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+
+                  {activeInstance.name === "工事完了引渡証明書（表題）" && (
+                    <div className="border-t pt-4 text-black text-black text-black text-black">
+                      <div className="space-y-3 text-black text-black text-black text-black">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1 text-black text-black text-black">工事人を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white text-black text-black text-black text-black"
+                            value={activePick.targetContractorPersonId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetContractorPersonId: e.target.value })}
+                          >
+                            <option value="">(未選択・最初の工事人)</option>
+                            {(contractorsInPeople || []).map(p => (
+                              <option key={p.id} value={p.id}>{p.name || "(名前未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1 text-black text-black text-black text-black">対象建物選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white text-black text-black text-black text-black"
+                            value={activePick.targetPropBuildingId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                          >
+                            <option value="">(未選択)</option>
+                            {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
+                              <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-2 space-y-2 font-sans font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black"><button onClick={() => handlePickChange(activeInstanceKey, { customText: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black"><ResetIcon size={12} /> 文言をリセット</button><button onClick={() => handlePickChange(activeInstanceKey, { stampPositions: null, signerStampPositions: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black"><ResetIcon size={12} /> 位置をリセット</button></div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scrollbar bg-slate-200 shadow-inner rounded-xl text-black text-black text-black text-black text-black text-black text-black">
+              {activeInstance ? (
+                <div className="p-10 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+                  <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+                    <DocTemplate name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
+                       instanceKey={activeInstanceKey} 
+                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} />
+                  </div>
+                </div>
+              ) : <div className="flex items-center text-slate-400 italic h-full font-bold text-black text-black text-black text-black text-black text-black text-black">書類を選択してください</div>}
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+// ==========================================
+// Section 11: Document Templates & Helpers
+// ==========================================
+
+const getSelectedContractor = (siteData, contractors) => (contractors || []).find(c => c.id === siteData.contractorId) || null;
+const getSelectedScrivener = (siteData, scriveners) => (scriveners || []).find(s => s.id === siteData.scrivenerId) || null;
+const formatWareki = (d) => {
+  if (!d) return "　";
+  if (d.unknown) return "不詳";
+
+  const era = d.era || "令和";
+
+  const zenOrBlank = (v) => {
+    const s = (v ?? "").toString().trim();
+    return s ? toFullWidthDigits(s) : "　";
+  };
+
+  const y = zenOrBlank(d.year);
+  const m = zenOrBlank(d.month);
+  const day = zenOrBlank(d.day);
+
+  return `${era}${y}年${m}月${day}日`;
+};
+
+const DocTemplate = ({ name, siteData, instanceKey, pick, onPickChange, onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex,scriveners }) => {
+const allApplicants = useMemo(
+  () => (siteData.people || []).filter(p => (p.roles || []).includes("申請人")),
+  [siteData.people]
+);
+
+const applicants = useMemo(() => {
+  const ids = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
+  if (!ids.length) return allApplicants; // 未指定は全員
+  const set = new Set(ids);
+  const filtered = allApplicants.filter(p => set.has(p.id));
+  return filtered.length ? filtered : allApplicants; // 念のため空なら全員に戻す
+}, [allApplicants, pick?.applicantPersonIds]);
+
+// ★申述人候補：まず「建築申請人」、いなければ「申請人」にフォールバック
+const statementCandidates = useMemo(() => {
+  const people = siteData.people || [];
+
+  const buildingApplicants = people.filter(
+    (p) => (p.roles || []).includes("建築申請人")
+  );
+  if (buildingApplicants.length) return buildingApplicants;
+
+  const applicants = people.filter(
+    (p) => (p.roles || []).includes("申請人")
+  );
+  return applicants;
+}, [siteData.people]);
+
+// ★追加：申述人（空なら全員扱い）
+const statementPeople = useMemo(() => {
+  const ids = Array.isArray(pick?.statementPersonIds) ? pick.statementPersonIds : [];
+  if (!ids.length) return statementCandidates; // 空＝全員
+  const set = new Set(ids);
+  const filtered = statementCandidates.filter((p) => set.has(p.id));
+  return filtered.length ? filtered : statementCandidates; // 念のため空なら全員に戻す
+}, [statementCandidates, pick?.statementPersonIds]);
+
+const linkedScrivener = useMemo(
+  () => getSelectedScrivener(siteData, scriveners),
+  [siteData?.scrivenerId, scriveners]
+);
+
+// 「住所」「氏名」の2行を必ず返す（未選択なら2行空白）
+const getLinkedScrivenerLines = () => {
+  if (!linkedScrivener) return ["　", "　"];
+  return [linkedScrivener.address || "　", linkedScrivener.name || "　"];
+};
+
+// ★追加：委任状（保存）・委任状（住所変更）のときだけ右上に司法書士を出す
+const useLinkedScrivenerOnTopRight =
+  name === "委任状（保存）" || name === "委任状（住所変更）";
+
+const [linkedScrivenerAddrLine, linkedScrivenerNameLine] = getLinkedScrivenerLines();
+
+
+  // ★委任状（保存）は「附属建物」を出力しない（常に非表示）
+  if (name === "委任状（保存）") {
+    const p = pick || {};
+    pick = { ...p, showAnnex: false };
+  }
+
+  // 申請人が複数なら持分も表示 / 申請人1行表示 は、上で定義済みのものを使う
+  // （ここで再宣言すると "has already been declared" でビルドが落ちるため削除）
+
+  // 委任者印（ドラッグ位置）取得：{i,dx,dy} 形式に対応
+  const getSignerPos = (idx) => {
+    const list = Array.isArray(pick?.signerStampPositions) ? pick.signerStampPositions : [];
+    const hit = list.find(p => p?.i === idx);
+    return { dx: hit?.dx || 0, dy: hit?.dy || 0 };
+  };
+
+
+  const sortedProp = useMemo(() => naturalSortList(siteData.proposedBuildings || [], 'houseNum'), [siteData.proposedBuildings]);
+
+  // ★追加：既登記土地（地番順）
+  const sortedLand = useMemo(() => naturalSortList(siteData.land || [], "lotNumber"), [siteData.land]);
+
+  // ★追加：委任状（住所変更）で表示する土地（空なら全選択扱い）
+  const selectedLand = useMemo(() => {
+    const all = sortedLand || [];
+    const ids = Array.isArray(pick?.targetLandIds) ? pick.targetLandIds : [];
+    if (!ids.length) return all;
+    const set = new Set(ids);
+    const filtered = all.filter(l => set.has(l.id));
+    return filtered.length ? filtered : all;
+  }, [sortedLand, pick?.targetLandIds]);
+
+    // 今日の和暦（年だけ使う：工事完了引渡証明書（表題）と同形式にする）
+  const getWarekiNow = () => {
+    const y = new Date().getFullYear();
+    if (y >= 2019) return { era: "令和", year: String(y - 2018) };
+    if (y >= 1989) return { era: "平成", year: String(y - 1988) };
+    if (y >= 1926) return { era: "昭和", year: String(y - 1925) };
+    if (y >= 1912) return { era: "大正", year: String(y - 1911) };
+    if (y >= 1868) return { era: "明治", year: String(y - 1867) };
+    return { era: "", year: String(y) };
+  };
+
+  // 工事完了引渡証明書（表題）の「令和　8年　　月　　日」と完全に同じ形
+  const formatTodayDateBlock = () => {
+    const w = getWarekiNow();
+    return toFullWidthDigits(`${w.era}${w.year}年　　月　　日`);
+  };
+
+  const formatDateBlock = (d) => {
+    if (!d) return "令和年　　月　　日";
+    if (d.unknown) return "不詳";
+
+    // あり得る空白を全部削除（半角/全角/改行/ノーブレーク/ゼロ幅系）
+    const stripWS = (s) =>
+     (s ?? "")
+        .toString()
+        .replace(/[\s\u3000\u00A0\u2000-\u200B\u202F\u205F\uFEFF]/g, "");
+
+  const era = stripWS(d.era);
+  const year = stripWS(d.year);
+
+  // 年が空なら従来の空欄（全角スペース）に戻す
+  const y = year || "　";
+
+  return toFullWidthDigits(`${era}${y}年　　月　　日`);
+  };
+
+
+  const floorLine = (floorAreas) => {
+    // 委任状（保存）は床面積を表示しない
+    if (name === "委任状（保存）") return "";
+    const arr = Array.isArray(floorAreas) ? floorAreas : [];
+    const t = arr.map(fa => `${fa.floor} ${fa.area || "　"}㎡`).join("  ");
+    return t || "　";
+  };
+
+  const stripAllWS = (s) =>
+    (s ?? "").toString().replace(/[\s\u3000\u00A0\u2000-\u200B\u202F\u205F\uFEFF]/g, "");
+
+  // 符号プレフィックス：
+  // - 空なら ""（スペースも付けない）
+  // - "主" なら "主　　"
+  // - それ以外は "符" を付けて "符X　　"（すでに"符"で始まるなら二重にしない）
+  const formatSymbolPrefix = (rawSymbol) => {
+    const sym = stripAllWS(rawSymbol);
+    if (!sym) return "";
+    if (sym === "主") return `主　　`;
+    if (sym.startsWith("符")) return `${sym}　　`;
+    return `符${sym}　　`;
+  };
+
+  // 主建物の符号：明示入力があればそれ、なければ附属建物がある場合のみ "主"
+  const getMainSymbolPrefix = (b) => {
+    const explicit = stripAllWS(b?.symbol);
+    const sym = explicit || (((b?.annexes || []).length > 0) ? "主" : "");
+    return formatSymbolPrefix(sym);
+  };
+
+  // 床面積：各階ごとにスペース（全角）で区切る
+  const floorLineInline = (floorAreas) => {
+    const arr = Array.isArray(floorAreas) ? floorAreas : [];
+    const t = arr.map(fa => `${fa.floor} ${fa.area || "　"}㎡`).join("　");
+    return t || "　";
+  };
+
+  // 1行組み立て：符号（必要時のみ）＋種類＋構造＋床面積
+  const buildKindStructAreaLine = (symbolPrefix, kind, struct, floorAreas) => {
+    // ★委任状（保存）だけ「種類」「構造」「床面積」を出さない
+    if (name === "委任状（保存）") {
+      const sym = symbolPrefix || "";
+      // 符号が空なら空欄（全角スペース）にする
+      return sym ? `${sym}` : "　";
+    }
+    const k = kind || "　";
+    const st = struct || "　";
+    const areas = floorLineInline(floorAreas);
+    return `${symbolPrefix}${k}　${st}　${areas}`;
+  };
+
+  // 表題用：主建物（所在・家屋番号は従来どおり、種類/構造/床面積を1行化）
+  const renderMainValuesInline = (b, { showHouseNum } = { showHouseNum: true }) => {
+    if (!b) return null;
+    const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div>{b.address || "　"}</div>
+          {showHouseNum && b.houseNum ? (
+            <div style={{ fontWeight: 'bold' }}>
+              {name === "委任状（保存）" ? `家屋番号　${b.houseNum}　の建物` : b.houseNum}
+            </div>
+          ) : null}
+        <div>{line}</div>
+      </div>
+    );
+  };
+
+  // 表題用：附属建物（1行化：符号/種類/構造/床面積）
+  const renderAnnexValuesInline = (a) => {
+    if (!a) return null;
+    const line = buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+        <div>{line}</div>
+      </div>
+    );
+  };
+
+    // 附属建物表示：太字なし版（共通スコープに置く）
+  const renderAnnexValuesPlain = (a) => renderAnnexValuesInline(a);
+
+
+  // 値だけの表示（項目ラベルなし）
+  const renderMainValues = (b, { showHouseNum } = { showHouseNum: true }) => {
+    if (!b) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div>{b.address || "　"}</div>
+        {showHouseNum && b.houseNum ? (
+          <div style={{ fontWeight: 'bold' }}>
+            {name === "委任状（保存）" ? `家屋番号 ${b.houseNum}の建物` : b.houseNum}
+          </div>
+        ) : null}
+
+        {/* ★委任状（保存）は種類・構造を表示しない */}
+        {name === "委任状（保存）" ? null : (
+          <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}</div>
+        )}
+
+        <div>{floorLine(b.floorAreas)}</div>
+      </div>
+    );
+  };
+
+  const renderAnnexValues = (a) => {
+    if (!a) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+        <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
+
+        {/* ★委任状（保存）は種類・構造を表示しない（念のため） */}
+        {name === "委任状（保存）" ? null : (
+          <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}</div>
+        )}
+
+        <div>{floorLine(a.floorAreas)}</div>
+      </div>
+    );
+  };
+
+  const renderReasonLine = (b) => {
+    if (!b) return "　";
+    const hn = b.houseNum ? `${b.houseNum} ` : "";
+    const cause = b.registrationCause || "　";
+    const date = formatWareki(b.registrationDate);
+    return `${hn}${cause}　${date}`;
+  };
+
+  const targetContractor = useMemo(() => {
+    const list = (siteData?.people || []).filter(p => (p.roles || []).includes("工事人"));
+    if (pick.targetContractorPersonId) {
+      return list.find(p => p.id === pick.targetContractorPersonId) || list[0] || null;
+    }
+    return list[0] || null;
+  }, [siteData.people, pick.targetContractorPersonId]);
+
+  const targetProp = useMemo(() => {
+    if (!pick.targetPropBuildingId) return sortedProp[0] || null;
+    return sortedProp.find(b => b.id === pick.targetPropBuildingId) || sortedProp[0] || null;
+  }, [sortedProp, pick.targetPropBuildingId]);
+
+  const hasMultipleApplicants = (applicants || []).length >= 2;
+
+  // 所有者（申請人）行：住所・持分・氏名を同一行に。
+  // 申請人が1人だけなら持分は出さない。
+  const formatApplicantLine = (p) => {
+    const parts = [];
+    parts.push(p?.address || "　");
+    if (hasMultipleApplicants) parts.push(p?.share || "　");
+    parts.push(p?.name || "　");
+    return parts.join("　");
+  };
+
+
+  // ---- 工事完了引渡証明書（表題） ----
+  if (name === "工事完了引渡証明書（表題）") {
+    if (!targetProp) return <div className="p-10 text-center font-bold text-black">申請建物データがありません</div>;
+    const currentYearReiwa = String(new Date().getFullYear() - 2018);
+    // ---- ここから追記 ----
+
+    // 附属建物表示：太字なし版（符号も太字にしない）
+    const renderAnnexValuesPlain = (a) => {
+      return renderAnnexValuesInline(a);
+    };
+
+    // ---- 追記ここまで ----
+
+    return (
+        <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}>
+        <div className="stamp-area">
+          {(applicants || []).map((_, i) => {
+            const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })}
+        </div>
+
+        <h1 style={{ fontSize: '20pt', fontWeight: 'bold', textAlign: 'center', marginBottom: '10mm' }}>
+          工事完了引渡証明書
+        </h1>
+
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          {/* 見出しは残す */}
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+                        {(pick.showMain ?? true) && renderMainValuesInline(targetProp, { showHouseNum: false })}
+            {(pick.showAnnex ?? true) && (targetProp.annexes || []).map(a => (
+              <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+            ))}
+
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate)}　{targetProp.registrationCause || "　"}</p>
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            {(applicants || []).map(p => (
+              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {formatApplicantLine(p)}
+              </p>
+              ))}
+
+          </div>
+
+          <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
+            上記のとおり工事を完了して引渡したものであることを証明します。
+          </p>
+
+          <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
+            <p>令和{currentYearReiwa}年　　月　　日</p>
+          </div>
+          <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
+
+
+          <div style={{ marginTop: '5mm', position: 'relative' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
+              <div style={{ fontSize: '12pt' }}>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+              </div>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
+            </div>
+          </div>
+        </EditableDocBody>
+      </div>
+    );
+  }
+
+  // ---- 委任状系（書類ごとにテンプレ分割） ----
+  const getLegacyWorkText = () => {
+    // 既存の挙動をそのまま維持（ここは後で各テンプレで変えていける）
+    return (siteData?.name || "").includes("登記") ? siteData.name : "建物表題登記";
+  };
+
+  const renderDelegationCommon = ({
+    docNoBold = false,
+    workText,
+    buildingTitle = "建物の表示",
+    buildingBlock,
+    dateBlock,
+    topRightBlock,
+  }) => {
+    return (
+    <div
+      className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold"
+      style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}
+    >
+
+        <div className="stamp-area">
+          {(applicants || []).map((_, i) => {
+            const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })}
+        </div>
+
+        <h1
+          style={{
+            fontSize: '24pt',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            letterSpacing: '10mm',
+            margin: '0',
+            position: 'absolute',
+            left: '0',
+            right: '0',
+            top: '40mm'
+          }}
+        >
+          委任状
+        </h1>
+
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+          <EditableDocBody
+            editable={!isPrint}
+            customHtml={pick.customText}
+            onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+          >
+            <div style={{ textAlign: 'right', fontSize: '11pt', marginTop: '36mm', marginBottom: '5mm' }}>
+              {topRightBlock ?? (
+                useLinkedScrivenerOnTopRight ? (
+                  <>
+                    <p style={{ margin: '0' }}>{linkedScrivenerAddrLine}</p>
+                    <p style={{ margin: '0' }}>{linkedScrivenerNameLine}</p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷信泰</p>
+                    <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷一真</p>
+                  </>
+                )
+              )}
+            </div>
+
+            {/* 委任文（固定） */}
+            <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
+              {name === "委任状（保存）"
+                ? DEFAULT_DELEGATION_TEXT_SAVE
+                : name === "委任状（住所変更）"
+                  ? DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE
+                  : DEFAULT_DELEGATION_TEXT}
+            </p>
+
+            <div style={{ fontSize: '11pt', marginBottom: '10mm', fontWeight: 'bold' }}>
+              {workText}
+            </div>
+
+            {/* 建物の表示 */}
+            <div style={{ marginTop: '-5mm' }}>
+              <h2 style={{ fontSize: '11pt', margin: '0', fontWeight: 'bold' }}>{buildingTitle}</h2>
+              <div style={{ fontSize: '11pt', marginBottom: '10mm' }}>
+                {buildingBlock}
+              </div>
+            </div>
+
+            {/* 日付ブロック（表題は中身差し替え、その他は現状のまま） */}
+            <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+              {dateBlock ?? formatTodayDateBlock()}
+            </div>
+
+            {/* 見出し：委任者 */}
+            <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
+
+            {/* 申請人ブロック（日付ブロックの下） */}
+            <div style={{ fontSize: '11pt', marginTop: '0mm' }}>
+              {(applicants || []).map((p, i) => {
+                const pos = getSignerPos(i);
+                return (
+                  <div
+                    key={p.id || i}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 26.6mm',
+                      alignItems: 'center',
+                      margin: '0 0 2mm 0'
+                    }}
+                  >
+                    <div>{formatApplicantLine(p)}</div>
+
+                    <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                      <DraggableSignerStamp
+                        index={i}
+                        dx={pos.dx}
+                        dy={pos.dy}
+                        editable={!isPrint}
+                        onChange={onSignerStampPosChange}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </EditableDocBody>
+        </div>
+      </div>
+    );
+  };
+
+  // ---- 各テンプレ（この段階では“分岐だけ”作って、出力は基本そのまま） ----
+
+  // 委任状（表題）
+  const DelegationTitleTemplate = () => {
+    const workText =
+      (targetProp)
+        ? `${formatWareki(targetProp.registrationDate)}${targetProp.registrationCause || ""}したので建物表題登記`
+        : getLegacyWorkText();
+
+    const buildingBlock = targetProp ? (
+      <div style={{ marginBottom: '6mm' }}>
+        {(pick.showMain ?? true) && renderMainValuesInline(targetProp, { showHouseNum: false })}
+        {(pick.showAnnex ?? true) && (targetProp.annexes || []).map(a => (
+          <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+        ))}
+      </div>
+    ) : (
+      <div>　</div>
+    );
+
+    const dateBlock = (
+      <p style={{ margin: '0 0 1mm 0' }}>
+        {formatTodayDateBlock()}
+      </p>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: true,
+      workText,
+      buildingBlock,
+      dateBlock
+    });
+  };
+
+  // 共通（表題以外）の建物ブロック：現状のまま
+  const buildCommonBuildingBlock = () => {
+    return (sortedProp || []).map(b => (
+      <div key={b.id} style={{ marginBottom: '6mm' }}>
+        {(pick.showMain ?? true) && renderMainValues(b, { showHouseNum: true })}
+        {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+          <div key={a.id}>{renderAnnexValues(a)}</div>
+        ))}
+      </div>
+    ));
+  };
+
+  // 共通（表題以外）の日付ブロック：現状のまま（= 今日の和暦ブロック）
+  const buildCommonDateBlock = () => (
+    <>
+      {formatTodayDateBlock()}
+    </>
+  );
+
+const DelegationSaveTemplate = () => {
+    // targetProp がある実装ならそれを優先（未定義でも落ちない）
+    const b = (typeof targetProp !== "undefined" && targetProp) ? targetProp : (sortedProp?.[0] || null);
+
+    const workText = "登記の目的　所有権保存登記";
+
+    const buildingBlock = b ? (
+      <div style={{ marginBottom: '6mm' }}>
+        {(pick.showMain ?? true) && renderMainValues(b, { showHouseNum: true })}
+        {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+          <div key={a.id}>{renderAnnexValues(a)}</div>
+        ))}
+      </div>
+    ) : (
+      <div>　</div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText,
+      buildingBlock,
+      // dateBlock は指定しない（共通の「今日の和暦ブロック」のみ表示）
+    });
+  };
+
+  const DelegationLandCategoryChangeTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  const DelegationLossTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  const DelegationTitleChangeTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  const DelegationAddressChangeTemplate = () => {
+    const workText = (
+      <>
+        <div style={{ whiteSpace: 'pre-wrap' }}>
+             登 記 の 目 的　　　所有権登記名義人住所変更
+        </div>
+        <div>原　　　　　因</div>
+        <div>変更すべき事項</div>
+
+        {/* 空白行を2行追加 */}
+        <div>　</div>
+        <div>　</div>
+      </>
+    );
+
+    // ★住所変更は「建物」ではなく「既登記土地」を表示する（所在・地番・地目・地積を1行化）
+    const landBlock = (selectedLand || []).length ? (
+      <div style={{ marginBottom: '6mm' }}>
+        {(selectedLand || []).map((l, idx) => (
+          <div key={l.id || idx} style={{ marginBottom: '4mm', whiteSpace: 'pre-wrap' }}>
+            <div>
+              {(l.address || "　")}
+              {""}
+              {(l.lotNumber || "　")}
+              {"　"}
+              {(l.category || "　")}
+              {"　"}
+              {`${l.area || "　"}㎡`}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div>　</div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText,
+      buildingTitle: "物件の表示",
+      buildingBlock: landBlock,
+      dateBlock: buildCommonDateBlock(),
+    });
+  };
+
+  const DelegationTitleCorrectionTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  const DelegationMergeTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  const DelegationSplitTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  const DelegationCombineTemplate = () =>
+    renderDelegationCommon({
+      docNoBold: false,
+      workText: getLegacyWorkText(),
+      buildingBlock: buildCommonBuildingBlock(),
+      dateBlock: buildCommonDateBlock(),
+    });
+
+  // テンプレ辞書（書類名→テンプレ）
+  const DELEGATION_TEMPLATES = {
+    "委任状（表題）": DelegationTitleTemplate,
+    "委任状（保存）": DelegationSaveTemplate,
+    "委任状（地目変更）": DelegationLandCategoryChangeTemplate,
+    "委任状（滅失）": DelegationLossTemplate,
+    "委任状（表題部変更）": DelegationTitleChangeTemplate,
+    "委任状（住所変更）": DelegationAddressChangeTemplate,
+    "委任状（表題部更正）": DelegationTitleCorrectionTemplate,
+    "委任状（合併）": DelegationMergeTemplate,
+    "委任状（分割）": DelegationSplitTemplate,
+    "委任状（合体）": DelegationCombineTemplate,
+  };
+
+  // ---- 委任状系の分岐 ----
+  if (DELEGATION_TEMPLATES[name]) {
+    return DELEGATION_TEMPLATES[name]();
+  }
+
+  // ==========================
+  // 申述書系（共有 / 単独）
+  // ==========================
+
+  const renderStatementCommon = ({ titleText, defaultBody }) => {
+    // 申述人が複数なら持分も表示（委任状と同じ見た目ルール）
+    const hasMultipleStatementPeople = (statementPeople || []).length >= 2;
+    const formatStatementLine = (p) => {
+      const parts = [];
+      parts.push(p?.address || "　");
+      if (hasMultipleStatementPeople) parts.push(p?.share || "　");
+      parts.push(p?.name || "　");
+      return parts.join("　");
+    };
+
+    const buildingBlock = targetProp ? (
+      <div style={{ marginBottom: "6mm" }}>
+        {(pick.showMain ?? true) && renderMainValuesInline(targetProp, { showHouseNum: false })}
+        {(pick.showAnnex ?? true) &&
+          (targetProp.annexes || []).map((a) => <div key={a.id}>{renderAnnexValuesPlain(a)}</div>)}
+      </div>
+    ) : (
+      <div>　</div>
+    );
+
+    return (
+      <div
+        className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold"
+        style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}
+      >
+        <h1 style={{ fontSize: "24pt", fontWeight: "bold", textAlign: "center", margin: "0 0 8mm 0" }}>
+          {titleText}
+        </h1>
+
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          <div style={{ textAlign: "right", fontSize: "11pt", margin: "0 0 6mm 0" }}>
+            {formatTodayDateBlock()}
+          </div>
+
+          <h2 style={{ fontSize: "11pt", margin: "0 0 2mm 0", fontWeight: "bold" }}>建物の表示</h2>
+          <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
+
+          {/* 申述本文（初期表示）。編集すると pick.customText に保存されます */}
+          <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
+            {defaultBody}
+          </div>
+
+          <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
+
+          <div style={{ fontSize: "11pt", marginTop: "0mm" }}>
+            {(statementPeople || []).map((p, i) => {
+              const pos = getSignerPos(i);
+              return (
+                <div
+                  key={p.id || i}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 26.6mm",
+                    alignItems: "center",
+                    margin: "0 0 2mm 0",
+                  }}
+                >
+                  <div>{formatStatementLine(p)}</div>
+                  <div style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
+                    <DraggableSignerStamp
+                      index={i}
+                      dx={pos.dx}
+                      dy={pos.dy}
+                      editable={!isPrint}
+                      onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </EditableDocBody>
+      </div>
+    );
+  };
+
+  // ★ここが無いので白紙になっていました：申述書のreturn分岐を追加
+  if (name === "申述書（共有）") {
+    return renderStatementCommon({
+      titleText: "申　述　書",
+      defaultBody: "上記の建物は下記の通りの持分であることを証明します。",
+    });
+  }
+
+  if (name === "申述書（単独）") {
+    const selected = (allApplicants || []).find(p => p.id === (pick?.statementApplicantPersonId || "")) || null;
+    const who = selected?.name || "［申請人］";
+    const body =
+      `上記の建物は${who}が単独で全額出資したものです。\n` +
+      `従って${who}の単独名義での表題登記を申請することに対し異議ありません。`;
+
+    return renderStatementCommon({
+      titleText: "申　述　書",
+      defaultBody: body,
+    });
+  }
+
+  // ★保険：未対応の書類名なら原因が分かる表示にする（白紙回避）
+  return (
+    <div className="p-10 text-center font-bold text-black">
+      未対応の書類テンプレです：{name}
+    </div>
+  );
+};
+
+// ==========================================
+// Section 12: App Core & Root
+// ==========================================
+
+const StepBadge = ({ num, label, active, completed }) => {
+  const base = "flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold transition-all";
+  const cls = active
+    ? "bg-blue-600 text-white border-blue-600 shadow"
+    : completed
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : "bg-white text-slate-500 border-slate-200";
+
+  return (
+    <div className={`${base} ${cls}`}>
+      <span
+        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+          active ? "bg-white/20" : completed ? "bg-emerald-100" : "bg-slate-100"
+        }`}
+      >
+        {completed ? "✓" : num}
+      </span>
+      <span className="leading-none">{label}</span>
+    </div>
+  );
+};
+
+const CountRow = ({ label, count, onChange }) => (
+  <div className={`p-4 rounded-xl border-2 transition-all flex items-center justify-between ${count > 0 ? 'bg-white border-blue-500 shadow-md' : 'bg-white border-slate-100 opacity-60'} text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black`}>
+    <span className="font-bold text-slate-700 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">{label}</span>
+    <div className="flex items-center gap-4 text-black font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+      <button onClick={() => onChange(-1)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 text-slate-500 transition-colors text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black"><Minus size={14}/></button>
+      <span className="w-6 text-center font-mono font-bold text-lg text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">{count}</span>
+      <button onClick={() => onChange(1)} className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center hover:bg-slate-700 text-white shadow-lg transition-colors text-white text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-white text-white text-white text-white text-white"><Plus size={16}/></button>
+    </div>
+  </div>
+);
+
+const DocRow = ({ name, count, isRequired, sources, onChange }) => (
+  <div className={`p-4 rounded-xl border-2 bg-white transition-all flex items-center justify-between ${count > 0 ? 'border-blue-400 shadow-sm' : 'border-slate-100 opacity-60'} text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black`}>
+    <div className="flex-1 text-black font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+      <div className="flex items-center gap-2 mb-1 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+        <span className="font-bold text-slate-800 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">{name}</span>
+        {isRequired && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black uppercase tracking-tighter shadow-sm text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white text-white">Required</span>}
+      </div>
+      <div className="flex flex-wrap gap-1 text-slate-400 font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">{sources.map(s => <span key={s} className="text-[8px] text-slate-400 bg-slate-50 px-1 rounded border border-slate-100 font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">{s}</span>)}</div>
+    </div>
+    <div className="flex items-center gap-4 shrink-0 ml-4 font-bold text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">
+      <button onClick={() => onChange(-1)} className="p-1.5 rounded hover:bg-slate-100 text-slate-400 text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black"><Minus size={16}/></button>
+      <span className="w-4 text-center font-mono font-bold text-sm text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black">{count}</span>
+      <button onClick={() => onChange(1)} className="p-1.5 rounded bg-slate-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95 text-blue-600 font-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black text-black"><Plus size={16}/></button>
+    </div>
+  </div>
+);
+
+// ===== Persistence helpers (localStorage + window.name fallback) =====
+const WINDOW_NAME_STATE_PREFIX = "building_app_state_v1::";
+
+const isLocalStorageAvailable = () => {
+  try {
+    const k = "__ls_test__";
+    window.localStorage.setItem(k, "1");
+    window.localStorage.removeItem(k);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+const readStateFromWindowName = () => {
+  try {
+    const raw = window.name || "";
+    if (!raw.startsWith(WINDOW_NAME_STATE_PREFIX)) return null;
+    const json = raw.slice(WINDOW_NAME_STATE_PREFIX.length);
+    return JSON.parse(json);
+  } catch (e) {
+    return null;
+  }
+};
+
+const writeStateToWindowName = (payload) => {
+  try {
+    window.name = WINDOW_NAME_STATE_PREFIX + JSON.stringify(payload);
+  } catch (e) {}
+};
+
+
+const App = () => {
+  const [sites, setSites] = useState([]);
+
+  const [activeSiteId, setActiveSiteId] = useState(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [contractors, setContractors] = useState([]);
+  const [scriveners, setScriveners] = useState([]);
+  const didInitRef = useRef(false);
+
+  const sanitizeContractors = (list) => {
+    if (!Array.isArray(list)) return [];
+    return list.map(c => ({
+      id: c.id || generateId(),
+      address: c.address || "",
+      tradeName: c.tradeName || c.name || "",
+      representative: c.representative || ""
+    }));
+  };
+
+  const sanitizeScriveners = (list) => {
+    if (!Array.isArray(list)) return [];
+    return list.map(s => ({
+      id: s.id || generateId(),
+      address: s.address || "",
+      name: s.name || ""
+    }));
+  };
+
+  useEffect(() => {
+    const savedC = localStorage.getItem(CONTRACTORS_STORAGE_KEY);
+    const savedS = localStorage.getItem(SCRIVENERS_STORAGE_KEY);
+    if (savedC) { try { setContractors(sanitizeContractors(JSON.parse(savedC))); } catch(e) {} }
+    if (savedS) { try { setScriveners(sanitizeScriveners(JSON.parse(savedS))); } catch(e) {} }
+  }, []);
+
+  useEffect(() => { localStorage.setItem(CONTRACTORS_STORAGE_KEY, JSON.stringify(contractors)); }, [contractors]);
+  useEffect(() => { localStorage.setItem(SCRIVENERS_STORAGE_KEY, JSON.stringify(scriveners)); }, [scriveners]);
+
+useEffect(() => {
+  // まず localStorage を読む
+  try {
+    const saved = localStorage.getItem(APP_STATE_STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      const loadedSites = Array.isArray(data?.sites) ? data.sites.map(sanitizeSiteData) : [];
+      if (loadedSites.length > 0) {
+        setSites(loadedSites);
+        const nextActive =
+          loadedSites.some(s => s.id === data.activeSiteId)
+            ? data.activeSiteId
+            : loadedSites[0].id;
+        setActiveSiteId(nextActive);
+        didInitRef.current = true;
+        setHydrated(true);
+        return;
+      }
+    }
+  } catch (e) {
+    // 破損など → sampleへ
+  }
+
+  // 保存が無い/壊れてる → sample
+  const sample = sanitizeSiteData({
+    name: '令和7年表題登記サンプル案件',
+    proposedBuildings: [{
+      id: 'b1', address: '砺波市中神三丁目71番地2', houseNum: '101番1', kind: '居宅', struct: '木造合金メッキ鋼板ぶき2階建',
+      floorAreas: [{ id: 'f1', floor: '1階', area: '78.66' }, { id: 'f2', floor: '2階', area: '58.32' }], annexes: [],
+      registrationCause: "新築",
+      registrationDate: { era: "令和", year: "7", month: "1", day: "26", unknown: false }
+    }],
+    people: [{ id: 'p1', name: '上島 克之', address: '砺波市中神三丁目71番地', share: '1/1', roles: ["申請人"], role: "申請人" }]
+  });
+
+  setSites([sample]);
+  setActiveSiteId(sample.id);
+  didInitRef.current = true;
+  setHydrated(true);
+}, []);
+
+
+// 復元(hydrated)が完了した後だけ、stateを丸ごと保存する（復元前に空で上書きしない）
+useEffect(() => {
+  // 初期化前に空で上書きしない
+  if (!didInitRef.current) return;
+  if (!Array.isArray(sites) || sites.length === 0) return;
+
+  try {
+    const payload = { activeSiteId, sites };
+    localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn("Failed to persist app state:", e);
+  }
+}, [sites, activeSiteId]);
+
+  return (
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<Editor sites={sites} setSites={setSites} activeSiteId={activeSiteId} setActiveSiteId={setActiveSiteId} contractors={contractors} setContractors={setContractors} scriveners={scriveners} setScriveners={setScriveners} />} />
+          <Route path="/docs" element={<Docs sites={sites} setSites={setSites} contractors={contractors} scriveners={scriveners} />} />
+          <Route path="*" element={<Editor sites={sites} setSites={setSites} activeSiteId={activeSiteId} setActiveSiteId={setActiveSiteId} contractors={contractors} setContractors={setContractors} scriveners={scriveners} setScriveners={setScriveners} />} />
+        </Routes>
+      </HashRouter>
+    </ErrorBoundary>
+  );
+};
+
+export default App;
