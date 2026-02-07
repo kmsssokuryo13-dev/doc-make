@@ -34,7 +34,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     targetLandIds: [],
     statementPersonIds: [],
     statementApplicantPersonId: "",
-    statementConfirmApplicantPersonId: ""
+    statementConfirmApplicantPersonId: "",
+    confirmApplicantPersonIds: []
   };
 
   const allInstances = useMemo(() => {
@@ -337,6 +338,10 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     handlePickChange(activeInstanceKey, { applicantPersonIds: next });
   };
 
+  const isStatement = activeInstance && (activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）");
+
+  if (isStatement) return null;
+
   return (
     <div className="border-t pt-4 text-black">
       <label className="block text-[10px] font-bold text-gray-500 mb-2">
@@ -405,6 +410,56 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                   {(activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）") && (
                     <div className="border-t pt-4 text-black">
                       <div className="space-y-3">
+
+                        {(() => {
+                          const confirmCandidates = (siteData?.people || []).filter(p => {
+                            const roles = p?.roles || [];
+                            return roles.includes("申請人") || roles.includes("建築申請人");
+                          });
+                          const curConfirm = Array.isArray(activePick.confirmApplicantPersonIds) ? activePick.confirmApplicantPersonIds : [];
+                          const defaultIds = new Set(confirmCandidates.filter(p => (p.roles || []).includes("建築申請人")).map(p => p.id));
+                          const effectiveConfirmSet = curConfirm.length > 0 ? new Set(curConfirm) : defaultIds;
+
+                          const toggleConfirm = (id) => {
+                            const base = new Set(curConfirm.length > 0 ? curConfirm : Array.from(defaultIds));
+                            if (base.has(id)) base.delete(id);
+                            else base.add(id);
+                            handlePickChange(activeInstanceKey, { confirmApplicantPersonIds: Array.from(base) });
+                          };
+
+                          return (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-2">
+                                建築確認の申請人
+                              </label>
+                              {confirmCandidates.length === 0 ? (
+                                <p className="text-[10px] text-slate-400">「申請人」または「建築申請人」が登録されていません。</p>
+                              ) : (
+                                <div className="grid grid-cols-1 gap-1">
+                                  {confirmCandidates.map((p) => (
+                                    <label
+                                      key={p.id}
+                                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                        effectiveConfirmSet.has(p.id)
+                                          ? "bg-blue-50 border-blue-200 text-blue-700"
+                                          : "bg-white border-slate-200 text-slate-500"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="w-3 h-3 rounded"
+                                        checked={effectiveConfirmSet.has(p.id)}
+                                        onChange={() => toggleConfirm(p.id)}
+                                      />
+                                      <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <div>
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
                           <select

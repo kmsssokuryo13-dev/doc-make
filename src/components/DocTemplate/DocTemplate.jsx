@@ -636,12 +636,16 @@ export const DocTemplate = ({
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
             <div>確認済証の番号{"\u3000\u3000\u3000\u3000\u3000\u3000\u3000"}{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "\u3000"}</div>
             <div>確認済証記載の建築主名義</div>
-            {((siteData.people || []).filter(p => (p.roles || []).includes("建築申請人")).length > 0)
-              ? (siteData.people || []).filter(p => (p.roles || []).includes("建築申請人")).map(p => (
-                  <div key={p.id} style={{ paddingLeft: "15.2em" }}>{p.name || "\u3000"}</div>
-                ))
-              : <div style={{ paddingLeft: "15.2em" }}>{"\u3000"}</div>
-            }
+            {(() => {
+              const confirmIds = Array.isArray(pick?.confirmApplicantPersonIds) ? pick.confirmApplicantPersonIds : [];
+              const people = siteData.people || [];
+              const selected = confirmIds.length > 0
+                ? people.filter(p => confirmIds.includes(p.id))
+                : people.filter(p => (p.roles || []).includes("建築申請人"));
+              return selected.length > 0
+                ? selected.map(p => <div key={p.id} style={{ paddingLeft: "15.2em" }}>{p.name || "\u3000"}</div>)
+                : <div style={{ paddingLeft: "15.2em" }}>{"\u3000"}</div>;
+            })()}
           </div>
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
