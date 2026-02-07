@@ -633,10 +633,6 @@ export const DocTemplate = ({
           customHtml={pick.customText}
           onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
         >
-          <div style={{ textAlign: "right", fontSize: "11pt", margin: "0 0 6mm 0" }}>
-            {formatTodayDateBlock()}
-          </div>
-
           <h2 style={{ fontSize: "11pt", margin: "0 0 2mm 0", fontWeight: "bold" }}>建物の表示</h2>
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
@@ -657,6 +653,10 @@ export const DocTemplate = ({
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
             {defaultBody}
+          </div>
+
+          <div style={{ textAlign: "right", fontSize: "11pt", margin: "0 0 6mm 0" }}>
+            {formatTodayDateBlock()}
           </div>
 
           <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
