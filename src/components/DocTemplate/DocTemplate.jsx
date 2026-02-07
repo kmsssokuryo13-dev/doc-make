@@ -615,7 +615,7 @@ export const DocTemplate = ({
     return (
       <div
         className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold"
-        style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}
+        style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}
       >
         <div className="stamp-area">
           {(statementPeople || []).map((_, i) => {
@@ -624,16 +624,23 @@ export const DocTemplate = ({
           })}
         </div>
 
-        <h1 style={{ fontSize: "24pt", fontWeight: "bold", textAlign: "center", margin: "0 0 8mm 0" }}>
+        <h1
+          style={{
+            fontSize: '24pt', fontWeight: 'bold', textAlign: 'center',
+            letterSpacing: '10mm', margin: '0', position: 'absolute',
+            left: '0', right: '0', top: '40mm'
+          }}
+        >
           {titleText}
         </h1>
 
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
           onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
         >
-          <h2 style={{ fontSize: "11pt", margin: "0 0 2mm 0", fontWeight: "bold" }}>建物の表示</h2>
+          <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm', marginBottom: '2mm' }}>建物の表示</h2>
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
@@ -684,6 +691,7 @@ export const DocTemplate = ({
             })}
           </div>
         </EditableDocBody>
+      </div>
       </div>
     );
   };
