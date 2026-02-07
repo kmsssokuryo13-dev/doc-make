@@ -512,15 +512,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                           const selecting = cur.length > 0;
                           const curSet = new Set(cur);
 
-                          const setSelecting = (on) => {
-                            if (!on) {
-                              handlePickChange(activeInstanceKey, { statementPersonIds: [] });
-                              return;
-                            }
-                            handlePickChange(activeInstanceKey, { statementPersonIds: candidates.map(p => p.id) });
-                          };
-
-                          const toggleOne = (id) => {
+                          const toggleOne= (id) => {
                             const base = new Set(selecting ? cur : candidates.map(p => p.id));
                             if (base.has(id)) base.delete(id);
                             else base.add(id);
@@ -528,35 +520,13 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                             handlePickChange(activeInstanceKey, { statementPersonIds: Array.from(base) });
                           };
 
-                          const setAll = () => handlePickChange(activeInstanceKey, { statementPersonIds: [] });
-
-                          const effectiveSet = new Set(selecting ? cur : candidates.map(p => p.id));
+                          const effectiveSet= new Set(selecting ? cur : candidates.map(p => p.id));
 
                           return (
                             <div className="mt-1">
                               <label className="block text-[10px] font-bold text-gray-500 mb-2">
                                 申述人（署名・押印する人）
                               </label>
-
-                              <label className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  className="w-3 h-3 rounded"
-                                  checked={selecting}
-                                  onChange={(e) => setSelecting(e.target.checked)}
-                                />
-                                申述人を指定する（OFFなら全員）
-                              </label>
-
-                              {candidates.length >= 2 && (
-                                <button
-                                  type="button"
-                                  onClick={setAll}
-                                  className="mt-2 w-full py-1.5 text-[9px] font-bold rounded bg-slate-100 hover:bg-slate-200"
-                                >
-                                  全て選択に戻す
-                                </button>
-                              )}
 
                               <div className="mt-2 grid grid-cols-1 gap-1">
                                 {candidates.map((p) => (
