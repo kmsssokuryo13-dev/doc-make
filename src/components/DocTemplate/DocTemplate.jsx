@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   toFullWidthDigits, naturalSortList, formatWareki, getSelectedScrivener,
-  formatConfirmationCertLine
+  formatConfirmationCertLine, formatShare
 } from '../../utils.js';
 import {
   DOC_PAGE_PADDING, DEFAULT_DELEGATION_TEXT, DEFAULT_DELEGATION_TEXT_SAVE,
@@ -234,7 +234,7 @@ export const DocTemplate = ({
   const formatApplicantLine = (p) => {
     const parts = [];
     parts.push(p?.address || "　");
-    if (hasMultipleApplicants) parts.push(p?.share || "　");
+    if (hasMultipleApplicants) parts.push(formatShare(p?.share));
     parts.push(p?.name || "　");
     return parts.join("　");
   };
@@ -597,7 +597,7 @@ export const DocTemplate = ({
     const formatStatementLine = (p) => {
       const parts = [];
       parts.push(p?.address || "　");
-      if (hasMultipleStatementPeople) parts.push(p?.share || "　");
+      if (hasMultipleStatementPeople) parts.push(formatShare(p?.share));
       parts.push(p?.name || "　");
       return parts.join("　");
     };

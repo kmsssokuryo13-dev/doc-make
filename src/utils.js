@@ -245,6 +245,23 @@ export const formatConfirmationCertLine = (cc) => {
   return `${no}　${dt}`;
 };
 
+export const formatShare = (share) => {
+  const raw = (share ?? "").toString().trim();
+  if (!raw) return "持分\u3000\u3000分の\u3000\u3000";
+  const hw = toHalfWidth(raw);
+  const slashMatch = hw.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (slashMatch) {
+    const numer = toFullWidthDigits(slashMatch[1]);
+    const denom = toFullWidthDigits(slashMatch[2]);
+    return `持分${denom}分の${numer}`;
+  }
+  const bunnoMatch = raw.match(/^(\S+?)分の(\S+)$/);
+  if (bunnoMatch) {
+    return raw.startsWith("持分") ? raw : `持分${raw}`;
+  }
+  return raw.startsWith("持分") ? raw : `持分${raw}`;
+};
+
 export const getSelectedContractor = (siteData, contractors) => (contractors || []).find(c => c.id === siteData.contractorId) || null;
 export const getSelectedScrivener = (siteData, scriveners) => (scriveners || []).find(s => s.id === siteData.scrivenerId) || null;
 
