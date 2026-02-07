@@ -638,9 +638,9 @@ export const DocTemplate = ({
             <div>確認済証記載の建築主名義</div>
             {((siteData.people || []).filter(p => (p.roles || []).includes("建築申請人")).length > 0)
               ? (siteData.people || []).filter(p => (p.roles || []).includes("建築申請人")).map(p => (
-                  <div key={p.id} style={{ paddingLeft: "17em" }}>{p.name || "\u3000"}</div>
+                  <div key={p.id} style={{ paddingLeft: "15em" }}>{p.name || "\u3000"}</div>
                 ))
-              : <div style={{ paddingLeft: "17em" }}>{"\u3000"}</div>
+              : <div style={{ paddingLeft: "15em" }}>{"\u3000"}</div>
             }
           </div>
 
