@@ -617,6 +617,13 @@ export const DocTemplate = ({
         className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold"
         style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}
       >
+        <div className="stamp-area">
+          {(statementPeople || []).map((_, i) => {
+            const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })}
+        </div>
+
         <h1 style={{ fontSize: "24pt", fontWeight: "bold", textAlign: "center", margin: "0 0 8mm 0" }}>
           {titleText}
         </h1>
