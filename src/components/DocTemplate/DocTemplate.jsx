@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import {
-  toFullWidthDigits, naturalSortList, formatWareki, getSelectedScrivener
+  toFullWidthDigits, naturalSortList, formatWareki, getSelectedScrivener,
+  formatConfirmationCertLine
 } from '../../utils.js';
 import {
   DOC_PAGE_PADDING, DEFAULT_DELEGATION_TEXT, DEFAULT_DELEGATION_TEXT_SAVE,
@@ -631,6 +632,16 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: "11pt", margin: "0 0 2mm 0", fontWeight: "bold" }}>建物の表示</h2>
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
+
+          {targetProp?.confirmationCert && (
+            <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
+              <div>確認済証の番号{"\u3000\u3000\u3000\u3000\u3000\u3000\u3000"}{formatConfirmationCertLine(targetProp.confirmationCert)}</div>
+              <div>確認済証記載の建築主名義</div>
+              {(siteData.people || []).filter(p => (p.roles || []).includes("建築申請人")).map(p => (
+                <div key={p.id}>{p.name || "\u3000"}</div>
+              ))}
+            </div>
+          )}
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
             {defaultBody}
