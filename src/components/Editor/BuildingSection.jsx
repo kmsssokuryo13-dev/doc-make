@@ -124,17 +124,28 @@ export const BuildingSection = ({ type, site, update }) => {
                       <label className="ml-2 flex items-center gap-1 cursor-pointer">
                         <input
                           type="checkbox" className="w-3 h-3 rounded" checked={b.registrationDate?.unknown || false}
-                          onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: e.target.checked })}
+                          onChange={e => {
+                            updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: e.target.checked });
+                            if (e.target.checked) updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                          }}
                         />
                         <span className="text-[10px] font-bold text-slate-500">不詳</span>
                       </label>
-                      <button
-                        onClick={() => updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }])}
-                        className="ml-1 text-[10px] bg-gray-500 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-gray-600 font-bold active:scale-95 shadow-sm"
-                        title="不詳の登記原因を追加"
-                      >
-                        <Plus size={10} /> 不詳
-                      </button>
+                      <label className="ml-1 flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox" className="w-3 h-3 rounded"
+                          checked={(b.additionalCauses || []).some(ac => ac.date?.unknown)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: false });
+                              updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }]);
+                            } else {
+                              updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                            }
+                          }}
+                        />
+                        <span className="text-[10px] font-bold text-slate-500">+不詳</span>
+                      </label>
                       <button
                         onClick={() => updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: createDefaultCauseDate() }])}
                         className="ml-auto text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
@@ -332,16 +343,25 @@ export const BuildingSection = ({ type, site, update }) => {
                             <span className="text-[10px] font-bold text-gray-400">日</span>
                             <label className="ml-2 flex items-center gap-1 cursor-pointer">
                               <input type="checkbox" className="w-3 h-3 rounded" checked={a.registrationDate?.unknown || false}
-                                onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), unknown: e.target.checked })} />
+                                onChange={e => {
+                                  updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), unknown: e.target.checked });
+                                  if (e.target.checked) updateAnnex(b.id, a.id, 'additionalCauses', (a.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                                }} />
                               <span className="text-[10px] font-bold text-slate-500">不詳</span>
                             </label>
-                            <button
-                              onClick={() => updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }])}
-                              className="ml-1 text-[10px] bg-gray-500 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-gray-600 font-bold active:scale-95 shadow-sm"
-                              title="不詳の登記原因を追加"
-                            >
-                              <Plus size={10} /> 不詳
-                            </button>
+                            <label className="ml-1 flex items-center gap-1 cursor-pointer">
+                              <input type="checkbox" className="w-3 h-3 rounded"
+                                checked={(a.additionalCauses || []).some(ac => ac.date?.unknown)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), unknown: false });
+                                    updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }]);
+                                  } else {
+                                    updateAnnex(b.id, a.id, 'additionalCauses', (a.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                                  }
+                                }} />
+                              <span className="text-[10px] font-bold text-slate-500">+不詳</span>
+                            </label>
                             <button
                               onClick={() => updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: createDefaultCauseDate() }])}
                               className="ml-auto text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
