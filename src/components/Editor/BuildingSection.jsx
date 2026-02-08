@@ -129,11 +129,18 @@ export const BuildingSection = ({ type, site, update }) => {
                         <span className="text-[10px] font-bold text-slate-500">不詳</span>
                       </label>
                       <button
+                        onClick={() => updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }])}
+                        className="ml-1 text-[10px] bg-gray-500 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-gray-600 font-bold active:scale-95 shadow-sm"
+                        title="不詳の登記原因を追加"
+                      >
+                        <Plus size={10} /> 不詳
+                      </button>
+                      <button
                         onClick={() => updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: createDefaultCauseDate() }])}
-                        className="ml-2 text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
+                        className="ml-auto text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
                         title="登記原因を追加"
                       >
-                        <Plus size={10} /> 追加
+                        <Plus size={10} /> 原因追加
                       </button>
                     </div>
                   </div>
@@ -329,11 +336,18 @@ export const BuildingSection = ({ type, site, update }) => {
                               <span className="text-[10px] font-bold text-slate-500">不詳</span>
                             </label>
                             <button
+                              onClick={() => updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }])}
+                              className="ml-1 text-[10px] bg-gray-500 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-gray-600 font-bold active:scale-95 shadow-sm"
+                              title="不詳の登記原因を追加"
+                            >
+                              <Plus size={10} /> 不詳
+                            </button>
+                            <button
                               onClick={() => updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: createDefaultCauseDate() }])}
-                              className="ml-2 text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
+                              className="ml-auto text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
                               title="登記原因を追加"
                             >
-                              <Plus size={10} /> 追加
+                              <Plus size={10} /> 原因追加
                             </button>
                           </div>
                         </div>
