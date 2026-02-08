@@ -98,7 +98,7 @@ export const BuildingSection = ({ type, site, update }) => {
                     <div className="flex items-center gap-1 text-black">
                       <select
                         className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                        value={b.registrationDate?.era || "令和"}
+                        value={b.registrationDate?.era ?? "令和"}
                         onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, era: e.target.value })}
                       >
                         {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
@@ -150,8 +150,8 @@ export const BuildingSection = ({ type, site, update }) => {
                       <div className="flex items-center gap-1 text-black">
                         <select
                           className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                          value={ac.date?.era || "令和"}
-                          onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateBuild(b.id, 'additionalCauses', next); }}
+                                                    value={ac.date?.era ?? "令和"}
+                                                    onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateBuild(b.id, 'additionalCauses', next); }}
                         >
                           {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                         </select>
@@ -307,7 +307,7 @@ export const BuildingSection = ({ type, site, update }) => {
                           <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
                           <div className="flex items-center gap-1 text-black">
                             <select className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                              value={a.registrationDate?.era || "令和"}
+                              value={a.registrationDate?.era ?? "令和"}
                               onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), era: e.target.value })}>
                               {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                             </select>
@@ -349,8 +349,8 @@ export const BuildingSection = ({ type, site, update }) => {
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
                             <div className="flex items-center gap-1 text-black">
                               <select className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                                value={ac.date?.era || "令和"}
-                                onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}>
+                                                                value={ac.date?.era ?? "令和"}
+                                                                onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}>
                                 {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                               </select>
                               <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(ac.date?.year || "")} placeholder="年"
