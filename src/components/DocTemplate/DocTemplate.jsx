@@ -496,11 +496,61 @@ export const DocTemplate = ({
     return renderDelegationCommon({ docNoBold: false, workText, buildingBlock });
   };
 
-  const DelegationLandCategoryChangeTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+  const DelegationLandCategoryChangeTemplate = () => {
+    const changedLands = (selectedLand || []).filter(l => l.categoryChangeEnabled);
+    const newCategories = [...new Set(changedLands.map(l => l.newCategory || "").filter(Boolean))];
+    const categoryText = newCategories.join("・") || "　";
+
+    const workText = `${formatTodayDateBlock()}${categoryText}に変更したので土地地目変更登記`;
+
+    const beforeLands = changedLands.length > 0 ? changedLands : (selectedLand || []);
+    const afterLands = changedLands;
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '4mm' }}>
+          {beforeLands.map((l, idx) => (
+            <div key={l.id || idx} style={{ whiteSpace: 'pre-wrap' }}>
+              <div>
+                {(l.address || "　")}
+                {(l.lotNumber || "　")}
+                {"　"}
+                {(l.category || "　")}
+                {"　"}
+                {`${l.area || "　"}㎡`}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {afterLands.length > 0 && (
+          <>
+            <h2 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>変更後の表示</h2>
+            <div style={{ marginBottom: '4mm' }}>
+              {afterLands.map((l, idx) => (
+                <div key={l.id || idx} style={{ whiteSpace: 'pre-wrap' }}>
+                  <div>
+                    {(l.address || "　")}
+                    {(l.lotNumber || "　")}
+                    {"　"}
+                    {(l.newCategory || "　")}
+                    {"　"}
+                    {`${l.newArea || "　"}㎡`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false, workText,
+      buildingTitle: "変更前の表示", buildingBlock,
+      dateBlock: buildCommonDateBlock(),
     });
+  };
 
   const DelegationLossTemplate = () =>
     renderDelegationCommon({

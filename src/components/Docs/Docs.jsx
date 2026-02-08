@@ -315,6 +315,62 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
                   <div className="space-y-2 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
                   {(() => {
+  const isStatement = activeInstance && (activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）");
+  if (isStatement) return null;
+
+  const isLandCategoryChange = activeInstance && activeInstance.name === "委任状（地目変更）";
+
+  if (isLandCategoryChange) {
+    const candidates = (siteData?.people || []).filter(p => {
+      const roles = p?.roles || [];
+      return roles.includes("土地所有者") || roles.includes("申請人");
+    });
+    const cur = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
+    const defaultIds = new Set(candidates.filter(p => (p.roles || []).includes("土地所有者")).map(p => p.id));
+    const effectiveSet = cur.length > 0 ? new Set(cur) : defaultIds;
+
+    const toggleOne = (id) => {
+      const base = new Set(cur.length > 0 ? cur : Array.from(defaultIds));
+      if (base.has(id)) base.delete(id);
+      else base.add(id);
+      if (base.size === 0) return;
+      handlePickChange(activeInstanceKey, { applicantPersonIds: Array.from(base) });
+    };
+
+    return (
+      <div className="border-t pt-4 text-black">
+        <label className="block text-[10px] font-bold text-gray-500 mb-2">
+          この書類で使う申請人
+        </label>
+        {candidates.length === 0 ? (
+          <p className="text-[10px] text-slate-400">「土地所有者」または「申請人」が登録されていません。</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-1">
+            {candidates.map((p) => (
+              <label
+                key={p.id}
+                className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                  effectiveSet.has(p.id)
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-white border-slate-200 text-slate-500"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="w-3 h-3 rounded"
+                  checked={effectiveSet.has(p.id)}
+                  onChange={() => toggleOne(p.id)}
+                />
+                <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
+              </label>
+            ))}
+            <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const all = applicantsInPeople || [];
   const cur = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
   const selecting = cur.length > 0;
@@ -337,10 +393,6 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     if (next.length === 0) return;
     handlePickChange(activeInstanceKey, { applicantPersonIds: next });
   };
-
-  const isStatement = activeInstance && (activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）");
-
-  if (isStatement) return null;
 
   return (
     <div className="border-t pt-4 text-black">
