@@ -662,7 +662,7 @@ export const DocTemplate = ({
             {defaultBody}
           </div>
 
-          <div style={{ textAlign: "right", fontSize: "11pt", margin: "0 0 6mm 0" }}>
+          <div style={{ textAlign: "left", fontSize: "11pt", margin: "0 0 6mm 0" }}>
             {formatTodayDateBlock()}
           </div>
 
