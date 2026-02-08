@@ -95,18 +95,24 @@ export const createNewSite = (name) => ({
   contractorId: "", scrivenerId: ""
 });
 
+export const createDefaultCauseDate = () => ({ era: "令和", year: "", month: "", day: "", unknown: false });
+
 export const createNewBuilding = () => ({
   id: generateId(),
   address: '', symbol: '', houseNum: '', kind: '', struct: '', owner: '',
   floorAreas: [{ id: generateId(), floor: '1階', area: '' }], annexes: [],
   registrationCause: "",
   registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
+  additionalCauses: [],
   confirmationCert: null
 });
 
 export const createNewAnnex = () => ({
   id: generateId(), symbol: '', kind: '', struct: '', includeBasement: false,
-  floorAreas: [{ id: generateId(), floor: '1階', area: '' }]
+  floorAreas: [{ id: generateId(), floor: '1階', area: '' }],
+  registrationCause: "",
+  registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
+  additionalCauses: [],
 });
 
 export const createNewPerson = (patch = {}) => {

@@ -17,6 +17,18 @@ export const sanitizeSiteData = (raw = {}) => {
     newArea: l.newArea ?? "",
   });
 
+  const sanitizeCauseEntry = (c = {}) => ({
+    id: c.id || generateId(),
+    cause: c.cause || "",
+    date: {
+      era: c.date?.era || "令和",
+      year: c.date?.year || "",
+      month: c.date?.month || "",
+      day: c.date?.day || "",
+      unknown: !!c.date?.unknown
+    }
+  });
+
   const sanitizeAnnex = (a = {}) => {
     const struct = a.struct || "";
     const includeBasement = !!a.includeBasement;
@@ -35,6 +47,15 @@ export const sanitizeSiteData = (raw = {}) => {
       struct,
       includeBasement,
       floorAreas,
+      registrationCause: a.registrationCause || "",
+      registrationDate: {
+        era: a.registrationDate?.era || "令和",
+        year: a.registrationDate?.year || "",
+        month: a.registrationDate?.month || "",
+        day: a.registrationDate?.day || "",
+        unknown: !!a.registrationDate?.unknown
+      },
+      additionalCauses: Array.isArray(a.additionalCauses) ? a.additionalCauses.map(sanitizeCauseEntry) : [],
     };
   };
 
@@ -64,6 +85,7 @@ export const sanitizeSiteData = (raw = {}) => {
         day: b.registrationDate?.day || "",
         unknown: !!b.registrationDate?.unknown
       },
+      additionalCauses: Array.isArray(b.additionalCauses) ? b.additionalCauses.map(sanitizeCauseEntry) : [],
       confirmationCert: sanitizeConfirmationCert(b.confirmationCert)
     };
   };
