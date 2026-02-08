@@ -332,17 +332,20 @@ export const DocTemplate = ({
     docNoBold = false,
     workText,
     buildingTitle = "建物の表示",
+    buildingSubTitle,
     buildingBlock,
     dateBlock,
     topRightBlock,
+    signerList,
   }) => {
+    const signers = signerList || applicants || [];
     return (
       <div
         className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold"
         style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}
       >
         <div className="stamp-area">
-          {(applicants || []).map((_, i) => {
+          {signers.map((_, i) => {
             const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
             return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
           })}
@@ -394,6 +397,7 @@ export const DocTemplate = ({
 
             <div style={{ marginTop: '-5mm' }}>
               <h2 style={{ fontSize: '11pt', margin: '0', fontWeight: 'bold' }}>{buildingTitle}</h2>
+              {buildingSubTitle && <h3 style={{ fontSize: '11pt', margin: '2mm 0 0 0', fontWeight: 'bold' }}>{buildingSubTitle}</h3>}
               <div style={{ fontSize: '11pt', marginBottom: '10mm' }}>
                 {buildingBlock}
               </div>
@@ -406,7 +410,7 @@ export const DocTemplate = ({
             <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
 
             <div style={{ fontSize: '11pt', marginTop: '0mm' }}>
-              {(applicants || []).map((p, i) => {
+              {signers.map((p, i) => {
                 const pos = getSignerPos(i);
                 return (
                   <div
@@ -501,7 +505,7 @@ export const DocTemplate = ({
     const newCategories = [...new Set(changedLands.map(l => l.newCategory || "").filter(Boolean))];
     const categoryText = newCategories.join("・") || "　";
 
-    const workText = `${formatTodayDateBlock()}${categoryText}に変更したので土地地目変更登記`;
+    const workText = `${formatWareki(targetProp?.registrationDate)}${categoryText}に変更したので土地地目変更登記`;
 
     const beforeLands = changedLands.length > 0 ? changedLands : (selectedLand || []);
     const afterLands = changedLands;
@@ -525,7 +529,7 @@ export const DocTemplate = ({
 
         {afterLands.length > 0 && (
           <>
-            <h2 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>変更後の表示</h2>
+            <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>変更後</h3>
             <div style={{ marginBottom: '4mm' }}>
               {afterLands.map((l, idx) => (
                 <div key={l.id || idx} style={{ whiteSpace: 'pre-wrap' }}>
@@ -545,10 +549,25 @@ export const DocTemplate = ({
       </div>
     );
 
+    const landCategorySigners = (() => {
+      const allCandidates = (siteData?.people || []).filter(p => {
+        const roles = p?.roles || [];
+        return roles.includes("土地所有者") || roles.includes("申請人");
+      });
+      const ids = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
+      if (!ids.length) {
+        return allCandidates.filter(p => (p.roles || []).includes("土地所有者"));
+      }
+      const set = new Set(ids);
+      const filtered = allCandidates.filter(p => set.has(p.id));
+      return filtered.length ? filtered : allCandidates.filter(p => (p.roles || []).includes("土地所有者"));
+    })();
+
     return renderDelegationCommon({
       docNoBold: false, workText,
-      buildingTitle: "変更前の表示", buildingBlock,
+      buildingTitle: "土地の表示", buildingSubTitle: "変更前", buildingBlock,
       dateBlock: buildCommonDateBlock(),
+      signerList: landCategorySigners,
     });
   };
 
