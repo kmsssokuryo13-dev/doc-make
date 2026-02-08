@@ -12,6 +12,9 @@ export const sanitizeSiteData = (raw = {}) => {
     category: l.category || "",
     area: l.area || "",
     owner: l.owner || "",
+    categoryChangeEnabled: !!l.categoryChangeEnabled,
+    newCategory: l.newCategory ?? "",
+    newArea: l.newArea ?? "",
   });
 
   const sanitizeAnnex = (a = {}) => {
