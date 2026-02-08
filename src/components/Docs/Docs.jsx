@@ -313,7 +313,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
               {activeInstance && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
-                  {activeInstance.name !== "委任状（地目変更）" && (
+                  {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && (
                     <div className="space-y-2 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
                   )}
                   {(() => {
@@ -321,6 +321,87 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   if (isStatement) return null;
 
   const isLandCategoryChange = activeInstance && activeInstance.name === "委任状（地目変更）";
+  const isLoss = activeInstance && activeInstance.name === "委任状（滅失）";
+
+  if (isLoss) {
+    const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const curBldgIds = Array.isArray(activePick.lossBuildingIds) ? activePick.lossBuildingIds : [];
+    const defaultBldgIds = new Set(lossBuildings.map(pb => pb.id));
+    const effectiveBldgSet = curBldgIds.length > 0 ? new Set(curBldgIds) : defaultBldgIds;
+
+    const toggleBldg = (id) => {
+      const base = new Set(curBldgIds.length > 0 ? curBldgIds : Array.from(defaultBldgIds));
+      if (base.has(id)) base.delete(id);
+      else base.add(id);
+      handlePickChange(activeInstanceKey, { lossBuildingIds: Array.from(base) });
+    };
+
+    const candidates = (siteData?.people || []).filter(p => {
+      const roles = p?.roles || [];
+      return roles.includes("建物所有者") || roles.includes("申請人");
+    });
+    const curAppl = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
+    const defaultApplIds = new Set(candidates.filter(p => (p.roles || []).includes("建物所有者")).map(p => p.id));
+    const effectiveApplSet = curAppl.length > 0 ? new Set(curAppl) : defaultApplIds;
+
+    const toggleAppl = (id) => {
+      const base = new Set(curAppl.length > 0 ? curAppl : Array.from(defaultApplIds));
+      if (base.has(id)) base.delete(id);
+      else base.add(id);
+      if (base.size === 0) return;
+      handlePickChange(activeInstanceKey, { applicantPersonIds: Array.from(base) });
+    };
+
+    return (
+      <>
+        <div className="border-t pt-4 text-black">
+          <label className="block text-[10px] font-bold text-gray-500 mb-2">滅失する建物を選択</label>
+          {lossBuildings.length === 0 ? (
+            <p className="text-[10px] text-slate-400">登記原因「滅失」の申請建物がありません。</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-1">
+              {lossBuildings.map((pb) => (
+                <label
+                  key={pb.id}
+                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                    effectiveBldgSet.has(pb.id)
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                      : "bg-white border-slate-200 text-slate-500"
+                  }`}
+                >
+                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveBldgSet.has(pb.id)} onChange={() => toggleBldg(pb.id)} />
+                  <span className="truncate">{pb.houseNum || "(家屋番号未入力)"}{pb.address ? ` - ${pb.address}` : ""}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="border-t pt-4 text-black">
+          <label className="block text-[10px] font-bold text-gray-500 mb-2">この書類で使う申請人</label>
+          {candidates.length === 0 ? (
+            <p className="text-[10px] text-slate-400">「建物所有者」または「申請人」が登録されていません。</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-1">
+              {candidates.map((p) => (
+                <label
+                  key={p.id}
+                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                    effectiveApplSet.has(p.id)
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                      : "bg-white border-slate-200 text-slate-500"
+                  }`}
+                >
+                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveApplSet.has(p.id)} onChange={() => toggleAppl(p.id)} />
+                  <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
+                </label>
+              ))}
+              <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
 
   if (isLandCategoryChange) {
     const candidates = (siteData?.people || []).filter(p => {
