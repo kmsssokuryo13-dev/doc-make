@@ -245,24 +245,30 @@ export const DocTemplate = ({
     const currentYearReiwa = String(new Date().getFullYear() - 2018);
 
     return (
-      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}>
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
         <div className="stamp-area">
-          {(applicants || []).map((_, i) => {
-            const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
-          })}
+          {(() => {
+            const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })()}
         </div>
 
-        <h1 style={{ fontSize: '20pt', fontWeight: 'bold', textAlign: 'center', marginBottom: '10mm' }}>
+        <h1
+          style={{
+            fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+            margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
+          }}
+        >
           工事完了引渡証明書
         </h1>
 
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
           onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
         >
-          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {(pick.showMain ?? true) && renderMainValuesInline(targetProp, { showHouseNum: false })}
             {(pick.showAnnex ?? true) && (targetProp.annexes || []).map(a => (
@@ -284,12 +290,12 @@ export const DocTemplate = ({
             ))}
           </div>
 
-          <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
+          <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
             上記のとおり工事を完了して引渡したものであることを証明します。
           </p>
 
           <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
-            <p>令和{currentYearReiwa}年　　月　　日</p>
+            <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
           </div>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
@@ -312,6 +318,7 @@ export const DocTemplate = ({
             </div>
           </div>
         </EditableDocBody>
+        </div>
       </div>
     );
   }
@@ -615,22 +622,32 @@ export const DocTemplate = ({
     return (
       <div
         className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold"
-        style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}
+        style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}
       >
-        <h1 style={{ fontSize: "24pt", fontWeight: "bold", textAlign: "center", margin: "0 0 8mm 0" }}>
-          {titleText}
+        <div className="stamp-area">
+          {(statementPeople || []).map((_, i) => {
+            const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })}
+        </div>
+
+        <h1
+          style={{
+            fontSize: '24pt', fontWeight: 'bold', textAlign: 'center',
+            letterSpacing: '10mm', margin: '0', position: 'absolute',
+                    left: '0', right: '0', top: '40mm'
+                  }}
+                >
+                  {titleText}
         </h1>
 
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
           onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
         >
-          <div style={{ textAlign: "right", fontSize: "11pt", margin: "0 0 6mm 0" }}>
-            {formatTodayDateBlock()}
-          </div>
-
-          <h2 style={{ fontSize: "11pt", margin: "0 0 2mm 0", fontWeight: "bold" }}>建物の表示</h2>
+          <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm', marginBottom: '2mm' }}>建物の表示</h2>
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
@@ -650,6 +667,10 @@ export const DocTemplate = ({
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
             {defaultBody}
+          </div>
+
+          <div style={{ textAlign: "left", fontSize: "11pt", margin: "0 0 6mm 0" }}>
+            {formatTodayDateBlock()}
           </div>
 
           <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
@@ -678,12 +699,13 @@ export const DocTemplate = ({
           </div>
         </EditableDocBody>
       </div>
+      </div>
     );
   };
 
   if (name === "申述書（共有）") {
     return renderStatementCommon({
-      titleText: "申　述　書",
+      titleText: "申述書",
       defaultBody: "上記の建物は下記の通りの持分であることを証明します。",
     });
   }
@@ -696,7 +718,7 @@ export const DocTemplate = ({
       `従って${who}の単独名義での表題登記を申請することに対し異議ありません。`;
 
     return renderStatementCommon({
-      titleText: "申　述　書",
+      titleText: "申述書",
       defaultBody: body,
     });
   }
