@@ -698,7 +698,7 @@ export const DocTemplate = ({
 
   if (name === "申述書（共有）") {
     return renderStatementCommon({
-      titleText: "申　述　書",
+      titleText: "申述書",
       defaultBody: "上記の建物は下記の通りの持分であることを証明します。",
     });
   }
@@ -711,7 +711,7 @@ export const DocTemplate = ({
       `従って${who}の単独名義での表題登記を申請することに対し異議ありません。`;
 
     return renderStatementCommon({
-      titleText: "申　述　書",
+      titleText: "申述書",
       defaultBody: body,
     });
   }
