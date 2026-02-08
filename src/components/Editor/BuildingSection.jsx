@@ -101,7 +101,7 @@ export const BuildingSection = ({ type, site, update }) => {
                         value={b.registrationDate?.era || "令和"}
                         onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, era: e.target.value })}
                       >
-                        {["令和","平成","昭和","大正","明治"].map(e => <option key={e} value={e}>{e}</option>)}
+                        {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                       </select>
                       <input
                         type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(b.registrationDate?.year || "")} placeholder="年"
@@ -153,7 +153,7 @@ export const BuildingSection = ({ type, site, update }) => {
                           value={ac.date?.era || "令和"}
                           onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateBuild(b.id, 'additionalCauses', next); }}
                         >
-                          {["令和","平成","昭和","大正","明治"].map(e => <option key={e} value={e}>{e}</option>)}
+                          {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                         </select>
                         <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(ac.date?.year || "")} placeholder="年"
                           onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, year: toFullWidthDigits(e.target.value) } }; updateBuild(b.id, 'additionalCauses', next); }}
@@ -309,7 +309,7 @@ export const BuildingSection = ({ type, site, update }) => {
                             <select className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                               value={a.registrationDate?.era || "令和"}
                               onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), era: e.target.value })}>
-                              {["令和","平成","昭和","大正","明治"].map(e => <option key={e} value={e}>{e}</option>)}
+                              {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                             </select>
                             <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(a.registrationDate?.year || "")} placeholder="年"
                               onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), year: toFullWidthDigits(e.target.value) })}
@@ -351,7 +351,7 @@ export const BuildingSection = ({ type, site, update }) => {
                               <select className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                                 value={ac.date?.era || "令和"}
                                 onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}>
-                                {["令和","平成","昭和","大正","明治"].map(e => <option key={e} value={e}>{e}</option>)}
+                                {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                               </select>
                               <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(ac.date?.year || "")} placeholder="年"
                                 onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, year: toFullWidthDigits(e.target.value) } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
