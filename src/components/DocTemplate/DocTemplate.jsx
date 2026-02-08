@@ -247,10 +247,10 @@ export const DocTemplate = ({
     return (
       <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
         <div className="stamp-area">
-          {(applicants || []).map((_, i) => {
-            const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
-          })}
+          {(() => {
+            const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })()}
         </div>
 
         <h1
@@ -290,12 +290,12 @@ export const DocTemplate = ({
             ))}
           </div>
 
-          <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
+          <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
             上記のとおり工事を完了して引渡したものであることを証明します。
           </p>
 
           <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
-            <p>令和{currentYearReiwa}年　　月　　日</p>
+            <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
           </div>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
