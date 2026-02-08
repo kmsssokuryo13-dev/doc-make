@@ -245,7 +245,7 @@ export const DocTemplate = ({
     const currentYearReiwa = String(new Date().getFullYear() - 2018);
 
     return (
-      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif', padding: DOC_PAGE_PADDING }}>
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
         <div className="stamp-area">
           {(applicants || []).map((_, i) => {
             const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
@@ -253,16 +253,22 @@ export const DocTemplate = ({
           })}
         </div>
 
-        <h1 style={{ fontSize: '20pt', fontWeight: 'bold', textAlign: 'center', marginBottom: '10mm' }}>
+        <h1
+          style={{
+            fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+            margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
+          }}
+        >
           工事完了引渡証明書
         </h1>
 
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
           onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
         >
-          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {(pick.showMain ?? true) && renderMainValuesInline(targetProp, { showHouseNum: false })}
             {(pick.showAnnex ?? true) && (targetProp.annexes || []).map(a => (
@@ -312,6 +318,7 @@ export const DocTemplate = ({
             </div>
           </div>
         </EditableDocBody>
+        </div>
       </div>
     );
   }
