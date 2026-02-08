@@ -628,7 +628,7 @@ export const DocTemplate = ({
           style={{
             fontSize: '24pt', fontWeight: 'bold', textAlign: 'center',
             letterSpacing: '10mm', margin: '0', position: 'absolute',
-                    left: '0', right: '0', top: '60mm'
+                    left: '0', right: '0', top: '40mm'
                   }}
                 >
                   {titleText}
@@ -640,7 +640,7 @@ export const DocTemplate = ({
           customHtml={pick.customText}
           onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
         >
-          <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '56mm', marginBottom: '2mm' }}>建物の表示</h2>
+          <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm', marginBottom: '2mm' }}>建物の表示</h2>
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
           <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
