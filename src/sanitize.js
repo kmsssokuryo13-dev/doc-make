@@ -21,7 +21,7 @@ export const sanitizeSiteData = (raw = {}) => {
     id: c.id || generateId(),
     cause: c.cause || "",
     date: {
-      era: c.date?.era || "令和",
+      era: c.date?.era ?? "令和",
       year: c.date?.year || "",
       month: c.date?.month || "",
       day: c.date?.day || "",
@@ -49,7 +49,7 @@ export const sanitizeSiteData = (raw = {}) => {
       floorAreas,
       registrationCause: a.registrationCause || "",
       registrationDate: {
-        era: a.registrationDate?.era || "令和",
+        era: a.registrationDate?.era ?? "令和",
         year: a.registrationDate?.year || "",
         month: a.registrationDate?.month || "",
         day: a.registrationDate?.day || "",
@@ -79,7 +79,7 @@ export const sanitizeSiteData = (raw = {}) => {
       annexes: Array.isArray(b.annexes) ? b.annexes.map(sanitizeAnnex) : [],
       registrationCause: b.registrationCause || "",
       registrationDate: {
-        era: b.registrationDate?.era || "令和",
+        era: b.registrationDate?.era ?? "令和",
         year: b.registrationDate?.year || "",
         month: b.registrationDate?.month || "",
         day: b.registrationDate?.day || "",
