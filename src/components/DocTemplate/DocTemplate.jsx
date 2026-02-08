@@ -571,11 +571,57 @@ export const DocTemplate = ({
     });
   };
 
-  const DelegationLossTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+  const DelegationLossTemplate = () => {
+    const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
+    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const selectedLoss = lossIds.length > 0
+      ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
+      : allLossBuildings;
+    const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
+
+    const dates = buildings.map(b => formatWareki(b.registrationDate)).filter(Boolean);
+    const uniqueDates = [...new Set(dates)];
+    const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate) || "";
+    const workText = `${dateText}取壊したので建物滅失登記`;
+
+    const buildingBlock = buildings.length > 0 ? buildings.map(b => (
+      <div key={b.id} style={{ marginBottom: '6mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? (
+            <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
+          ) : null}
+          <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLine(b.floorAreas)}`}</div>
+        </div>
+        {(b.annexes || []).map(a => (
+          <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+            <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
+            <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLine(a.floorAreas)}`}</div>
+          </div>
+        ))}
+      </div>
+    )) : <div>　</div>;
+
+    const lossSigners = (() => {
+      const allCandidates = (siteData?.people || []).filter(p => {
+        const roles = p?.roles || [];
+        return roles.includes("建物所有者") || roles.includes("申請人");
+      });
+      const ids = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
+      if (!ids.length) {
+        return allCandidates.filter(p => (p.roles || []).includes("建物所有者"));
+      }
+      const set = new Set(ids);
+      const filtered = allCandidates.filter(p => set.has(p.id));
+      return filtered.length ? filtered : allCandidates.filter(p => (p.roles || []).includes("建物所有者"));
+    })();
+
+    return renderDelegationCommon({
+      docNoBold: false, workText,
+      buildingBlock, dateBlock: buildCommonDateBlock(),
+      signerList: lossSigners,
     });
+  };
 
   const DelegationTitleChangeTemplate = () =>
     renderDelegationCommon({
