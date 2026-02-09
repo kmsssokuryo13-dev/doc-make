@@ -39,6 +39,21 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
     return <div className="doc-editable">{children}</div>;
   }
 
+  if (hasCustom) {
+    return (
+      <div
+        ref={containerRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        className="doc-editable focus:outline-none min-h-[50mm]"
+        dangerouslySetInnerHTML={{ __html: customHtml || "" }}
+      />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -48,9 +63,8 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
       onFocus={handleFocus}
       onBlur={handleBlur}
       className="doc-editable focus:outline-none min-h-[50mm]"
-      dangerouslySetInnerHTML={hasCustom ? { __html: customHtml || "" } : undefined}
     >
-      {!hasCustom && children}
+      {children}
     </div>
   );
 };
