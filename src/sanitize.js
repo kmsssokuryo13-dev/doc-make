@@ -86,6 +86,7 @@ export const sanitizeSiteData = (raw = {}) => {
         unknown: !!b.registrationDate?.unknown
       },
       additionalCauses: Array.isArray(b.additionalCauses) ? b.additionalCauses.map(sanitizeCauseEntry) : [],
+      additionalUnknownDate: !!b.additionalUnknownDate,
       confirmationCert: sanitizeConfirmationCert(b.confirmationCert)
     };
   };
