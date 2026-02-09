@@ -3,7 +3,7 @@ import { Building, Plus, Trash2, Copy, X } from 'lucide-react';
 import {
   generateId, naturalSortList, toHalfWidth, toFullWidthDigits,
   createNewBuilding, createNewAnnex, parseStructureToFloors,
-  parseAnnexStructureToFloors, createDefaultConfirmationCert
+  parseAnnexStructureToFloors, createDefaultConfirmationCert, createDefaultCauseDate
 } from '../../utils.js';
 import { FormField } from '../ui/FormField.jsx';
 
@@ -98,10 +98,10 @@ export const BuildingSection = ({ type, site, update }) => {
                     <div className="flex items-center gap-1 text-black">
                       <select
                         className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                        value={b.registrationDate?.era || "令和"}
+                        value={b.registrationDate?.era ?? "令和"}
                         onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, era: e.target.value })}
                       >
-                        {["令和","平成","昭和","大正","明治"].map(e => <option key={e} value={e}>{e}</option>)}
+                        {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
                       </select>
                       <input
                         type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(b.registrationDate?.year || "")} placeholder="年"
@@ -124,13 +124,82 @@ export const BuildingSection = ({ type, site, update }) => {
                       <label className="ml-2 flex items-center gap-1 cursor-pointer">
                         <input
                           type="checkbox" className="w-3 h-3 rounded" checked={b.registrationDate?.unknown || false}
-                          onChange={e => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: e.target.checked })}
+                          onChange={e => {
+                            updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: e.target.checked });
+                            if (e.target.checked) updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                          }}
                         />
                         <span className="text-[10px] font-bold text-slate-500">不詳</span>
                       </label>
+                      <label className="ml-1 flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox" className="w-3 h-3 rounded"
+                          checked={(b.additionalCauses || []).some(ac => ac.date?.unknown)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: false });
+                              updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }]);
+                            } else {
+                              updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                            }
+                          }}
+                        />
+                        <span className="text-[10px] font-bold text-slate-500">+不詳</span>
+                      </label>
+                      <button
+                        onClick={() => updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: createDefaultCauseDate() }])}
+                        className="ml-auto text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
+                        title="登記原因を追加"
+                      >
+                        <Plus size={10} /> 原因追加
+                      </button>
                     </div>
                   </div>
                 </div>
+                {(b.additionalCauses || []).map((ac, acIdx) => (
+                  <div key={ac.id} className="flex items-center gap-3 pl-2 border-l-2 border-blue-200">
+                    <div className="flex-[1.5]">
+                      <FormField label={`登記原因${acIdx + 2}`} value={ac.cause} onChange={v => {
+                        const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, cause: v }; updateBuild(b.id, 'additionalCauses', next);
+                      }} placeholder="例: 增築" />
+                    </div>
+                    <div className="flex-[3] flex flex-col">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
+                      <div className="flex items-center gap-1 text-black">
+                        <select
+                          className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                                                    value={ac.date?.era ?? "令和"}
+                                                    onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateBuild(b.id, 'additionalCauses', next); }}
+                        >
+                          {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
+                        </select>
+                        <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(ac.date?.year || "")} placeholder="年"
+                          onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, year: toFullWidthDigits(e.target.value) } }; updateBuild(b.id, 'additionalCauses', next); }}
+                          disabled={ac.date?.unknown} />
+                        <span className="text-[10px] font-bold text-gray-400">年</span>
+                        <input type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.month || ""} placeholder="月"
+                          onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, month: e.target.value } }; updateBuild(b.id, 'additionalCauses', next); }}
+                          disabled={ac.date?.unknown} />
+                        <span className="text-[10px] font-bold text-gray-400">月</span>
+                        <input type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.day || ""} placeholder="日"
+                          onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, day: e.target.value } }; updateBuild(b.id, 'additionalCauses', next); }}
+                          disabled={ac.date?.unknown} />
+                        <span className="text-[10px] font-bold text-gray-400">日</span>
+                        <label className="ml-2 flex items-center gap-1 cursor-pointer">
+                          <input type="checkbox" className="w-3 h-3 rounded" checked={ac.date?.unknown || false}
+                            onChange={e => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, unknown: e.target.checked } }; updateBuild(b.id, 'additionalCauses', next); }} />
+                          <span className="text-[10px] font-bold text-slate-500">不詳</span>
+                        </label>
+                        <button
+                          onClick={() => updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter((_, i) => i !== acIdx))}
+                          className="ml-1 text-gray-400 hover:text-red-500 p-0.5 transition-colors" title="この登記原因を削除"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
 
                 <div className="pt-3 mt-3 border-t border-slate-200">
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">
@@ -246,6 +315,107 @@ export const BuildingSection = ({ type, site, update }) => {
                     </div>
                     {(a.floorAreas || []).map((fa, i) => (<FormField key={fa.id} label={`面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = [...a.floorAreas]; n[i].area = v; updateAnnex(b.id, a.id, 'floorAreas', n); }} />))}
                   </div>
+                  {!isReg && (
+                    <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-[1.5]">
+                          <FormField label="登記原因" value={a.registrationCause || ""} onChange={v => updateAnnex(b.id, a.id, 'registrationCause', v)} placeholder="例: 新築" />
+                        </div>
+                        <div className="flex-[3] flex flex-col">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
+                          <div className="flex items-center gap-1 text-black">
+                            <select className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                              value={a.registrationDate?.era ?? "令和"}
+                              onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), era: e.target.value })}>
+                              {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
+                            </select>
+                            <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(a.registrationDate?.year || "")} placeholder="年"
+                              onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), year: toFullWidthDigits(e.target.value) })}
+                              disabled={a.registrationDate?.unknown} />
+                            <span className="text-[10px] font-bold text-gray-400">年</span>
+                            <input type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={a.registrationDate?.month || ""} placeholder="月"
+                              onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), month: e.target.value })}
+                              disabled={a.registrationDate?.unknown} />
+                            <span className="text-[10px] font-bold text-gray-400">月</span>
+                            <input type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={a.registrationDate?.day || ""} placeholder="日"
+                              onChange={e => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), day: e.target.value })}
+                              disabled={a.registrationDate?.unknown} />
+                            <span className="text-[10px] font-bold text-gray-400">日</span>
+                            <label className="ml-2 flex items-center gap-1 cursor-pointer">
+                              <input type="checkbox" className="w-3 h-3 rounded" checked={a.registrationDate?.unknown || false}
+                                onChange={e => {
+                                  updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), unknown: e.target.checked });
+                                  if (e.target.checked) updateAnnex(b.id, a.id, 'additionalCauses', (a.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                                }} />
+                              <span className="text-[10px] font-bold text-slate-500">不詳</span>
+                            </label>
+                            <label className="ml-1 flex items-center gap-1 cursor-pointer">
+                              <input type="checkbox" className="w-3 h-3 rounded"
+                                checked={(a.additionalCauses || []).some(ac => ac.date?.unknown)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), unknown: false });
+                                    updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }]);
+                                  } else {
+                                    updateAnnex(b.id, a.id, 'additionalCauses', (a.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                                  }
+                                }} />
+                              <span className="text-[10px] font-bold text-slate-500">+不詳</span>
+                            </label>
+                            <button
+                              onClick={() => updateAnnex(b.id, a.id, 'additionalCauses', [...(a.additionalCauses || []), { id: generateId(), cause: '', date: createDefaultCauseDate() }])}
+                              className="ml-auto text-[10px] bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-700 font-bold active:scale-95 shadow-sm"
+                              title="登記原因を追加"
+                            >
+                              <Plus size={10} /> 原因追加
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {(a.additionalCauses || []).map((ac, acIdx) => (
+                        <div key={ac.id} className="flex items-center gap-3 pl-2 border-l-2 border-blue-200">
+                          <div className="flex-[1.5]">
+                            <FormField label={`登記原因${acIdx + 2}`} value={ac.cause} onChange={v => {
+                              const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, cause: v }; updateAnnex(b.id, a.id, 'additionalCauses', next);
+                            }} placeholder="例: 增築" />
+                          </div>
+                          <div className="flex-[3] flex flex-col">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
+                            <div className="flex items-center gap-1 text-black">
+                              <select className="text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                                                                value={ac.date?.era ?? "令和"}
+                                                                onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, era: e.target.value } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}>
+                                {["","令和","平成","昭和","大正","明治"].map(e => <option key={e || "_blank"} value={e}>{e || "　"}</option>)}
+                              </select>
+                              <input type="text" className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={toFullWidthDigits(ac.date?.year || "")} placeholder="年"
+                                onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, year: toFullWidthDigits(e.target.value) } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
+                                disabled={ac.date?.unknown} />
+                              <span className="text-[10px] font-bold text-gray-400">年</span>
+                              <input type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.month || ""} placeholder="月"
+                                onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, month: e.target.value } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
+                                disabled={ac.date?.unknown} />
+                              <span className="text-[10px] font-bold text-gray-400">月</span>
+                              <input type="text" className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.day || ""} placeholder="日"
+                                onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, day: e.target.value } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
+                                disabled={ac.date?.unknown} />
+                              <span className="text-[10px] font-bold text-gray-400">日</span>
+                              <label className="ml-2 flex items-center gap-1 cursor-pointer">
+                                <input type="checkbox" className="w-3 h-3 rounded" checked={ac.date?.unknown || false}
+                                  onChange={e => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, unknown: e.target.checked } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }} />
+                                <span className="text-[10px] font-bold text-slate-500">不詳</span>
+                              </label>
+                              <button
+                                onClick={() => updateAnnex(b.id, a.id, 'additionalCauses', (a.additionalCauses || []).filter((_, i) => i !== acIdx))}
+                                className="ml-1 text-gray-400 hover:text-red-500 p-0.5 transition-colors" title="この登記原因を削除"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <button onClick={() => update({ [dataKey]: buildings.map(x => x.id === b.id ? {...x, annexes: x.annexes.filter(z => z.id !== a.id)} : x)})} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-1 transition-colors font-sans font-bold">
                     <X size={14} />
                   </button>
