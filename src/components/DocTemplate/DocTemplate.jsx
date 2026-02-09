@@ -436,6 +436,111 @@ export const DocTemplate = ({
     );
   }
 
+  // ---- 非登載証明書 ----
+  if (name === "非登載証明書") {
+    const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
+    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const ntrSelectedBuildings = lossIds.length > 0
+      ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
+      : allLossBuildings;
+    const ntrBuildings = ntrSelectedBuildings.length > 0 ? ntrSelectedBuildings : allLossBuildings;
+
+    const ntrOwnerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
+    const ntrOwnerIds = Array.isArray(pick?.lossCertOwnerIds) ? pick.lossCertOwnerIds : [];
+    const ntrDefaultOwners = ntrOwnerCandidates.filter(p => (p.roles || []).includes("建物所有者"));
+    const ntrOwners = ntrOwnerIds.length > 0
+      ? ntrOwnerCandidates.filter(p => new Set(ntrOwnerIds).has(p.id))
+      : ntrDefaultOwners;
+    const ntrDisplayOwners = ntrOwners.length > 0 ? ntrOwners : ntrDefaultOwners;
+
+    const getMayorTitle = () => {
+      const addr = ntrBuildings[0]?.address || siteData?.address || "";
+      const noPref = addr.replace(/^.+?[都道府県]/, "");
+      const cityMatch = noPref.match(/^(.+?市)/);
+      if (cityMatch) return `${cityMatch[1]}長`;
+      const gunMatch = noPref.match(/^.+?郡(.+?[町村])/);
+      if (gunMatch) return `${gunMatch[1]}長`;
+      const townMatch = noPref.match(/^(.+?[町村])/);
+      if (townMatch) return `${townMatch[1]}長`;
+      return "　　長";
+    };
+
+    const w = getWarekiNow();
+    const currentYear = toFullWidthDigits(w.year);
+
+    return (
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          <h1
+            style={{
+              fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+              margin: '0 0 8mm 0', letterSpacing: '0.5em'
+            }}
+          >
+            証　明　願
+          </h1>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '12pt', marginBottom: '2mm' }}>
+            <div>{getMayorTitle()}　殿</div>
+            <div>{formatTodayDateBlock()}</div>
+          </div>
+
+          <p style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            下記物件は令和{currentYear}年度の固定資産課税台帳に登載されていないことを証明願います。
+          </p>
+
+          <div style={{ fontSize: '11pt', marginBottom: '6mm' }}>
+            <div style={{ display: 'flex', gap: '4mm' }}>
+              <span>使用目的</span>
+              <span>管轄法務局へ建物滅失登記申請のため</span>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm', minHeight: '30mm', paddingLeft: '4mm' }}>
+            {ntrBuildings.length > 0 ? ntrBuildings.map(b => (
+              <div key={b.id} style={{ marginBottom: '4mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                  <div>{b.address || "　"}</div>
+                  {b.houseNum ? (
+                    <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
+                  ) : null}
+                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                </div>
+                {(b.annexes || []).map(a => (
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
+                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                  </div>
+                ))}
+              </div>
+            )) : <div>　</div>}
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm', paddingLeft: '4mm' }}>
+            {ntrDisplayOwners.length > 0 ? ntrDisplayOwners.map(p => (
+              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {p.address || "　"}　{p.name || "　"}
+              </p>
+            )) : <div>　</div>}
+          </div>
+
+          <div style={{ textAlign: 'right', fontSize: '12pt', marginTop: 'auto' }}>
+            <p style={{ margin: '0 0 2mm 0' }}>{linkedScrivener?.address || "　"}</p>
+            <p style={{ margin: '0' }}>土地家屋調査士　{linkedScrivener?.name || "　"}</p>
+          </div>
+        </EditableDocBody>
+        </div>
+      </div>
+    );
+  }
+
   // ---- 委任状系（書類ごとにテンプレ分割） ----
   const getLegacyWorkText = () => {
     return (siteData?.name || "").includes("登記") ? siteData.name : "建物表題登記";
