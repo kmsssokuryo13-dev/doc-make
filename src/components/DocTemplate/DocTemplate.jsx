@@ -212,7 +212,7 @@ export const DocTemplate = ({
     if (!b) return "　";
     const hn = b.houseNum ? `${b.houseNum} ` : "";
     const cause = b.registrationCause || "　";
-    const date = formatWareki(b.registrationDate);
+    const date = formatWareki(b.registrationDate, b.additionalUnknownDate);
     return `${hn}${cause}　${date}`;
   };
 
@@ -278,7 +278,7 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate)}　{targetProp.registrationCause || "　"}</p>
+            <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}　{targetProp.registrationCause || "　"}</p>
           </div>
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
@@ -340,9 +340,9 @@ export const DocTemplate = ({
       : defaultOwners;
     const displayOwners = owners.length > 0 ? owners : defaultOwners;
 
-    const dates = buildings.map(b => formatWareki(b.registrationDate)).filter(Boolean);
+    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
     const uniqueDates = [...new Set(dates)];
-    const causeDate = uniqueDates[0] || formatWareki(targetProp?.registrationDate) || "令和　年　月　日";
+    const causeDate = uniqueDates[0] || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "令和　年　月　日";
 
     return (
       <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
@@ -556,7 +556,7 @@ export const DocTemplate = ({
   const DelegationTitleTemplate = () => {
     const workText =
       (targetProp)
-        ? `${formatWareki(targetProp.registrationDate)}${targetProp.registrationCause || ""}したので建物表題登記`
+        ? `${formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}${targetProp.registrationCause || ""}したので建物表題登記`
         : getLegacyWorkText();
 
     const buildingBlock = targetProp ? (
@@ -619,7 +619,7 @@ export const DocTemplate = ({
     const newCategories = [...new Set(changedLands.map(l => l.newCategory || "").filter(Boolean))];
     const categoryText = newCategories.join("・") || "　";
 
-    const workText = `${formatWareki(targetProp?.registrationDate)}${categoryText}に変更したので土地地目変更登記`;
+    const workText = `${formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate)}${categoryText}に変更したので土地地目変更登記`;
 
     const beforeLands = changedLands.length > 0 ? changedLands : (selectedLand || []);
     const afterLands = changedLands;
@@ -693,9 +693,9 @@ export const DocTemplate = ({
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
 
-    const dates = buildings.map(b => formatWareki(b.registrationDate)).filter(Boolean);
+    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
     const uniqueDates = [...new Set(dates)];
-    const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate) || "";
+    const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "";
     const workText = `${dateText}取壊したので建物滅失登記`;
 
     const buildingBlock = buildings.length > 0 ? buildings.map(b => (
