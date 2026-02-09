@@ -323,6 +323,119 @@ export const DocTemplate = ({
     );
   }
 
+  // ---- 滅失証明書（滅失） ----
+  if (name === "滅失証明書（滅失）") {
+    const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
+    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const selectedLossBuildings = lossIds.length > 0
+      ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
+      : allLossBuildings;
+    const buildings = selectedLossBuildings.length > 0 ? selectedLossBuildings : allLossBuildings;
+
+    const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者"));
+    const ownerIds = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
+    const owners = ownerIds.length > 0
+      ? ownerCandidates.filter(p => new Set(ownerIds).has(p.id))
+      : ownerCandidates;
+    const displayOwners = owners.length > 0 ? owners : ownerCandidates;
+
+    const dates = buildings.map(b => formatWareki(b.registrationDate)).filter(Boolean);
+    const uniqueDates = [...new Set(dates)];
+    const causeDate = uniqueDates[0] || formatWareki(targetProp?.registrationDate) || "令和　年　月　日";
+
+    return (
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
+        <div className="stamp-area">
+          {(() => {
+            const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })()}
+        </div>
+
+        <h1
+          style={{
+            fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+            margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
+          }}
+        >
+          建物取壊し証明書
+        </h1>
+
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            {buildings.length > 0 ? buildings.map(b => (
+              <div key={b.id} style={{ marginBottom: '4mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                  <div>{b.address || "　"}</div>
+                  {b.houseNum ? (
+                    <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
+                  ) : null}
+                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                </div>
+                {(b.annexes || []).map(a => (
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
+                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                  </div>
+                ))}
+              </div>
+            )) : <div>　</div>}
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>取壊しの事由及び年月日</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            <p style={{ margin: '0' }}>{causeDate}取壊し</p>
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            {displayOwners.length > 0 ? displayOwners.map(p => (
+              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {p.address || "　"}　{p.name || "　"}
+              </p>
+            )) : <div>　</div>}
+          </div>
+
+          <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
+            上記のとおり建物を滅失したことを証明します。
+          </p>
+
+          <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
+            <p>{formatTodayDateBlock()}</p>
+          </div>
+
+          <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
+
+          <div style={{ marginTop: '5mm', position: 'relative' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
+              <div style={{ fontSize: '12pt' }}>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+              </div>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
+            </div>
+          </div>
+        </EditableDocBody>
+        </div>
+      </div>
+    );
+  }
+
   // ---- 委任状系（書類ごとにテンプレ分割） ----
   const getLegacyWorkText = () => {
     return (siteData?.name || "").includes("登記") ? siteData.name : "建物表題登記";

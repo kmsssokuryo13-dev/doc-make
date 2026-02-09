@@ -313,7 +313,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
               {activeInstance && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
-                  {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && (
+                  {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && activeInstance.name !== "滅失証明書（滅失）" && (
                     <div className="space-y-2 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
                   )}
                   {(() => {
@@ -754,6 +754,104 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                           </>
                         );
                       })()}
+                    </div>
+                  )}
+
+                  {activeInstance.name === "滅失証明書（滅失）" && (
+                    <div className="border-t pt-4">
+                      <div className="space-y-3">
+                        {(() => {
+                          const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+                          const curBldgIds = Array.isArray(activePick.lossBuildingIds) ? activePick.lossBuildingIds : [];
+                          const defaultBldgIds = new Set(lossBuildings.map(pb => pb.id));
+                          const effectiveBldgSet = curBldgIds.length > 0 ? new Set(curBldgIds) : defaultBldgIds;
+
+                          const toggleBldg = (id) => {
+                            const base = new Set(curBldgIds.length > 0 ? curBldgIds : Array.from(defaultBldgIds));
+                            if (base.has(id)) base.delete(id);
+                            else base.add(id);
+                            handlePickChange(activeInstanceKey, { lossBuildingIds: Array.from(base) });
+                          };
+
+                          return (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-2">滅失する建物を選択</label>
+                              {lossBuildings.length === 0 ? (
+                                <p className="text-[10px] text-slate-400">登記原因「滅失」の申請建物がありません。</p>
+                              ) : (
+                                <div className="grid grid-cols-1 gap-1">
+                                  {lossBuildings.map((pb) => (
+                                    <label
+                                      key={pb.id}
+                                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                        effectiveBldgSet.has(pb.id)
+                                          ? "bg-blue-50 border-blue-200 text-blue-700"
+                                          : "bg-white border-slate-200 text-slate-500"
+                                      }`}
+                                    >
+                                      <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveBldgSet.has(pb.id)} onChange={() => toggleBldg(pb.id)} />
+                                      <span className="truncate">{pb.houseNum || "(家屋番号未入力)"}{pb.address ? ` - ${pb.address}` : ""}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {(() => {
+                          const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者"));
+                          const curOwner = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
+                          const defaultOwnerIds = new Set(ownerCandidates.map(p => p.id));
+                          const effectiveOwnerSet = curOwner.length > 0 ? new Set(curOwner) : defaultOwnerIds;
+
+                          const toggleOwner = (id) => {
+                            const base = new Set(curOwner.length > 0 ? curOwner : Array.from(defaultOwnerIds));
+                            if (base.has(id)) base.delete(id);
+                            else base.add(id);
+                            handlePickChange(activeInstanceKey, { applicantPersonIds: Array.from(base) });
+                          };
+
+                          return (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-2">建物所有者を選択</label>
+                              {ownerCandidates.length === 0 ? (
+                                <p className="text-[10px] text-slate-400">「建物所有者」が登録されていません。</p>
+                              ) : (
+                                <div className="grid grid-cols-1 gap-1">
+                                  {ownerCandidates.map((p) => (
+                                    <label
+                                      key={p.id}
+                                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                        effectiveOwnerSet.has(p.id)
+                                          ? "bg-blue-50 border-blue-200 text-blue-700"
+                                          : "bg-white border-slate-200 text-slate-500"
+                                      }`}
+                                    >
+                                      <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveOwnerSet.has(p.id)} onChange={() => toggleOwner(p.id)} />
+                                      <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">工事人を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetContractorPersonId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetContractorPersonId: e.target.value })}
+                          >
+                            <option value="">(未選択・最初の工事人)</option>
+                            {(contractorsInPeople || []).map(p => (
+                              <option key={p.id} value={p.id}>{p.name || "(名前未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   )}
 
