@@ -357,7 +357,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
     return (
       <>
-        <div className="pt-4 text-black">
+        <div className="text-black">
           <label className="block text-[10px] font-bold text-gray-500 mb-2">滅失する建物を選択</label>
           {lossBuildings.length === 0 ? (
             <p className="text-[10px] text-slate-400">登記原因「滅失」の申請建物がありません。</p>
@@ -761,7 +761,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                   )}
 
                   {activeInstance.name === "滅失証明書（滅失）" && (
-                    <div className="border-t pt-4">
+                    <div>
                       <div className="space-y-3">
                         {(() => {
                           const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => (pb.registrationCause || "").includes("滅失"));

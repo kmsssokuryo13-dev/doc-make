@@ -125,8 +125,16 @@ export const BuildingSection = ({ type, site, update }) => {
                         <input
                           type="checkbox" className="w-3 h-3 rounded" checked={b.registrationDate?.unknown || false}
                           onChange={e => {
-                            updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: e.target.checked });
-                            if (e.target.checked) updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter(ac => !ac.date?.unknown));
+                            const checked = e.target.checked;
+                            update({ [dataKey]: buildings.map(bld => {
+                              if (bld.id !== b.id) return bld;
+                              const up = { ...bld, registrationDate: { ...bld.registrationDate, unknown: checked } };
+                              if (checked) {
+                                up.additionalUnknownDate = false;
+                                up.additionalCauses = (bld.additionalCauses || []).filter(ac => !ac.date?.unknown);
+                              }
+                              return up;
+                            })});
                           }}
                         />
                         <span className="text-[10px] font-bold text-slate-500">不詳</span>
@@ -134,14 +142,17 @@ export const BuildingSection = ({ type, site, update }) => {
                       <label className="ml-1 flex items-center gap-1 cursor-pointer">
                         <input
                           type="checkbox" className="w-3 h-3 rounded"
-                          checked={(b.additionalCauses || []).some(ac => ac.date?.unknown)}
+                          checked={b.additionalUnknownDate || false}
                           onChange={e => {
-                            if (e.target.checked) {
-                              updateBuild(b.id, 'registrationDate', { ...b.registrationDate, unknown: false });
-                              updateBuild(b.id, 'additionalCauses', [...(b.additionalCauses || []), { id: generateId(), cause: '', date: { ...createDefaultCauseDate(), unknown: true } }]);
-                            } else {
-                              updateBuild(b.id, 'additionalCauses', (b.additionalCauses || []).filter(ac => !ac.date?.unknown));
-                            }
+                            const checked = e.target.checked;
+                            update({ [dataKey]: buildings.map(bld => {
+                              if (bld.id !== b.id) return bld;
+                              const up = { ...bld, additionalUnknownDate: checked };
+                              if (checked) {
+                                up.registrationDate = { ...bld.registrationDate, unknown: false };
+                              }
+                              return up;
+                            })});
                           }}
                         />
                         <span className="text-[10px] font-bold text-slate-500">+不詳</span>
