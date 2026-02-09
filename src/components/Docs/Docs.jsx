@@ -320,6 +320,9 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const isStatement = activeInstance && (activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）");
   if (isStatement) return null;
 
+  const isLossCert = activeInstance && activeInstance.name === "滅失証明書（滅失）";
+  if (isLossCert) return null;
+
   const isLandCategoryChange = activeInstance && activeInstance.name === "委任状（地目変更）";
   const isLoss = activeInstance && activeInstance.name === "委任状（滅失）";
 
@@ -354,7 +357,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
     return (
       <>
-        <div className="border-t pt-4 text-black">
+        <div className="pt-4 text-black">
           <label className="block text-[10px] font-bold text-gray-500 mb-2">滅失する建物を選択</label>
           {lossBuildings.length === 0 ? (
             <p className="text-[10px] text-slate-400">登記原因「滅失」の申請建物がありません。</p>
