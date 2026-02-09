@@ -25,7 +25,6 @@ export const sanitizeSiteData = (raw = {}) => {
       year: c.date?.year || "",
       month: c.date?.month || "",
       day: c.date?.day || "",
-      unknown: !!c.date?.unknown
     }
   });
 
@@ -53,9 +52,9 @@ export const sanitizeSiteData = (raw = {}) => {
         year: a.registrationDate?.year || "",
         month: a.registrationDate?.month || "",
         day: a.registrationDate?.day || "",
-        unknown: !!a.registrationDate?.unknown
       },
       additionalCauses: Array.isArray(a.additionalCauses) ? a.additionalCauses.map(sanitizeCauseEntry) : [],
+      additionalUnknownDate: !!a.additionalUnknownDate,
     };
   };
 
@@ -83,7 +82,6 @@ export const sanitizeSiteData = (raw = {}) => {
         year: b.registrationDate?.year || "",
         month: b.registrationDate?.month || "",
         day: b.registrationDate?.day || "",
-        unknown: !!b.registrationDate?.unknown
       },
       additionalCauses: Array.isArray(b.additionalCauses) ? b.additionalCauses.map(sanitizeCauseEntry) : [],
       additionalUnknownDate: !!b.additionalUnknownDate,

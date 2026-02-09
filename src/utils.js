@@ -276,11 +276,7 @@ export const formatWareki = (d, additionalUnknownDate = false) => {
 
   const era = (d.era || "").trim();
 
-  if (d.unknown) {
-    return `${era}年月日不詳`;
-  }
-
-  const y = (d.year ?? "").toString().trim();
+  const y= (d.year ?? "").toString().trim();
   const m = (d.month ?? "").toString().trim();
   const day = (d.day ?? "").toString().trim();
 

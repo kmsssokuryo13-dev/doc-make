@@ -99,8 +99,7 @@ export const DocTemplate = ({
 
   const formatDateBlock = (d) => {
     if (!d) return "令和年　　月　　日";
-    if (d.unknown) return "不詳";
-    const stripWS = (s) =>
+    const stripWS= (s) =>
       (s ?? "").toString().replace(/[\s\u3000\u00A0\u2000-\u200B\u202F\u205F\uFEFF]/g, "");
     const era = stripWS(d.era);
     const year = stripWS(d.year);
