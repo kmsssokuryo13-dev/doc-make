@@ -800,23 +800,23 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                         })()}
 
                         {(() => {
-                          const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者"));
-                          const curOwner = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
-                          const defaultOwnerIds = new Set(ownerCandidates.map(p => p.id));
+                          const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
+                          const curOwner = Array.isArray(activePick.lossCertOwnerIds) ? activePick.lossCertOwnerIds : [];
+                          const defaultOwnerIds = new Set(ownerCandidates.filter(p => (p.roles || []).includes("建物所有者")).map(p => p.id));
                           const effectiveOwnerSet = curOwner.length > 0 ? new Set(curOwner) : defaultOwnerIds;
 
                           const toggleOwner = (id) => {
                             const base = new Set(curOwner.length > 0 ? curOwner : Array.from(defaultOwnerIds));
                             if (base.has(id)) base.delete(id);
                             else base.add(id);
-                            handlePickChange(activeInstanceKey, { applicantPersonIds: Array.from(base) });
+                            handlePickChange(activeInstanceKey, { lossCertOwnerIds: Array.from(base) });
                           };
 
                           return (
                             <div>
                               <label className="block text-[10px] font-bold text-gray-500 mb-2">建物所有者を選択</label>
                               {ownerCandidates.length === 0 ? (
-                                <p className="text-[10px] text-slate-400">「建物所有者」が登録されていません。</p>
+                                <p className="text-[10px] text-slate-400">「建物所有者」または「申請人」が登録されていません。</p>
                               ) : (
                                 <div className="grid grid-cols-1 gap-1">
                                   {ownerCandidates.map((p) => (
@@ -829,7 +829,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                                       }`}
                                     >
                                       <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveOwnerSet.has(p.id)} onChange={() => toggleOwner(p.id)} />
-                                      <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                      <span className="truncate">{p.name || "(氏名未入力)"} [{(p.roles || []).join("、")}]</span>
                                     </label>
                                   ))}
                                 </div>

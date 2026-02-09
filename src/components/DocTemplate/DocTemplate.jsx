@@ -332,12 +332,13 @@ export const DocTemplate = ({
       : allLossBuildings;
     const buildings = selectedLossBuildings.length > 0 ? selectedLossBuildings : allLossBuildings;
 
-    const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者"));
-    const ownerIds = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
+    const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
+    const ownerIds = Array.isArray(pick?.lossCertOwnerIds) ? pick.lossCertOwnerIds : [];
+    const defaultOwners = ownerCandidates.filter(p => (p.roles || []).includes("建物所有者"));
     const owners = ownerIds.length > 0
       ? ownerCandidates.filter(p => new Set(ownerIds).has(p.id))
-      : ownerCandidates;
-    const displayOwners = owners.length > 0 ? owners : ownerCandidates;
+      : defaultOwners;
+    const displayOwners = owners.length > 0 ? owners : defaultOwners;
 
     const dates = buildings.map(b => formatWareki(b.registrationDate)).filter(Boolean);
     const uniqueDates = [...new Set(dates)];
