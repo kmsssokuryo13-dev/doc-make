@@ -550,11 +550,11 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                     </div>
                   )}
 
-                  {activeInstance.name === "委任状（表題部変更）" && (
+                  {(activeInstance.name === "委任状（表題部変更）" || activeInstance.name === "委任状（表題部更正）") && (
                     <div className="border-t pt-4">
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-1">変更前の建物を選択</label>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">{activeInstance.name === "委任状（表題部更正）" ? "更正前" : "変更前"}の建物を選択</label>
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                             value={activePick.targetBeforeBuildingId || ""}
@@ -567,7 +567,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-1">変更後の建物を選択</label>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">{activeInstance.name === "委任状（表題部更正）" ? "更正後" : "変更後"}の建物を選択</label>
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                             value={activePick.targetPropBuildingId || ""}
