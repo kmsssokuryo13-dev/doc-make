@@ -254,8 +254,13 @@ const createNewBuilding = () => ({
 });
 
 const createNewAnnex = () => ({
-  id: generateId(), symbol: '', kind: '', struct: '', includeBasement: false,
-  floorAreas: [{ id: generateId(), floor: '1階', area: '' }]
+  id: generateId(), symbol: '', kind: '',
+  structMaterial: '', structFloor: '', struct: '',
+  hasBasement: false,
+  floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
+  registrationCause: "",
+  registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
+  additionalCauses: [],
 });
 
 // ★追加：関係人（people）新規作成
@@ -431,23 +436,54 @@ const sanitizeSiteData = (raw = {}) => {
   });
 
   const sanitizeAnnex = (a = {}) => {
-    const struct = a.struct || "";
-    const includeBasement = !!a.includeBasement;
-    const baseFloors = parseAnnexStructureToFloors(struct);
-    const basementFloors = includeBasement ? ["地下1階"] : [];
-    const labels = [...baseFloors, ...basementFloors];
-    const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
-    const floorAreas = labels.map(floor => {
-      const ex = map.get(floor);
-      return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
-    });
+    const hasNewFields = a.structMaterial !== undefined;
+    let structMaterial, structFloor, floorAreas, hasBasement;
+    if (hasNewFields) {
+      structMaterial = a.structMaterial || "";
+      structFloor = a.structFloor || "";
+      floorAreas = Array.isArray(a.floorAreas) && a.floorAreas.length > 0
+        ? a.floorAreas.map(fa => ({ id: fa.id || generateId(), floor: fa.floor, area: fa.area || "" }))
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = !!a.hasBasement;
+    } else {
+      const parsed = parseStructParts(a.struct || "");
+      structMaterial = parsed.structMaterial;
+      structFloor = parsed.structFloor;
+      const baseFloors = parseAnnexStructureToFloors(a.struct || "");
+      const includeBasement = !!a.includeBasement;
+      const basementFloors = includeBasement ? ["地下1階"] : [];
+      const labels = [...baseFloors, ...basementFloors];
+      const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
+      floorAreas = labels.length > 0
+        ? labels.map(floor => {
+            const ex = map.get(floor);
+            return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
+          })
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = floorAreas.some(fa => fa.floor.includes("地下"));
+    }
+    if (!floorAreas.some(fa => toHalfWidth(fa.floor) === "1階")) {
+      floorAreas.unshift({ id: generateId(), floor: "１階", area: "" });
+    }
+    const struct = structMaterial + structFloor;
     return {
       id: a.id || generateId(),
       symbol: a.symbol || "",
       kind: a.kind || "",
+      structMaterial,
+      structFloor,
       struct,
-      includeBasement,
+      hasBasement,
       floorAreas,
+      registrationCause: a.registrationCause || "",
+      registrationDate: {
+        era: a.registrationDate?.era ?? "令和",
+        year: a.registrationDate?.year || "",
+        month: a.registrationDate?.month || "",
+        day: a.registrationDate?.day || "",
+      },
+      additionalCauses: Array.isArray(a.additionalCauses) ? a.additionalCauses : [],
+      additionalUnknownDate: !!a.additionalUnknownDate,
     };
   };
 
@@ -899,22 +935,21 @@ const BuildingSection = ({ type, site, update }) => {
         const annexes = (b.annexes || []).map(a => {
           if (a.id !== aid) return a;
           let up = { ...a, [field]: val };
-          if (field === "struct" || field === "includeBasement") {
-            const nextStruct = field === "struct" ? val : (a.struct || "");
-            const nextIncludeBasement = field === "includeBasement" ? !!val : !!a.includeBasement;
-            const baseFloors = parseAnnexStructureToFloors(nextStruct);
-            const basementFloors = [];
-            if (nextIncludeBasement) {
-              const hw = toHalfWidth(nextStruct || "");
-              const m = hw.match(/地下(\d+)階/);
-              const n = m ? parseInt(m[1], 10) : 1;
-              for (let i = 1; i <= n; i++) basementFloors.push(`地下${i}階`);
+          if (field === 'structMaterial') {
+            up.struct = val + (up.structFloor || "");
+          }
+          if (field === 'floorAreas') {
+            up.floorAreas = ensureNextFloors(val, up.hasBasement);
+            up.structFloor = computeStructFloor(up.floorAreas);
+            up.struct = (up.structMaterial || "") + up.structFloor;
+          }
+          if (field === 'hasBasement' && val) {
+            const newAreas = [...(up.floorAreas || [])];
+            const label = toFullWidthDigits("地下1階");
+            if (!newAreas.some(fa => toHalfWidth(fa.floor) === "地下1階")) {
+              newAreas.push({ id: generateId(), floor: label, area: "" });
             }
-            const labels = [...baseFloors, ...basementFloors];
-            const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
-            up.floorAreas = labels.map(l => map.get(l) || { id: generateId(), floor: l, area: "" });
-            up.struct = nextStruct;
-            up.includeBasement = nextIncludeBasement;
+            up.floorAreas = newAreas;
           }
           return up;
         });
@@ -1125,13 +1160,20 @@ const BuildingSection = ({ type, site, update }) => {
                   <div className="grid grid-cols-3 lg:grid-cols-4 gap-3 pr-8 text-black">
                     <FormField label="符号" value={a.symbol} onChange={v => updateAnnex(b.id, a.id, 'symbol', v)} />
                     <FormField label="種類" value={a.kind} onChange={v => updateAnnex(b.id, a.id, 'kind', v)} />
-                    <FormField label="構造" value={a.struct} onChange={v => updateAnnex(b.id, a.id, 'struct', v)} />
-                    <div className="flex flex-col justify-center text-black font-sans font-bold">
-                      <label className="flex items-center gap-2 cursor-pointer mt-2 text-[9px] font-bold text-gray-500 uppercase tracking-tighter">
-                        <input type="checkbox" className="w-3 h-3 rounded" checked={a.includeBasement} onChange={e => updateAnnex(b.id, a.id, 'includeBasement', e.target.checked)} />地下階も入力
-                      </label>
-                    </div>
-                    {(a.floorAreas || []).map((fa, i) => (<FormField key={fa.id} label={`面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = [...a.floorAreas]; n[i].area = v; updateAnnex(b.id, a.id, 'floorAreas', n); }} />))}
+                    <FormField label="構造（構成材料・屋根の種類）" value={a.structMaterial || ''} onChange={v => updateAnnex(b.id, a.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" />
+                    <FormField label="構造（階層）" value={a.structFloor || ''} readOnly />
+                    {(a.floorAreas || []).filter(fa => !fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = a.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateAnnex(b.id, a.id, 'floorAreas', n); }} />))}
+                    {!a.hasBasement ? (
+                      <div className="flex items-end pb-1">
+                        <button onClick={() => updateAnnex(b.id, a.id, 'hasBasement', true)} className="text-[10px] bg-slate-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-slate-700 font-bold active:scale-95 shadow-sm whitespace-nowrap">
+                          <Plus size={12} /> 地下階を追加
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {(a.floorAreas || []).filter(fa => fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = a.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateAnnex(b.id, a.id, 'floorAreas', n); }} />))}
+                      </>
+                    )}
                   </div>
                   <button onClick={() => update({ [dataKey]: buildings.map(x => x.id === b.id ? {...x, annexes: x.annexes.filter(z => z.id !== a.id)} : x)})} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-1 transition-colors font-sans font-bold">
                     <X size={14} />

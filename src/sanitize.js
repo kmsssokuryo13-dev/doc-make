@@ -30,22 +30,44 @@ export const sanitizeSiteData = (raw = {}) => {
   });
 
   const sanitizeAnnex = (a = {}) => {
-    const struct = a.struct || "";
-    const includeBasement = !!a.includeBasement;
-    const baseFloors = parseAnnexStructureToFloors(struct);
-    const basementFloors = includeBasement ? ["地下1階"] : [];
-    const labels = [...baseFloors, ...basementFloors];
-    const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
-    const floorAreas = labels.map(floor => {
-      const ex = map.get(floor);
-      return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
-    });
+    const hasNewFields = a.structMaterial !== undefined;
+    let structMaterial, structFloor, floorAreas, hasBasement;
+    if (hasNewFields) {
+      structMaterial = a.structMaterial || "";
+      structFloor = a.structFloor || "";
+      floorAreas = Array.isArray(a.floorAreas) && a.floorAreas.length > 0
+        ? a.floorAreas.map(fa => ({ id: fa.id || generateId(), floor: fa.floor, area: fa.area || "" }))
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = !!a.hasBasement;
+    } else {
+      const parsed = parseStructParts(a.struct || "");
+      structMaterial = parsed.structMaterial;
+      structFloor = parsed.structFloor;
+      const baseFloors = parseAnnexStructureToFloors(a.struct || "");
+      const includeBasement = !!a.includeBasement;
+      const basementFloors = includeBasement ? ["地下1階"] : [];
+      const labels = [...baseFloors, ...basementFloors];
+      const map = new Map((a.floorAreas || []).map(f => [f.floor, f]));
+      floorAreas = labels.length > 0
+        ? labels.map(floor => {
+            const ex = map.get(floor);
+            return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
+          })
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = floorAreas.some(fa => fa.floor.includes("地下"));
+    }
+    if (!floorAreas.some(fa => toHalfWidth(fa.floor) === "1階")) {
+      floorAreas.unshift({ id: generateId(), floor: "１階", area: "" });
+    }
+    const struct = structMaterial + structFloor;
     return {
       id: a.id || generateId(),
       symbol: a.symbol || "",
       kind: a.kind || "",
+      structMaterial,
+      structFloor,
       struct,
-      includeBasement,
+      hasBasement,
       floorAreas,
       registrationCause: a.registrationCause || "",
       registrationDate: {

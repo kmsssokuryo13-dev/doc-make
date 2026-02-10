@@ -180,8 +180,10 @@ export const createNewBuilding = () => ({
 });
 
 export const createNewAnnex = () => ({
-  id: generateId(), symbol: '', kind: '', struct: '', includeBasement: false,
-  floorAreas: [{ id: generateId(), floor: '1階', area: '' }],
+  id: generateId(), symbol: '', kind: '',
+  structMaterial: '', structFloor: '', struct: '',
+  hasBasement: false,
+  floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
   registrationCause: "",
   registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
   additionalCauses: [],
