@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon } from 'lucide-react';
-import { naturalSortList, stableSortKeys, getOrderedDocs } from '../../utils.js';
+import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES } from '../../constants.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
@@ -36,7 +36,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     statementPersonIds: [],
     statementApplicantPersonId: "",
     statementConfirmApplicantPersonId: "",
-    confirmApplicantPersonIds: []
+    confirmApplicantPersonIds: [],
+    selectedCauseIds: []
   };
 
   const allInstances = useMemo(() => {
@@ -930,7 +931,49 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                     </div>
                   )}
 
-                  {activeInstance.name === "工事完了引渡証明書（表題部変更）" && (
+                  {activeInstance.name === "工事完了引渡証明書（表題部変更）" && (() => {
+                    const sortedProp = naturalSortList(siteData.proposedBuildings || [], 'houseNum');
+                    const targetPropB = activePick.targetPropBuildingId
+                      ? sortedProp.find(b => b.id === activePick.targetPropBuildingId)
+                      : null;
+                    const propsForCauses = targetPropB ? [targetPropB] : sortedProp;
+                    const causeEntries = [];
+                    propsForCauses.forEach(b => {
+                      if (b.registrationCause) {
+                        causeEntries.push({ id: `${b.id}_main`, label: `${formatWareki(b.registrationDate, b.additionalUnknownDate)}　${b.registrationCause}` });
+                      }
+                      (b.additionalCauses || []).forEach(ac => {
+                        if (ac.cause) {
+                          causeEntries.push({ id: ac.id, label: `${formatWareki(ac.date)}　${ac.cause}` });
+                        }
+                      });
+                      (b.annexes || []).forEach(a => {
+                        if (a.registrationCause) {
+                          causeEntries.push({ id: `${a.id}_main`, label: `${formatWareki(a.registrationDate, a.additionalUnknownDate)}　${a.registrationCause}` });
+                        }
+                        (a.additionalCauses || []).forEach(ac => {
+                          if (ac.cause) {
+                            causeEntries.push({ id: ac.id, label: `${formatWareki(ac.date)}　${ac.cause}` });
+                          }
+                        });
+                      });
+                    });
+                    const currentSelected = activePick.selectedCauseIds || [];
+                    const isAllSelected = currentSelected.length === 0 || causeEntries.every(c => currentSelected.includes(c.id));
+                    const toggleCause = (causeId) => {
+                      let ids = currentSelected.length === 0 ? causeEntries.map(c => c.id) : [...currentSelected];
+                      if (ids.includes(causeId)) {
+                        ids = ids.filter(id => id !== causeId);
+                      } else {
+                        ids.push(causeId);
+                      }
+                      if (ids.length === causeEntries.length) ids = [];
+                      handlePickChange(activeInstanceKey, { selectedCauseIds: ids });
+                    };
+                    const toggleAll = () => {
+                      handlePickChange(activeInstanceKey, { selectedCauseIds: isAllSelected ? [] : causeEntries.map(c => c.id) });
+                    };
+                    return (
                     <div className="border-t pt-4">
                       <div className="space-y-3">
                         <div>
@@ -959,6 +1002,28 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                             ))}
                           </select>
                         </div>
+                        {causeEntries.length > 0 && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">登記原因を選択</label>
+                            <div className="space-y-1">
+                              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                <input type="checkbox" checked={isAllSelected} onChange={toggleAll} className="accent-blue-600" />
+                                <span className="font-bold">全て選択</span>
+                              </label>
+                              {causeEntries.map(c => (
+                                <label key={c.id} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={currentSelected.length === 0 || currentSelected.includes(c.id)}
+                                    onChange={() => toggleCause(c.id)}
+                                    className="accent-blue-600"
+                                  />
+                                  <span>{c.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div>
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">工事人を選択</label>
                           <select
@@ -974,7 +1039,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                         </div>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   <div className="border-t pt-2 space-y-2 font-sans font-bold"><button onClick={() => handlePickChange(activeInstanceKey, { customText: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 文言をリセット</button><button onClick={() => handlePickChange(activeInstanceKey, { stampPositions: null, signerStampPositions: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 位置をリセット</button></div>
                 </div>

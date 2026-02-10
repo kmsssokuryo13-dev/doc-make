@@ -80,7 +80,11 @@ export const BuildingSection = ({ type, site, update }) => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-black">
               <FormField label="所在" value={b.address} onChange={v => updateBuild(b.id, 'address', v)} />
               <FormField label="家屋番号" value={b.houseNum} onChange={v => updateBuild(b.id, 'houseNum', v)} />
-              <FormField label="符号" value={(b.annexes || []).some(a => (a.symbol || '').replace(/[\s\u3000]/g, '').length > 0) ? '主' : ''} readOnly />
+              <FormField label="符号" value={(b.annexes || []).some(a => {
+                const sym = (a.symbol || '').replace(/[\s\u3000]/g, '');
+                const hasContent = (a.kind || '').replace(/[\s\u3000]/g, '').length > 0 || (a.struct || '').replace(/[\s\u3000]/g, '').length > 0 || (a.floorAreas || []).some(fa => (fa.area || '').replace(/[\s\u3000]/g, '').length > 0);
+                return sym.length > 0 && hasContent;
+              }) ? '主' : ''} readOnly />
               <FormField label="所有者" value={b.owner} onChange={v => updateBuild(b.id, 'owner', v)} />
               <FormField label="種類" value={b.kind} onChange={v => updateBuild(b.id, 'kind', v)} />
               <FormField label="構造" value={b.struct} onChange={v => updateBuild(b.id, 'struct', v)} placeholder="例: 木造2階建" />

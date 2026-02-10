@@ -110,8 +110,9 @@ export const DocTemplate = ({
   const floorLine = (floorAreas) => {
     if (name === "委任状（保存）") return "";
     const arr = Array.isArray(floorAreas) ? floorAreas : [];
-    const t = arr.map(fa => `${fa.floor} ${fa.area || "　"}㎡`).join("  ");
-    return t || "　";
+    const filtered = arr.filter(fa => stripAllWS(fa.area));
+    if (filtered.length === 0) return "";
+    return filtered.map(fa => `${fa.floor} ${fa.area}㎡`).join("  ");
   };
 
   const stripAllWS = (s) =>
@@ -127,15 +128,20 @@ export const DocTemplate = ({
 
   const getMainSymbolPrefix = (b) => {
     const explicit = stripAllWS(b?.symbol);
-    const hasAnnexSymbols = (b?.annexes || []).some(a => stripAllWS(a?.symbol));
-    const sym = explicit || (hasAnnexSymbols ? "主" : "");
+    const hasAnnexWithContent = (b?.annexes || []).some(a => {
+      const sym = stripAllWS(a?.symbol);
+      const hasContent = stripAllWS(a?.kind) || stripAllWS(a?.struct) || (a?.floorAreas || []).some(fa => stripAllWS(fa?.area));
+      return sym && hasContent;
+    });
+    const sym = explicit || (hasAnnexWithContent ? "主" : "");
     return formatSymbolPrefix(sym);
   };
 
   const floorLineInline = (floorAreas) => {
     const arr = Array.isArray(floorAreas) ? floorAreas : [];
-    const t = arr.map(fa => `${fa.floor} ${fa.area || "　"}㎡`).join("　");
-    return t || "　";
+    const filtered = arr.filter(fa => stripAllWS(fa.area));
+    if (filtered.length === 0) return "";
+    return filtered.map(fa => `${fa.floor} ${fa.area}㎡`).join("　");
   };
 
   const buildKindStructAreaLine = (symbolPrefix, kind, struct, floorAreas) => {
@@ -144,9 +150,11 @@ export const DocTemplate = ({
       return sym ? `${sym}` : "　";
     }
     const k = kind || "　";
-    const st = struct || "　";
     const areas = floorLineInline(floorAreas);
-    return `${symbolPrefix}${k}　${st}　${areas}`;
+    const parts = [symbolPrefix + k];
+    if (stripAllWS(struct)) parts.push(struct);
+    if (areas) parts.push(areas);
+    return parts.join("　");
   };
 
   const renderMainValuesInline = (b, { showHouseNum } = { showHouseNum: true }) => {
@@ -167,11 +175,10 @@ export const DocTemplate = ({
 
   const isAnnexEmpty = (a) => {
     if (!a) return true;
-    const hasSymbol = stripAllWS(a.symbol);
     const hasKind = stripAllWS(a.kind);
     const hasStruct = stripAllWS(a.struct);
     const hasArea = (a.floorAreas || []).some(fa => stripAllWS(fa.area));
-    return !hasSymbol && !hasKind && !hasStruct && !hasArea;
+    return !hasKind && !hasStruct && !hasArea;
   };
 
   const renderAnnexValuesInline = (a) => {
@@ -345,6 +352,32 @@ export const DocTemplate = ({
     const propsToUse = targetProp ? [targetProp] : sortedProp;
     const currentYearReiwa = String(new Date().getFullYear() - 2018);
 
+    const allCauseEntries = [];
+    propsToUse.forEach(b => {
+      if (b.registrationCause) {
+        allCauseEntries.push({ id: `${b.id}_main`, date: formatWareki(b.registrationDate, b.additionalUnknownDate), cause: b.registrationCause });
+      }
+      (b.additionalCauses || []).forEach(ac => {
+        if (ac.cause) {
+          allCauseEntries.push({ id: ac.id, date: formatWareki(ac.date), cause: ac.cause });
+        }
+      });
+      (b.annexes || []).forEach(a => {
+        if (a.registrationCause) {
+          allCauseEntries.push({ id: `${a.id}_main`, date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause });
+        }
+        (a.additionalCauses || []).forEach(ac => {
+          if (ac.cause) {
+            allCauseEntries.push({ id: ac.id, date: formatWareki(ac.date), cause: ac.cause });
+          }
+        });
+      });
+    });
+    const selectedCauseIds = Array.isArray(pick?.selectedCauseIds) ? pick.selectedCauseIds : [];
+    const filteredCauses = selectedCauseIds.length > 0
+      ? allCauseEntries.filter(c => selectedCauseIds.includes(c.id))
+      : allCauseEntries;
+
     const renderBldgForChange = (b) => {
       if (!b) return null;
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
@@ -409,8 +442,8 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>原因日付及び原因</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            {propsToUse.length > 0 ? propsToUse.map(b => (
-              <p key={b.id} style={{ margin: '0' }}>{formatWareki(b.registrationDate, b.additionalUnknownDate)}　{b.registrationCause || "　"}</p>
+            {filteredCauses.length > 0 ? filteredCauses.map(c => (
+              <p key={c.id} style={{ margin: '0' }}>{c.date}　{c.cause}</p>
             )) : <p style={{ margin: '0' }}>　</p>}
           </div>
 
