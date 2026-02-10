@@ -30,6 +30,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     signerStampPositions: null,
     printOn: true,
     targetPropBuildingId: "",
+    targetBeforeBuildingId: "",
     targetContractorPersonId: "",
     targetLandIds: [],
     statementPersonIds: [],
@@ -313,14 +314,14 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
               {activeInstance && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
-                  {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && activeInstance.name !== "滅失証明書（滅失）" && activeInstance.name !== "非登載証明書" && (
+                  {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && activeInstance.name !== "滅失証明書（滅失）" && activeInstance.name !== "滅失証明書（表題部変更）" && activeInstance.name !== "非登載証明書" && (
                     <div className="space-y-2 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
                   )}
                   {(() => {
   const isStatement = activeInstance && (activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）");
   if (isStatement) return null;
 
-  const isLossCert = activeInstance && activeInstance.name === "滅失証明書（滅失）";
+  const isLossCert = activeInstance && (activeInstance.name === "滅失証明書（滅失）" || activeInstance.name === "滅失証明書（表題部変更）");
   if (isLossCert) return null;
 
   const isNtrCert = activeInstance && activeInstance.name === "非登載証明書";
@@ -548,6 +549,39 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                     </div>
                   )}
 
+                  {activeInstance.name === "委任状（表題部変更）" && (
+                    <div className="border-t pt-4">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">変更前の建物を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetBeforeBuildingId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetBeforeBuildingId: e.target.value })}
+                          >
+                            <option value="">(全て表示)</option>
+                            {(naturalSortList(siteData.buildings || [], 'houseNum')).map(b => (
+                              <option key={b.id} value={b.id}>{b.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">変更後の建物を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetPropBuildingId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                          >
+                            <option value="">(全て表示)</option>
+                            {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
+                              <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {(activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）") && (
                     <div className="border-t pt-4 text-black">
                       <div className="space-y-3">
@@ -763,7 +797,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                     </div>
                   )}
 
-                  {(activeInstance.name === "滅失証明書（滅失）" || activeInstance.name === "非登載証明書") && (
+                  {(activeInstance.name === "滅失証明書（滅失）" || activeInstance.name === "滅失証明書（表題部変更）" || activeInstance.name === "非登載証明書") && (
                     <div>
                       <div className="space-y-3">
                         {(() => {
@@ -889,6 +923,52 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                             <option value="">(未選択)</option>
                             {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
                               <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeInstance.name === "工事完了引渡証明書（表題部変更）" && (
+                    <div className="border-t pt-4">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">変更前の建物を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetBeforeBuildingId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetBeforeBuildingId: e.target.value })}
+                          >
+                            <option value="">(全て表示)</option>
+                            {(naturalSortList(siteData.buildings || [], 'houseNum')).map(b => (
+                              <option key={b.id} value={b.id}>{b.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">変更後の建物を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetPropBuildingId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                          >
+                            <option value="">(全て表示)</option>
+                            {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
+                              <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">工事人を選択</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={activePick.targetContractorPersonId || ""}
+                            onChange={e => handlePickChange(activeInstanceKey, { targetContractorPersonId: e.target.value })}
+                          >
+                            <option value="">(未選択・最初の工事人)</option>
+                            {(contractorsInPeople || []).map(p => (
+                              <option key={p.id} value={p.id}>{p.name || "(名前未入力)"}</option>
                             ))}
                           </select>
                         </div>
