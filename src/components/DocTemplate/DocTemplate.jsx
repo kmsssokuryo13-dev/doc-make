@@ -1537,7 +1537,7 @@ export const DocTemplate = ({
       for (const entry of causeEntries) {
         if (entry.date) parts.push(entry.date);
       }
-      if (houseNumList) parts.push(houseNumList);
+      if (houseNumList) parts.push(houseNumList + "を");
       for (const entry of causeEntries) {
         if (entry.cause) parts.push(entry.cause);
       }
