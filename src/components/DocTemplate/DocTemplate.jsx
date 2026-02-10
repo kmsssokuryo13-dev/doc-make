@@ -1389,8 +1389,8 @@ export const DocTemplate = ({
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
-          <div>{b.address || "\u3000"}</div>
-          {b.houseNum ? <div>家屋番号\u3000{b.houseNum}</div> : null}
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
           <div>{line}</div>
         </div>
       );
@@ -1407,7 +1407,7 @@ export const DocTemplate = ({
               ))}
             </div>
           ))}
-          {beforeBuildings.length === 0 && <div>\u3000</div>}
+          {beforeBuildings.length === 0 && <div>　</div>}
         </div>
         <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>合併後</h3>
         <div style={{ marginBottom: '6mm' }}>
@@ -1419,7 +1419,7 @@ export const DocTemplate = ({
               ))}
             </div>
           ))}
-          {propsToUse.length === 0 && <div>\u3000</div>}
+          {propsToUse.length === 0 && <div>　</div>}
         </div>
       </div>
     );
@@ -1434,11 +1434,69 @@ export const DocTemplate = ({
     });
   };
 
-  const DelegationSplitTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+  const DelegationSplitTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const beforeBuildings = (() => {
+      if (pick.targetBeforeBuildingId) {
+        const found = sortedBuildings.find(b => b.id === pick.targetBeforeBuildingId);
+        return found ? [found] : sortedBuildings;
+      }
+      return sortedBuildings;
+    })();
+    const splitAfterIds = Array.isArray(pick.splitAfterBuildingIds) ? pick.splitAfterBuildingIds : [];
+    const propsToUse = splitAfterIds.length > 0
+      ? sortedProp.filter(b => splitAfterIds.includes(b.id))
+      : sortedProp;
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {beforeBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {beforeBuildings.length === 0 && <div>　</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>分割後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>　</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText: "建物分割登記",
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "分割前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
     });
+  };
 
   const DelegationCombineTemplate = () =>
     renderDelegationCommon({

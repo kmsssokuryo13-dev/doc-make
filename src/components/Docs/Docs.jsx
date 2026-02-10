@@ -38,7 +38,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     statementConfirmApplicantPersonId: "",
     confirmApplicantPersonIds: [],
     selectedCauseIds: null,
-    mergeBeforeBuildingIds: []
+    mergeBeforeBuildingIds: [],
+    splitAfterBuildingIds: []
   };
 
   const allInstances = useMemo(() => {
@@ -626,6 +627,54 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                                 <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
                               ))}
                             </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {activeInstance.name === "委任状（分割）" && (() => {
+                    const sortedProps = naturalSortList(siteData.proposedBuildings || [], 'houseNum');
+                    const curIds = new Set(Array.isArray(activePick.splitAfterBuildingIds) ? activePick.splitAfterBuildingIds : []);
+                    const toggleSplitAfter = (id) => {
+                      const next = new Set(curIds);
+                      if (next.has(id)) next.delete(id); else next.add(id);
+                      handlePickChange(activeInstanceKey, { splitAfterBuildingIds: Array.from(next) });
+                    };
+                    return (
+                      <div className="border-t pt-4">
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">分割前の建物を選択</label>
+                            <select
+                              className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                              value={activePick.targetBeforeBuildingId || ""}
+                              onChange={e => handlePickChange(activeInstanceKey, { targetBeforeBuildingId: e.target.value })}
+                            >
+                              <option value="">(全て表示)</option>
+                              {(naturalSortList(siteData.buildings || [], 'houseNum')).map(b => (
+                                <option key={b.id} value={b.id}>{b.houseNum || "(家屋番号未入力)"}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-2">分割後の建物を選択（複数可）</label>
+                            {sortedProps.length === 0 ? (
+                              <p className="text-[10px] text-slate-400">申請建物が登録されていません。</p>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-1">
+                                {sortedProps.map(pb => (
+                                  <label
+                                    key={pb.id}
+                                    className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${curIds.has(pb.id) ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}`}
+                                  >
+                                    <input type="checkbox" checked={curIds.has(pb.id)} onChange={() => toggleSplitAfter(pb.id)} className="accent-blue-600" />
+                                    {pb.houseNum || "(家屋番号未入力)"}
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-[9px] text-slate-400 mt-1">※未選択の場合は全て表示</p>
                           </div>
                         </div>
                       </div>
