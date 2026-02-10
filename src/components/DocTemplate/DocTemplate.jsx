@@ -373,10 +373,10 @@ export const DocTemplate = ({
         });
       });
     });
-    const selectedCauseIds = Array.isArray(pick?.selectedCauseIds) ? pick.selectedCauseIds : [];
-    const filteredCauses = selectedCauseIds.length > 0
-      ? allCauseEntries.filter(c => selectedCauseIds.includes(c.id))
-      : allCauseEntries;
+    const selectedCauseIds = pick?.selectedCauseIds;
+    const filteredCauses = selectedCauseIds == null
+      ? allCauseEntries
+      : allCauseEntries.filter(c => selectedCauseIds.includes(c.id));
 
     const renderBldgForChange = (b) => {
       if (!b) return null;

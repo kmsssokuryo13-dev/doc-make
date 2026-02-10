@@ -37,7 +37,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     statementApplicantPersonId: "",
     statementConfirmApplicantPersonId: "",
     confirmApplicantPersonIds: [],
-    selectedCauseIds: []
+    selectedCauseIds: null
   };
 
   const allInstances = useMemo(() => {
@@ -958,20 +958,20 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                         });
                       });
                     });
-                    const currentSelected = activePick.selectedCauseIds || [];
-                    const isAllSelected = currentSelected.length === 0 || causeEntries.every(c => currentSelected.includes(c.id));
+                    const currentSelected = activePick.selectedCauseIds;
+                    const isAllSelected = currentSelected == null || causeEntries.every(c => currentSelected.includes(c.id));
                     const toggleCause = (causeId) => {
-                      let ids = currentSelected.length === 0 ? causeEntries.map(c => c.id) : [...currentSelected];
+                      let ids = currentSelected == null ? causeEntries.map(c => c.id) : [...currentSelected];
                       if (ids.includes(causeId)) {
                         ids = ids.filter(id => id !== causeId);
                       } else {
                         ids.push(causeId);
                       }
-                      if (ids.length === causeEntries.length) ids = [];
+                      if (causeEntries.every(c => ids.includes(c.id))) ids = null;
                       handlePickChange(activeInstanceKey, { selectedCauseIds: ids });
                     };
                     const toggleAll = () => {
-                      handlePickChange(activeInstanceKey, { selectedCauseIds: isAllSelected ? [] : causeEntries.map(c => c.id) });
+                      handlePickChange(activeInstanceKey, { selectedCauseIds: isAllSelected ? [] : null });
                     };
                     return (
                     <div className="border-t pt-4">
@@ -1014,7 +1014,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                                 <label key={c.id} className="flex items-center gap-1.5 text-xs cursor-pointer">
                                   <input
                                     type="checkbox"
-                                    checked={currentSelected.length === 0 || currentSelected.includes(c.id)}
+                                    checked={currentSelected == null || currentSelected.includes(c.id)}
                                     onChange={() => toggleCause(c.id)}
                                     className="accent-blue-600"
                                   />
