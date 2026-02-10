@@ -352,23 +352,29 @@ export const DocTemplate = ({
     const propsToUse = targetProp ? [targetProp] : sortedProp;
     const currentYearReiwa = String(new Date().getFullYear() - 2018);
 
+    const hasAnyAnnexes = beforeBuildings.some(b => (b.annexes || []).length > 0)
+      || propsToUse.some(b => (b.annexes || []).length > 0);
+
     const allCauseEntries = [];
     propsToUse.forEach(b => {
+      const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
       if (b.registrationCause) {
-        allCauseEntries.push({ id: `${b.id}_main`, date: formatWareki(b.registrationDate, b.additionalUnknownDate), cause: b.registrationCause });
+        allCauseEntries.push({ id: `${b.id}_main`, date: formatWareki(b.registrationDate, b.additionalUnknownDate), cause: b.registrationCause, prefix: mainPrefix });
       }
       (b.additionalCauses || []).forEach(ac => {
         if (ac.cause) {
-          allCauseEntries.push({ id: ac.id, date: formatWareki(ac.date), cause: ac.cause });
+          allCauseEntries.push({ id: ac.id, date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
         }
       });
       (b.annexes || []).forEach(a => {
+        const sym = stripAllWS(a.symbol);
+        const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
         if (a.registrationCause) {
-          allCauseEntries.push({ id: `${a.id}_main`, date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause });
+          allCauseEntries.push({ id: `${a.id}_main`, date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause, prefix: annexPrefix });
         }
         (a.additionalCauses || []).forEach(ac => {
           if (ac.cause) {
-            allCauseEntries.push({ id: ac.id, date: formatWareki(ac.date), cause: ac.cause });
+            allCauseEntries.push({ id: ac.id, date: formatWareki(ac.date), cause: ac.cause, prefix: annexPrefix });
           }
         });
       });
@@ -443,7 +449,7 @@ export const DocTemplate = ({
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>原因日付及び原因</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {filteredCauses.length > 0 ? filteredCauses.map(c => (
-              <p key={c.id} style={{ margin: '0' }}>{c.date}　{c.cause}</p>
+              <p key={c.id} style={{ margin: '0' }}>{c.date}{c.prefix}{c.cause}</p>
             )) : <p style={{ margin: '0' }}>　</p>}
           </div>
 
@@ -605,12 +611,23 @@ export const DocTemplate = ({
 
   // ---- 滅失証明書（表題部変更） ----
   if (name === "滅失証明書（表題部変更）") {
+    const sortedBuildings_loss = naturalSortList(siteData.buildings || [], 'houseNum');
+    const beforeBuildings_loss = (() => {
+      if (pick.targetBeforeBuildingId) {
+        const found = sortedBuildings_loss.find(b => b.id === pick.targetBeforeBuildingId);
+        return found ? [found] : sortedBuildings_loss;
+      }
+      return sortedBuildings_loss;
+    })();
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
     const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
     const selectedLoss = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
+
+    const hasAnyAnnexes_loss = beforeBuildings_loss.some(b => (b.annexes || []).length > 0)
+      || buildings.some(b => (b.annexes || []).length > 0);
 
     const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
     const ownerIds = Array.isArray(pick?.lossCertOwnerIds) ? pick.lossCertOwnerIds : [];
@@ -620,9 +637,21 @@ export const DocTemplate = ({
       : defaultOwners;
     const displayOwners = owners.length > 0 ? owners : defaultOwners;
 
-    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
-    const uniqueDates = [...new Set(dates)];
-    const causeDate = uniqueDates[0] || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "令和　年　月　日";
+    const lossCauseEntries = [];
+    buildings.forEach(b => {
+      const mainPrefix = hasAnyAnnexes_loss ? "主である建物" : "";
+      if (b.registrationCause) {
+        lossCauseEntries.push({ date: formatWareki(b.registrationDate, b.additionalUnknownDate), cause: b.registrationCause, prefix: mainPrefix });
+      }
+      (b.annexes || []).forEach(a => {
+        const sym = stripAllWS(a.symbol);
+        const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
+        if (a.registrationCause) {
+          lossCauseEntries.push({ date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause, prefix: annexPrefix });
+        }
+      });
+    });
+    const fallbackDate = formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "令和　年　月　日";
 
     return (
       <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
@@ -671,7 +700,9 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>取壊しの事由及び年月日</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            <p style={{ margin: '0' }}>{causeDate}取壊し</p>
+            {lossCauseEntries.length > 0 ? lossCauseEntries.map((c, i) => (
+              <p key={i} style={{ margin: '0' }}>{c.date}{c.prefix}{c.cause}</p>
+            )) : <p style={{ margin: '0' }}>{fallbackDate}取壊し</p>}
           </div>
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>

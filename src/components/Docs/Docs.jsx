@@ -933,27 +933,33 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
                   {activeInstance.name === "工事完了引渡証明書（表題部変更）" && (() => {
                     const sortedProp = naturalSortList(siteData.proposedBuildings || [], 'houseNum');
+                    const sortedBefore = naturalSortList(siteData.buildings || [], 'houseNum');
                     const targetPropB = activePick.targetPropBuildingId
                       ? sortedProp.find(b => b.id === activePick.targetPropBuildingId)
                       : null;
                     const propsForCauses = targetPropB ? [targetPropB] : sortedProp;
+                    const hasAnyAnnexes = sortedBefore.some(b => (b.annexes || []).length > 0)
+                      || propsForCauses.some(b => (b.annexes || []).length > 0);
                     const causeEntries = [];
                     propsForCauses.forEach(b => {
+                      const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
                       if (b.registrationCause) {
-                        causeEntries.push({ id: `${b.id}_main`, label: `${formatWareki(b.registrationDate, b.additionalUnknownDate)}　${b.registrationCause}` });
+                        causeEntries.push({ id: `${b.id}_main`, label: `${formatWareki(b.registrationDate, b.additionalUnknownDate)}${mainPrefix}${b.registrationCause}` });
                       }
                       (b.additionalCauses || []).forEach(ac => {
                         if (ac.cause) {
-                          causeEntries.push({ id: ac.id, label: `${formatWareki(ac.date)}　${ac.cause}` });
+                          causeEntries.push({ id: ac.id, label: `${formatWareki(ac.date)}${mainPrefix}${ac.cause}` });
                         }
                       });
                       (b.annexes || []).forEach(a => {
+                        const sym = (a.symbol || '').replace(/[\s\u3000]/g, '');
+                        const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
                         if (a.registrationCause) {
-                          causeEntries.push({ id: `${a.id}_main`, label: `${formatWareki(a.registrationDate, a.additionalUnknownDate)}　${a.registrationCause}` });
+                          causeEntries.push({ id: `${a.id}_main`, label: `${formatWareki(a.registrationDate, a.additionalUnknownDate)}${annexPrefix}${a.registrationCause}` });
                         }
                         (a.additionalCauses || []).forEach(ac => {
                           if (ac.cause) {
-                            causeEntries.push({ id: ac.id, label: `${formatWareki(ac.date)}　${ac.cause}` });
+                            causeEntries.push({ id: ac.id, label: `${formatWareki(ac.date)}${annexPrefix}${ac.cause}` });
                           }
                         });
                       });
