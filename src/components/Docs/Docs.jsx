@@ -37,7 +37,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     statementApplicantPersonId: "",
     statementConfirmApplicantPersonId: "",
     confirmApplicantPersonIds: [],
-    selectedCauseIds: null
+    selectedCauseIds: null,
+    mergeBeforeBuildingIds: []
   };
 
   const allInstances = useMemo(() => {
@@ -582,6 +583,54 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                       </div>
                     </div>
                   )}
+
+                  {activeInstance.name === "委任状（合併）" && (() => {
+                    const sortedBldgs = naturalSortList(siteData.buildings || [], 'houseNum');
+                    const curIds = new Set(Array.isArray(activePick.mergeBeforeBuildingIds) ? activePick.mergeBeforeBuildingIds : []);
+                    const toggleMergeBefore = (id) => {
+                      const next = new Set(curIds);
+                      if (next.has(id)) next.delete(id); else next.add(id);
+                      handlePickChange(activeInstanceKey, { mergeBeforeBuildingIds: Array.from(next) });
+                    };
+                    return (
+                      <div className="border-t pt-4">
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-2">合併前の建物を選択（複数可）</label>
+                            {sortedBldgs.length === 0 ? (
+                              <p className="text-[10px] text-slate-400">登記建物が登録されていません。</p>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-1">
+                                {sortedBldgs.map(b => (
+                                  <label
+                                    key={b.id}
+                                    className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${curIds.has(b.id) ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}`}
+                                  >
+                                    <input type="checkbox" checked={curIds.has(b.id)} onChange={() => toggleMergeBefore(b.id)} className="accent-blue-600" />
+                                    {b.houseNum || "(家屋番号未入力)"}
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-[9px] text-slate-400 mt-1">※未選択の場合は全て表示</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">合併後の建物を選択</label>
+                            <select
+                              className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                              value={activePick.targetPropBuildingId || ""}
+                              onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                            >
+                              <option value="">(全て表示)</option>
+                              {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
+                                <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {(activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）") && (
                     <div className="border-t pt-4 text-black">

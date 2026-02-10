@@ -1376,11 +1376,63 @@ export const DocTemplate = ({
       });
   };
 
-  const DelegationMergeTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+  const DelegationMergeTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const mergeIds = Array.isArray(pick.mergeBeforeBuildingIds) ? pick.mergeBeforeBuildingIds : [];
+    const beforeBuildings = mergeIds.length > 0
+      ? sortedBuildings.filter(b => mergeIds.includes(b.id))
+      : sortedBuildings;
+    const propsToUse = targetProp ? [targetProp] : sortedProp;
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "\u3000"}</div>
+          {b.houseNum ? <div>家屋番号\u3000{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {beforeBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {beforeBuildings.length === 0 && <div>\u3000</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>合併後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>\u3000</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText: "建物合併登記",
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "合併前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
     });
+  };
 
   const DelegationSplitTemplate = () =>
     renderDelegationCommon({
