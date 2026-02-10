@@ -841,11 +841,98 @@ export const DocTemplate = ({
     });
   };
 
-  const DelegationTitleChangeTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+  const DelegationTitleChangeTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const propsToUse = targetProp ? [targetProp] : sortedProp;
+
+    const causeEntries = [];
+    for (const b of propsToUse) {
+      if (b.registrationCause) {
+        causeEntries.push({
+          date: formatWareki(b.registrationDate, b.additionalUnknownDate),
+          cause: b.registrationCause,
+        });
+      }
+      for (const ac of (b.additionalCauses || [])) {
+        if (ac.cause) {
+          causeEntries.push({
+            date: formatWareki(ac.date),
+            cause: ac.cause,
+          });
+        }
+      }
+    }
+
+    const uniqueCauses = [];
+    const seenKeys = new Set();
+    for (const entry of causeEntries) {
+      const key = `${entry.date}|${entry.cause}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueCauses.push(entry);
+      }
+    }
+
+    const workText = uniqueCauses.length > 0 ? (
+      <>
+        {uniqueCauses.map((cl, i) => (
+          <div key={i}>
+            {cl.date}{cl.cause}
+            {i === uniqueCauses.length - 1 ? "したので建物表題部変更登記" : ""}
+          </div>
+        ))}
+      </>
+    ) : "建物表題部変更登記";
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {sortedBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {sortedBuildings.length === 0 && <div>　</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>変更後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>　</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText,
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "変更前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
     });
+  };
 
   const DelegationAddressChangeTemplate = () => {
     const workText = (
