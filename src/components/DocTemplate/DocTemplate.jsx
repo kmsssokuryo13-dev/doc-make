@@ -553,8 +553,7 @@ export const DocTemplate = ({
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
                   <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
-                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
-                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                                        <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
               </div>
@@ -690,8 +689,7 @@ export const DocTemplate = ({
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
                   <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
-                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
-                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                                        <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
               </div>
