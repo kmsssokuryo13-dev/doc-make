@@ -1498,11 +1498,104 @@ export const DocTemplate = ({
     });
   };
 
-  const DelegationCombineTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+  const DelegationCombineTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const combineIds = Array.isArray(pick.combineBeforeBuildingIds) ? pick.combineBeforeBuildingIds : [];
+    const beforeBuildings = combineIds.length > 0
+      ? sortedBuildings.filter(b => combineIds.includes(b.id))
+      : sortedBuildings;
+    const propsToUse = targetProp ? [targetProp] : sortedProp;
+
+    const combinePurpose = pick.combinePurpose || "combineOnly";
+    const suffix = combinePurpose === "combineAndPreserve"
+      ? "したので\n合体による建物の表題登記及び合体前の建物の表題部登記の抹消並びに所有権の保存の登記"
+      : "したので\n合体による建物の表題登記及び合体前の建物の表題部登記の抹消";
+
+    const houseNumList = beforeBuildings
+      .map(b => b.houseNum || "")
+      .filter(h => h)
+      .map(h => `家屋番号${h}`)
+      .join("と");
+
+    const causeEntries = [];
+    for (const b of propsToUse) {
+      if (b.registrationCause) {
+        causeEntries.push({
+          date: formatWareki(b.registrationDate, b.additionalUnknownDate),
+          cause: b.registrationCause,
+        });
+      }
+    }
+
+    const workText = (() => {
+      if (causeEntries.length === 0 && !houseNumList) {
+        return combinePurpose === "combineAndPreserve"
+          ? "合体による建物の表題登記及び合体前の建物の表題部登記の抹消並びに所有権の保存の登記"
+          : "合体による建物の表題登記及び合体前の建物の表題部登記の抹消";
+      }
+      const parts = [];
+      for (const entry of causeEntries) {
+        if (entry.date) parts.push(entry.date);
+      }
+      if (houseNumList) parts.push(houseNumList);
+      for (const entry of causeEntries) {
+        if (entry.cause) parts.push(entry.cause);
+      }
+      const mainText = parts.join("");
+      return (
+        <div style={{ whiteSpace: 'pre-wrap' }}>{mainText}{suffix}</div>
+      );
+    })();
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {beforeBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {beforeBuildings.length === 0 && <div>　</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>合体後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>　</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText,
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "合体前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
     });
+  };
 
   const DELEGATION_TEMPLATES = {
     "委任状（表題）": DelegationTitleTemplate,
