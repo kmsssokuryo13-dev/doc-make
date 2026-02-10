@@ -163,6 +163,74 @@ const parseAnnexStructureToFloors = (struct) => {
   return floors;
 };
 
+const parseStructParts = (struct) => {
+  const s = struct || "";
+  const hw = toHalfWidth(s);
+  const floorPattern = /(地下\d+階付)?(平家建|\d+階建)$/;
+  const match = hw.match(floorPattern);
+  if (match) {
+    const matchIdx = hw.lastIndexOf(match[0]);
+    return { structMaterial: s.slice(0, matchIdx), structFloor: s.slice(matchIdx) };
+  }
+  return { structMaterial: s, structFloor: "" };
+};
+
+const computeStructFloor = (floorAreas) => {
+  const areas = floorAreas || [];
+  const isFilled = (a) => (a || "").replace(/[\s\u3000\u00A0]/g, "").length > 0;
+  let maxGround = 0;
+  let maxBasement = 0;
+  areas.forEach(fa => {
+    if (!isFilled(fa.area)) return;
+    const hw = toHalfWidth(fa.floor);
+    const bm = hw.match(/地下(\d+)階/);
+    if (bm) { maxBasement = Math.max(maxBasement, parseInt(bm[1], 10)); return; }
+    const gm = hw.match(/(\d+)階/);
+    if (gm) maxGround = Math.max(maxGround, parseInt(gm[1], 10));
+  });
+  let result = "";
+  if (maxBasement > 0) result += `地下${toFullWidthDigits(String(maxBasement))}階付`;
+  if (maxGround === 0) return result;
+  if (maxGround === 1) result += "平家建";
+  else result += `${toFullWidthDigits(String(maxGround))}階建`;
+  return result;
+};
+
+const ensureNextFloors = (floorAreas, hasBasement) => {
+  const newAreas = [...floorAreas];
+  const isFilled = (a) => (a || "").replace(/[\s\u3000\u00A0]/g, "").length > 0;
+  const groundAreas = newAreas.filter(fa => !fa.floor.includes("地下"));
+  let maxGroundNum = 0;
+  groundAreas.forEach(fa => {
+    const hw = toHalfWidth(fa.floor);
+    const m = hw.match(/(\d+)階/);
+    if (m && isFilled(fa.area)) maxGroundNum = Math.max(maxGroundNum, parseInt(m[1], 10));
+  });
+  const nextGroundLabel = toFullWidthDigits(`${maxGroundNum + 1}階`);
+  if (maxGroundNum > 0 && !newAreas.some(fa => toHalfWidth(fa.floor) === `${maxGroundNum + 1}階`)) {
+    const insertIdx = newAreas.findIndex(fa => fa.floor.includes("地下"));
+    const entry = { id: generateId(), floor: nextGroundLabel, area: "" };
+    if (insertIdx >= 0) newAreas.splice(insertIdx, 0, entry);
+    else newAreas.push(entry);
+  }
+  if (hasBasement) {
+    const basementAreas = newAreas.filter(fa => fa.floor.includes("地下"));
+    let maxBasementNum = 0;
+    basementAreas.forEach(fa => {
+      const hw = toHalfWidth(fa.floor);
+      const m = hw.match(/地下(\d+)階/);
+      if (m && isFilled(fa.area)) maxBasementNum = Math.max(maxBasementNum, parseInt(m[1], 10));
+    });
+    if (maxBasementNum > 0) {
+      const nextLabel = toFullWidthDigits(`地下${maxBasementNum + 1}階`);
+      if (!newAreas.some(fa => toHalfWidth(fa.floor) === `地下${maxBasementNum + 1}階`)) {
+        newAreas.push({ id: generateId(), floor: nextLabel, area: "" });
+      }
+    }
+  }
+  return newAreas;
+};
+
 const createNewSite = (name) => ({
   id: generateId(),
   name: name || '新規現場',
@@ -174,11 +242,15 @@ const createNewSite = (name) => ({
 
 const createNewBuilding = () => ({
   id: generateId(),
-  address: '', symbol: '', houseNum: '', kind: '', struct: '', owner: '',
-  floorAreas: [{ id: generateId(), floor: '1階', area: '' }], annexes: [],
+  address: '', symbol: '', houseNum: '', kind: '',
+  structMaterial: '', structFloor: '', struct: '',
+  owner: '',
+  floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
+  hasBasement: false,
+  annexes: [],
   registrationCause: "",
   registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
-  confirmationCert: null // ★追加：確認済証情報（申述書用）。未追加は null。
+  confirmationCert: null
 });
 
 const createNewAnnex = () => ({
@@ -380,22 +452,45 @@ const sanitizeSiteData = (raw = {}) => {
   };
 
   const sanitizeBuilding = (b = {}) => {
-    const struct = b.struct || "";
-    const labels = parseStructureToFloors(struct);
-    const map = new Map((b.floorAreas || []).map(f => [f.floor, f]));
-    const floorAreas = labels.map(floor => {
-      const ex = map.get(floor);
-      return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
-    });
+    const hasNewFields = b.structMaterial !== undefined;
+    let structMaterial, structFloor, floorAreas, hasBasement;
+    if (hasNewFields) {
+      structMaterial = b.structMaterial || "";
+      structFloor = b.structFloor || "";
+      floorAreas = Array.isArray(b.floorAreas) && b.floorAreas.length > 0
+        ? b.floorAreas.map(fa => ({ id: fa.id || generateId(), floor: fa.floor, area: fa.area || "" }))
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = !!b.hasBasement;
+    } else {
+      const parsed = parseStructParts(b.struct || "");
+      structMaterial = parsed.structMaterial;
+      structFloor = parsed.structFloor;
+      const labels = parseStructureToFloors(b.struct || "");
+      const map = new Map((b.floorAreas || []).map(f => [f.floor, f]));
+      floorAreas = labels.length > 0
+        ? labels.map(floor => {
+            const ex = map.get(floor);
+            return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
+          })
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = floorAreas.some(fa => fa.floor.includes("地下"));
+    }
+    if (!floorAreas.some(fa => toHalfWidth(fa.floor) === "1階")) {
+      floorAreas.unshift({ id: generateId(), floor: "１階", area: "" });
+    }
+    const struct = structMaterial + structFloor;
     return {
       id: b.id || generateId(),
       address: b.address || "",
       symbol: b.symbol || "",
       houseNum: b.houseNum || "",
       kind: b.kind || "",
+      structMaterial,
+      structFloor,
       struct,
       owner: b.owner || "",
       floorAreas,
+      hasBasement,
       annexes: Array.isArray(b.annexes) ? b.annexes.map(sanitizeAnnex) : [],
       registrationCause: b.registrationCause || "",
       registrationDate: {
@@ -405,7 +500,7 @@ const sanitizeSiteData = (raw = {}) => {
         day: b.registrationDate?.day || "",
         unknown: !!b.registrationDate?.unknown
       },
-      confirmationCert: sanitizeConfirmationCert(b.confirmationCert) // ★追加
+      confirmationCert: sanitizeConfirmationCert(b.confirmationCert)
     };
   };
 
@@ -776,16 +871,25 @@ const BuildingSection = ({ type, site, update }) => {
 
   const updateBuild = (bid, field, val) => {
     update({ [dataKey]: buildings.map(b => {
-      if (b.id === bid) {
-        let up = { ...b, [field]: val };
-        if (field === 'struct') {
-          const newFloorLabels = parseStructureToFloors(val);
-          const currentMap = new Map((b.floorAreas || []).map(fa => [fa.floor, fa]));
-          up.floorAreas = newFloorLabels.map(l => currentMap.get(l) || { id: generateId(), floor: l, area: '' });
-        }
-        return up;
+      if (b.id !== bid) return b;
+      let up = { ...b, [field]: val };
+      if (field === 'structMaterial') {
+        up.struct = val + (up.structFloor || "");
       }
-      return b;
+      if (field === 'floorAreas') {
+        up.floorAreas = ensureNextFloors(val, up.hasBasement);
+        up.structFloor = computeStructFloor(up.floorAreas);
+        up.struct = (up.structMaterial || "") + up.structFloor;
+      }
+      if (field === 'hasBasement' && val) {
+        const newAreas = [...(up.floorAreas || [])];
+        const label = toFullWidthDigits("地下1階");
+        if (!newAreas.some(fa => toHalfWidth(fa.floor) === "地下1階")) {
+          newAreas.push({ id: generateId(), floor: label, area: "" });
+        }
+        up.floorAreas = newAreas;
+      }
+      return up;
     })});
   };
   const updateAnnex = (bid, aid, field, val) => {
@@ -843,8 +947,20 @@ const BuildingSection = ({ type, site, update }) => {
               <FormField label="符号" value={b.annexes?.length > 0 ? '主' : ''} readOnly />
               <FormField label="所有者" value={b.owner} onChange={v => updateBuild(b.id, 'owner', v)} />
               <FormField label="種類" value={b.kind} onChange={v => updateBuild(b.id, 'kind', v)} />
-              <FormField label="構造" value={b.struct} onChange={v => updateBuild(b.id, 'struct', v)} placeholder="例: 木造2階建" />
-              {(b.floorAreas || []).map((fa, i) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = [...b.floorAreas]; n[i].area = v; updateBuild(b.id, 'floorAreas', n); }} />))}
+              <FormField label="構造（構成材料・屋根の種類）" value={b.structMaterial || ''} onChange={v => updateBuild(b.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" />
+              <FormField label="構造（階層）" value={b.structFloor || ''} readOnly />
+              {(b.floorAreas || []).filter(fa => !fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = b.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateBuild(b.id, 'floorAreas', n); }} />))}
+              {!b.hasBasement ? (
+                <div className="flex items-end pb-1">
+                  <button onClick={() => updateBuild(b.id, 'hasBasement', true)} className="text-[10px] bg-slate-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-slate-700 font-bold active:scale-95 shadow-sm whitespace-nowrap">
+                    <Plus size={12} /> 地下階を追加
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {(b.floorAreas || []).filter(fa => fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = b.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateBuild(b.id, 'floorAreas', n); }} />))}
+                </>
+              )}
             </div>
 
             {!isReg && (

@@ -3,7 +3,8 @@ import { Building, Plus, Trash2, Copy, X } from 'lucide-react';
 import {
   generateId, naturalSortList, toHalfWidth, toFullWidthDigits,
   createNewBuilding, createNewAnnex, parseStructureToFloors,
-  parseAnnexStructureToFloors, createDefaultConfirmationCert, createDefaultCauseDate
+  parseAnnexStructureToFloors, createDefaultConfirmationCert, createDefaultCauseDate,
+  computeStructFloor, ensureNextFloors
 } from '../../utils.js';
 import { FormField } from '../ui/FormField.jsx';
 
@@ -15,16 +16,25 @@ export const BuildingSection = ({ type, site, update }) => {
 
   const updateBuild = (bid, field, val) => {
     update({ [dataKey]: buildings.map(b => {
-      if (b.id === bid) {
-        let up = { ...b, [field]: val };
-        if (field === 'struct') {
-          const newFloorLabels = parseStructureToFloors(val);
-          const currentMap = new Map((b.floorAreas || []).map(fa => [fa.floor, fa]));
-          up.floorAreas = newFloorLabels.map(l => currentMap.get(l) || { id: generateId(), floor: l, area: '' });
-        }
-        return up;
+      if (b.id !== bid) return b;
+      let up = { ...b, [field]: val };
+      if (field === 'structMaterial') {
+        up.struct = val + (up.structFloor || "");
       }
-      return b;
+      if (field === 'floorAreas') {
+        up.floorAreas = ensureNextFloors(val, up.hasBasement);
+        up.structFloor = computeStructFloor(up.floorAreas);
+        up.struct = (up.structMaterial || "") + up.structFloor;
+      }
+      if (field === 'hasBasement' && val) {
+        const newAreas = [...(up.floorAreas || [])];
+        const label = toFullWidthDigits("地下1階");
+        if (!newAreas.some(fa => toHalfWidth(fa.floor) === "地下1階")) {
+          newAreas.push({ id: generateId(), floor: label, area: "" });
+        }
+        up.floorAreas = newAreas;
+      }
+      return up;
     })});
   };
 
@@ -87,8 +97,20 @@ export const BuildingSection = ({ type, site, update }) => {
               }) ? '主' : ''} readOnly />
               <FormField label="所有者" value={b.owner} onChange={v => updateBuild(b.id, 'owner', v)} />
               <FormField label="種類" value={b.kind} onChange={v => updateBuild(b.id, 'kind', v)} />
-              <FormField label="構造" value={b.struct} onChange={v => updateBuild(b.id, 'struct', v)} placeholder="例: 木造2階建" />
-              {(b.floorAreas || []).map((fa, i) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = [...b.floorAreas]; n[i].area = v; updateBuild(b.id, 'floorAreas', n); }} />))}
+              <FormField label="構造（構成材料・屋根の種類）" value={b.structMaterial || ''} onChange={v => updateBuild(b.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" />
+              <FormField label="構造（階層）" value={b.structFloor || ''} readOnly />
+              {(b.floorAreas || []).filter(fa => !fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = b.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateBuild(b.id, 'floorAreas', n); }} />))}
+              {!b.hasBasement ? (
+                <div className="flex items-end pb-1">
+                  <button onClick={() => updateBuild(b.id, 'hasBasement', true)} className="text-[10px] bg-slate-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-slate-700 font-bold active:scale-95 shadow-sm whitespace-nowrap">
+                    <Plus size={12} /> 地下階を追加
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {(b.floorAreas || []).filter(fa => fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = b.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateBuild(b.id, 'floorAreas', n); }} />))}
+                </>
+              )}
             </div>
 
             {!isReg && (

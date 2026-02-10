@@ -1,7 +1,8 @@
 import { APPLICATION_TYPES } from './constants.js';
 import {
   generateId, toHalfWidth, toFullWidthDigits, stableSortKeys,
-  parseStructureToFloors, parseAnnexStructureToFloors, sanitizeConfirmationCert
+  parseStructureToFloors, parseAnnexStructureToFloors, parseStructParts,
+  sanitizeConfirmationCert
 } from './utils.js';
 
 export const sanitizeSiteData = (raw = {}) => {
@@ -59,22 +60,45 @@ export const sanitizeSiteData = (raw = {}) => {
   };
 
   const sanitizeBuilding = (b = {}) => {
-    const struct = b.struct || "";
-    const labels = parseStructureToFloors(struct);
-    const map = new Map((b.floorAreas || []).map(f => [f.floor, f]));
-    const floorAreas = labels.map(floor => {
-      const ex = map.get(floor);
-      return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
-    });
+    const hasNewFields = b.structMaterial !== undefined;
+    let structMaterial, structFloor, floorAreas, hasBasement;
+    if (hasNewFields) {
+      structMaterial = b.structMaterial || "";
+      structFloor = b.structFloor || "";
+      floorAreas = Array.isArray(b.floorAreas) && b.floorAreas.length > 0
+        ? b.floorAreas.map(fa => ({ id: fa.id || generateId(), floor: fa.floor, area: fa.area || "" }))
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = !!b.hasBasement;
+    } else {
+      const parsed = parseStructParts(b.struct || "");
+      structMaterial = parsed.structMaterial;
+      structFloor = parsed.structFloor;
+      const labels = parseStructureToFloors(b.struct || "");
+      const map = new Map((b.floorAreas || []).map(f => [f.floor, f]));
+      floorAreas = labels.length > 0
+        ? labels.map(floor => {
+            const ex = map.get(floor);
+            return { id: ex?.id || generateId(), floor, area: ex?.area || "" };
+          })
+        : [{ id: generateId(), floor: "１階", area: "" }];
+      hasBasement = floorAreas.some(fa => fa.floor.includes("地下"));
+    }
+    if (!floorAreas.some(fa => toHalfWidth(fa.floor) === "1階")) {
+      floorAreas.unshift({ id: generateId(), floor: "１階", area: "" });
+    }
+    const struct = structMaterial + structFloor;
     return {
       id: b.id || generateId(),
       address: b.address || "",
       symbol: b.symbol || "",
       houseNum: b.houseNum || "",
       kind: b.kind || "",
+      structMaterial,
+      structFloor,
       struct,
       owner: b.owner || "",
       floorAreas,
+      hasBasement,
       annexes: Array.isArray(b.annexes) ? b.annexes.map(sanitizeAnnex) : [],
       registrationCause: b.registrationCause || "",
       registrationDate: {
