@@ -498,7 +498,7 @@ export const DocTemplate = ({
   // ---- 滅失証明書（滅失） ----
   if (name === "滅失証明書（滅失）") {
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const selectedLossBuildings = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
@@ -549,12 +549,11 @@ export const DocTemplate = ({
                   {b.houseNum ? (
                     <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
                   ) : null}
-                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                  <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
-                {(b.annexes || []).map(a => (
+                {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
                   <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
-                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
-                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                                        <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
               </div>
@@ -620,13 +619,13 @@ export const DocTemplate = ({
       return sortedBuildings_loss;
     })();
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const selectedLoss = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
 
-    const hasAnyAnnexes_loss = beforeBuildings_loss.some(b => (b.annexes || []).length > 0)
+    const hasAnyAnnexes_loss= beforeBuildings_loss.some(b => (b.annexes || []).length > 0)
       || buildings.some(b => (b.annexes || []).length > 0);
 
     const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
@@ -686,12 +685,11 @@ export const DocTemplate = ({
                   {b.houseNum ? (
                     <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
                   ) : null}
-                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                  <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
-                {(b.annexes || []).map(a => (
+                {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
                   <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
-                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
-                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                                        <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
               </div>
@@ -751,8 +749,8 @@ export const DocTemplate = ({
   // ---- 非登載証明書 ----
   if (name === "非登載証明書") {
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
-    const ntrSelectedBuildings = lossIds.length > 0
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
+    const ntrSelectedBuildings= lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const ntrBuildings = ntrSelectedBuildings.length > 0 ? ntrSelectedBuildings : allLossBuildings;
@@ -822,12 +820,11 @@ export const DocTemplate = ({
                   {b.houseNum ? (
                     <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
                   ) : null}
-                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                  <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
-                {(b.annexes || []).map(a => (
+                {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
                   <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
-                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
-                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                    <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
               </div>
@@ -1103,13 +1100,13 @@ export const DocTemplate = ({
 
   const DelegationLossTemplate = () => {
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const selectedLoss = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
 
-    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
+    const dates= buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
     const uniqueDates = [...new Set(dates)];
     const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "";
     const workText = `${dateText}取壊したので建物滅失登記`;
@@ -1121,12 +1118,11 @@ export const DocTemplate = ({
           {b.houseNum ? (
             <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
           ) : null}
-          <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLine(b.floorAreas)}`}</div>
+          <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
         </div>
-        {(b.annexes || []).map(a => (
+        {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
           <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
-            <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
-            <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLine(a.floorAreas)}`}</div>
+            <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
           </div>
         ))}
       </div>
@@ -1319,29 +1315,287 @@ export const DocTemplate = ({
     });
   };
 
-  const DelegationTitleCorrectionTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
-    });
+    const DelegationTitleCorrectionTemplate = () => {
+      const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+      const beforeBuildings = (() => {
+        if (pick.targetBeforeBuildingId) {
+          const found = sortedBuildings.find(b => b.id === pick.targetBeforeBuildingId);
+          return found ? [found] : sortedBuildings;
+        }
+        return sortedBuildings;
+      })();
+      const propsToUse = targetProp ? [targetProp] : sortedProp;
 
-  const DelegationMergeTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
-    });
+      const renderBuildingForChange = (b) => {
+        if (!b) return null;
+        const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+            <div>{b.address || "　"}</div>
+            {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+            <div>{line}</div>
+          </div>
+        );
+      };
 
-  const DelegationSplitTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
-    });
+      const buildingBlock = (
+        <div>
+          <div style={{ marginBottom: '6mm' }}>
+            {beforeBuildings.map(b => (
+              <div key={b.id} style={{ marginBottom: '4mm' }}>
+                {(pick.showMain ?? true) && renderBuildingForChange(b)}
+                {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                  <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+                ))}
+              </div>
+            ))}
+            {beforeBuildings.length === 0 && <div>　</div>}
+          </div>
+          <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>更正後</h3>
+          <div style={{ marginBottom: '6mm' }}>
+            {propsToUse.map(b => (
+              <div key={b.id} style={{ marginBottom: '4mm' }}>
+                {(pick.showMain ?? true) && renderBuildingForChange(b)}
+                {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                  <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+                ))}
+              </div>
+            ))}
+            {propsToUse.length === 0 && <div>　</div>}
+          </div>
+        </div>
+      );
 
-  const DelegationCombineTemplate = () =>
-    renderDelegationCommon({
-      docNoBold: false, workText: getLegacyWorkText(),
-      buildingBlock: buildCommonBuildingBlock(), dateBlock: buildCommonDateBlock(),
+      return renderDelegationCommon({
+        docNoBold: false,
+        workText: "錯誤により建物表題部更正登記",
+        buildingTitle: "建物の表示",
+        buildingSubTitle: "更正前",
+        buildingBlock,
+        dateBlock: buildCommonDateBlock(),
+      });
+  };
+
+  const DelegationMergeTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const mergeIds = Array.isArray(pick.mergeBeforeBuildingIds) ? pick.mergeBeforeBuildingIds : [];
+    const beforeBuildings = mergeIds.length > 0
+      ? sortedBuildings.filter(b => mergeIds.includes(b.id))
+      : sortedBuildings;
+    const propsToUse = targetProp ? [targetProp] : sortedProp;
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {beforeBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {beforeBuildings.length === 0 && <div>　</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>合併後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>　</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText: "建物合併登記",
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "合併前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
     });
+  };
+
+  const DelegationSplitTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const beforeBuildings = (() => {
+      if (pick.targetBeforeBuildingId) {
+        const found = sortedBuildings.find(b => b.id === pick.targetBeforeBuildingId);
+        return found ? [found] : sortedBuildings;
+      }
+      return sortedBuildings;
+    })();
+    const splitAfterIds = Array.isArray(pick.splitAfterBuildingIds) ? pick.splitAfterBuildingIds : [];
+    const propsToUse = splitAfterIds.length > 0
+      ? sortedProp.filter(b => splitAfterIds.includes(b.id))
+      : sortedProp;
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {beforeBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {beforeBuildings.length === 0 && <div>　</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>分割後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>　</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText: "建物分割登記",
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "分割前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
+    });
+  };
+
+  const DelegationCombineTemplate = () => {
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const combineIds = Array.isArray(pick.combineBeforeBuildingIds) ? pick.combineBeforeBuildingIds : [];
+    const beforeBuildings = combineIds.length > 0
+      ? sortedBuildings.filter(b => combineIds.includes(b.id))
+      : sortedBuildings;
+    const propsToUse = targetProp ? [targetProp] : sortedProp;
+
+    const combinePurpose = pick.combinePurpose || "combineOnly";
+    const suffix = combinePurpose === "combineAndPreserve"
+      ? "したので\n合体による建物の表題登記及び合体前の建物の表題部登記の抹消並びに所有権の保存の登記"
+      : "したので\n合体による建物の表題登記及び合体前の建物の表題部登記の抹消";
+
+    const houseNumList = beforeBuildings
+      .map(b => b.houseNum || "")
+      .filter(h => h)
+      .map(h => `家屋番号${h}`)
+      .join("と");
+
+    const causeEntries = [];
+    for (const b of propsToUse) {
+      if (b.registrationCause) {
+        causeEntries.push({
+          date: formatWareki(b.registrationDate, b.additionalUnknownDate),
+          cause: b.registrationCause,
+        });
+      }
+    }
+
+    const workText = (() => {
+      if (causeEntries.length === 0 && !houseNumList) {
+        return combinePurpose === "combineAndPreserve"
+          ? "合体による建物の表題登記及び合体前の建物の表題部登記の抹消並びに所有権の保存の登記"
+          : "合体による建物の表題登記及び合体前の建物の表題部登記の抹消";
+      }
+      const parts = [];
+      for (const entry of causeEntries) {
+        if (entry.date) parts.push(entry.date);
+      }
+      if (houseNumList) parts.push(houseNumList + "を");
+      for (const entry of causeEntries) {
+        if (entry.cause) parts.push(entry.cause);
+      }
+      const mainText = parts.join("");
+      return (
+        <div style={{ whiteSpace: 'pre-wrap' }}>{mainText}{suffix}</div>
+      );
+    })();
+
+    const renderBuildingForChange = (b) => {
+      if (!b) return null;
+      const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div>{b.address || "　"}</div>
+          {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
+          <div>{line}</div>
+        </div>
+      );
+    };
+
+    const buildingBlock = (
+      <div>
+        <div style={{ marginBottom: '6mm' }}>
+          {beforeBuildings.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {beforeBuildings.length === 0 && <div>　</div>}
+        </div>
+        <h3 style={{ fontSize: '11pt', margin: '4mm 0 0 0', fontWeight: 'bold' }}>合体後</h3>
+        <div style={{ marginBottom: '6mm' }}>
+          {propsToUse.map(b => (
+            <div key={b.id} style={{ marginBottom: '4mm' }}>
+              {(pick.showMain ?? true) && renderBuildingForChange(b)}
+              {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+              ))}
+            </div>
+          ))}
+          {propsToUse.length === 0 && <div>　</div>}
+        </div>
+      </div>
+    );
+
+    return renderDelegationCommon({
+      docNoBold: false,
+      workText,
+      buildingTitle: "建物の表示",
+      buildingSubTitle: "合体前",
+      buildingBlock,
+      dateBlock: buildCommonDateBlock(),
+    });
+  };
 
   const DELEGATION_TEMPLATES = {
     "委任状（表題）": DelegationTitleTemplate,
