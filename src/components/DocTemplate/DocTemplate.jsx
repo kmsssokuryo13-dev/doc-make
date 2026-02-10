@@ -121,8 +121,8 @@ export const DocTemplate = ({
     const sym = stripAllWS(rawSymbol);
     if (!sym) return "";
     if (sym === "主") return `主　　`;
-    if (sym.startsWith("符")) return `${sym}　　`;
-    return `符${sym}　　`;
+    if (sym.startsWith("符")) return `${sym}　`;
+    return `符${sym}　`;
   };
 
   const getMainSymbolPrefix = (b) => {
@@ -165,8 +165,17 @@ export const DocTemplate = ({
     );
   };
 
+  const isAnnexEmpty = (a) => {
+    if (!a) return true;
+    const hasSymbol = stripAllWS(a.symbol);
+    const hasKind = stripAllWS(a.kind);
+    const hasStruct = stripAllWS(a.struct);
+    const hasArea = (a.floorAreas || []).some(fa => stripAllWS(fa.area));
+    return !hasSymbol && !hasKind && !hasStruct && !hasArea;
+  };
+
   const renderAnnexValuesInline = (a) => {
-    if (!a) return null;
+    if (!a || isAnnexEmpty(a)) return null;
     const line = buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
@@ -196,7 +205,7 @@ export const DocTemplate = ({
   };
 
   const renderAnnexValues = (a) => {
-    if (!a) return null;
+    if (!a || isAnnexEmpty(a)) return null;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
         <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
