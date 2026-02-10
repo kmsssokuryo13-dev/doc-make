@@ -99,8 +99,7 @@ export const DocTemplate = ({
 
   const formatDateBlock = (d) => {
     if (!d) return "令和年　　月　　日";
-    if (d.unknown) return "不詳";
-    const stripWS = (s) =>
+    const stripWS= (s) =>
       (s ?? "").toString().replace(/[\s\u3000\u00A0\u2000-\u200B\u202F\u205F\uFEFF]/g, "");
     const era = stripWS(d.era);
     const year = stripWS(d.year);
@@ -212,7 +211,7 @@ export const DocTemplate = ({
     if (!b) return "　";
     const hn = b.houseNum ? `${b.houseNum} ` : "";
     const cause = b.registrationCause || "　";
-    const date = formatWareki(b.registrationDate);
+    const date = formatWareki(b.registrationDate, b.additionalUnknownDate);
     return `${hn}${cause}　${date}`;
   };
 
@@ -278,7 +277,7 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate)}　{targetProp.registrationCause || "　"}</p>
+            <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}　{targetProp.registrationCause || "　"}</p>
           </div>
 
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
@@ -316,6 +315,225 @@ export const DocTemplate = ({
                 />
               </div>
             </div>
+          </div>
+        </EditableDocBody>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- 滅失証明書（滅失） ----
+  if (name === "滅失証明書（滅失）") {
+    const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
+    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const selectedLossBuildings = lossIds.length > 0
+      ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
+      : allLossBuildings;
+    const buildings = selectedLossBuildings.length > 0 ? selectedLossBuildings : allLossBuildings;
+
+    const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
+    const ownerIds = Array.isArray(pick?.lossCertOwnerIds) ? pick.lossCertOwnerIds : [];
+    const defaultOwners = ownerCandidates.filter(p => (p.roles || []).includes("建物所有者"));
+    const owners = ownerIds.length > 0
+      ? ownerCandidates.filter(p => new Set(ownerIds).has(p.id))
+      : defaultOwners;
+    const displayOwners = owners.length > 0 ? owners : defaultOwners;
+
+    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
+    const uniqueDates = [...new Set(dates)];
+    const causeDate = uniqueDates[0] || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "令和　年　月　日";
+
+    return (
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
+        <div className="stamp-area">
+          {(() => {
+            const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })()}
+        </div>
+
+        <h1
+          style={{
+            fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+            margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
+          }}
+        >
+          建物取壊し証明書
+        </h1>
+
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            {buildings.length > 0 ? buildings.map(b => (
+              <div key={b.id} style={{ marginBottom: '4mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                  <div>{b.address || "　"}</div>
+                  {b.houseNum ? (
+                    <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
+                  ) : null}
+                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                </div>
+                {(b.annexes || []).map(a => (
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
+                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                  </div>
+                ))}
+              </div>
+            )) : <div>　</div>}
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>取壊しの事由及び年月日</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            <p style={{ margin: '0' }}>{causeDate}取壊し</p>
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            {displayOwners.length > 0 ? displayOwners.map(p => (
+              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {p.address || "　"}　{p.name || "　"}
+              </p>
+            )) : <div>　</div>}
+          </div>
+
+          <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
+            上記のとおり建物を滅失したことを証明します。
+          </p>
+
+          <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
+            <p>{formatTodayDateBlock()}</p>
+          </div>
+
+          <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
+
+          <div style={{ marginTop: '5mm', position: 'relative' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
+              <div style={{ fontSize: '12pt' }}>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+              </div>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
+            </div>
+          </div>
+        </EditableDocBody>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- 非登載証明書 ----
+  if (name === "非登載証明書") {
+    const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
+    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const ntrSelectedBuildings = lossIds.length > 0
+      ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
+      : allLossBuildings;
+    const ntrBuildings = ntrSelectedBuildings.length > 0 ? ntrSelectedBuildings : allLossBuildings;
+
+    const ntrOwnerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
+    const ntrOwnerIds = Array.isArray(pick?.lossCertOwnerIds) ? pick.lossCertOwnerIds : [];
+    const ntrDefaultOwners = ntrOwnerCandidates.filter(p => (p.roles || []).includes("建物所有者"));
+    const ntrOwners = ntrOwnerIds.length > 0
+      ? ntrOwnerCandidates.filter(p => new Set(ntrOwnerIds).has(p.id))
+      : ntrDefaultOwners;
+    const ntrDisplayOwners = ntrOwners.length > 0 ? ntrOwners : ntrDefaultOwners;
+
+    const getMayorTitle = () => {
+      const addr = ntrBuildings[0]?.address || siteData?.address || "";
+      const noPref = addr.replace(/^.+?[都道府県]/, "");
+      const cityMatch = noPref.match(/^(.+?市)/);
+      if (cityMatch) return `${cityMatch[1]}長`;
+      const gunMatch = noPref.match(/^.+?郡(.+?[町村])/);
+      if (gunMatch) return `${gunMatch[1]}長`;
+      const townMatch = noPref.match(/^(.+?[町村])/);
+      if (townMatch) return `${townMatch[1]}長`;
+      return "　　長";
+    };
+
+    const w = getWarekiNow();
+    const currentYear = toFullWidthDigits(w.year);
+
+    return (
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          <h1
+            style={{
+              fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+              margin: '0 0 8mm 0', letterSpacing: '0.5em'
+            }}
+          >
+            証　明　願
+          </h1>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '12pt', marginBottom: '2mm' }}>
+            <div>{getMayorTitle()}　殿</div>
+            <div>{formatTodayDateBlock()}</div>
+          </div>
+
+          <p style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+            下記物件は令和{currentYear}年度の固定資産課税台帳に登載されていないことを証明願います。
+          </p>
+
+          <div style={{ fontSize: '11pt', marginBottom: '6mm' }}>
+            <div style={{ display: 'flex', gap: '4mm' }}>
+              <span>使用目的</span>
+              <span>管轄法務局へ建物滅失登記申請のため</span>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm', minHeight: '30mm', paddingLeft: '4mm' }}>
+            {ntrBuildings.length > 0 ? ntrBuildings.map(b => (
+              <div key={b.id} style={{ marginBottom: '4mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                  <div>{b.address || "　"}</div>
+                  {b.houseNum ? (
+                    <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
+                  ) : null}
+                  <div>{(b.kind || "　")}{b.struct ? `　${b.struct}` : ""}{`　${floorLineInline(b.floorAreas)}`}</div>
+                </div>
+                {(b.annexes || []).map(a => (
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                    <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
+                    <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}{`　${floorLineInline(a.floorAreas)}`}</div>
+                  </div>
+                ))}
+              </div>
+            )) : <div>　</div>}
+          </div>
+
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '8mm', paddingLeft: '4mm' }}>
+            {ntrDisplayOwners.length > 0 ? ntrDisplayOwners.map(p => (
+              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {p.address || "　"}　{p.name || "　"}
+              </p>
+            )) : <div>　</div>}
+          </div>
+
+          <div style={{ textAlign: 'right', fontSize: '12pt', marginTop: 'auto' }}>
+            <p style={{ margin: '0 0 2mm 0' }}>{linkedScrivener?.address || "　"}</p>
+            <p style={{ margin: '0' }}>土地家屋調査士　{linkedScrivener?.name || "　"}</p>
           </div>
         </EditableDocBody>
         </div>
@@ -442,7 +660,7 @@ export const DocTemplate = ({
   const DelegationTitleTemplate = () => {
     const workText =
       (targetProp)
-        ? `${formatWareki(targetProp.registrationDate)}${targetProp.registrationCause || ""}したので建物表題登記`
+        ? `${formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}${targetProp.registrationCause || ""}したので建物表題登記`
         : getLegacyWorkText();
 
     const buildingBlock = targetProp ? (
@@ -505,7 +723,7 @@ export const DocTemplate = ({
     const newCategories = [...new Set(changedLands.map(l => l.newCategory || "").filter(Boolean))];
     const categoryText = newCategories.join("・") || "　";
 
-    const workText = `${formatWareki(targetProp?.registrationDate)}${categoryText}に変更したので土地地目変更登記`;
+    const workText = `${formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate)}${categoryText}に変更したので土地地目変更登記`;
 
     const beforeLands = changedLands.length > 0 ? changedLands : (selectedLand || []);
     const afterLands = changedLands;
@@ -579,9 +797,9 @@ export const DocTemplate = ({
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
 
-    const dates = buildings.map(b => formatWareki(b.registrationDate)).filter(Boolean);
+    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
     const uniqueDates = [...new Set(dates)];
-    const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate) || "";
+    const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "";
     const workText = `${dateText}取壊したので建物滅失登記`;
 
     const buildingBlock = buildings.length > 0 ? buildings.map(b => (

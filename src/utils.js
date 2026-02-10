@@ -271,20 +271,22 @@ export const formatShare = (share) => {
 export const getSelectedContractor = (siteData, contractors) => (contractors || []).find(c => c.id === siteData.contractorId) || null;
 export const getSelectedScrivener = (siteData, scriveners) => (scriveners || []).find(s => s.id === siteData.scrivenerId) || null;
 
-export const formatWareki = (d) => {
+export const formatWareki = (d, additionalUnknownDate = false) => {
   if (!d) return "　";
-  if (d.unknown) return "不詳";
 
-  const era = d.era || "令和";
+  const era = (d.era || "").trim();
 
-  const zenOrBlank = (v) => {
-    const s = (v ?? "").toString().trim();
-    return s ? toFullWidthDigits(s) : "　";
-  };
+  const y= (d.year ?? "").toString().trim();
+  const m = (d.month ?? "").toString().trim();
+  const day = (d.day ?? "").toString().trim();
 
-  const y = zenOrBlank(d.year);
-  const m = zenOrBlank(d.month);
-  const day = zenOrBlank(d.day);
+  const yFull = y ? toFullWidthDigits(y) : "";
+  const mFull = m ? toFullWidthDigits(m) : "";
+  const dFull = day ? toFullWidthDigits(day) : "";
 
-  return `${era}${y}年${m}月${day}日`;
+  if (additionalUnknownDate) {
+    return `${era}${yFull}年${mFull}月${dFull}日不詳`;
+  }
+
+  return `${era}${yFull || "\u3000\u3000"}年${mFull || "\u3000\u3000"}月${dFull || "\u3000\u3000"}日`;
 };
