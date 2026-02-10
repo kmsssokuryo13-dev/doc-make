@@ -498,7 +498,7 @@ export const DocTemplate = ({
   // ---- 滅失証明書（滅失） ----
   if (name === "滅失証明書（滅失）") {
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const selectedLossBuildings = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
@@ -620,13 +620,13 @@ export const DocTemplate = ({
       return sortedBuildings_loss;
     })();
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const selectedLoss = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
 
-    const hasAnyAnnexes_loss = beforeBuildings_loss.some(b => (b.annexes || []).length > 0)
+    const hasAnyAnnexes_loss= beforeBuildings_loss.some(b => (b.annexes || []).length > 0)
       || buildings.some(b => (b.annexes || []).length > 0);
 
     const ownerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("建物所有者") || (p.roles || []).includes("申請人"));
@@ -751,8 +751,8 @@ export const DocTemplate = ({
   // ---- 非登載証明書 ----
   if (name === "非登載証明書") {
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
-    const ntrSelectedBuildings = lossIds.length > 0
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
+    const ntrSelectedBuildings= lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const ntrBuildings = ntrSelectedBuildings.length > 0 ? ntrSelectedBuildings : allLossBuildings;
@@ -1103,13 +1103,13 @@ export const DocTemplate = ({
 
   const DelegationLossTemplate = () => {
     const lossIds = Array.isArray(pick?.lossBuildingIds) ? pick.lossBuildingIds : [];
-    const allLossBuildings = (sortedProp || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const allLossBuildings = (sortedProp || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const selectedLoss = lossIds.length > 0
       ? allLossBuildings.filter(pb => new Set(lossIds).has(pb.id))
       : allLossBuildings;
     const buildings = selectedLoss.length > 0 ? selectedLoss : allLossBuildings;
 
-    const dates = buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
+    const dates= buildings.map(b => formatWareki(b.registrationDate, b.additionalUnknownDate)).filter(Boolean);
     const uniqueDates = [...new Set(dates)];
     const dateText = uniqueDates.join("・") || formatWareki(targetProp?.registrationDate, targetProp?.additionalUnknownDate) || "";
     const workText = `${dateText}取壊したので建物滅失登記`;

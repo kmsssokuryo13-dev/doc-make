@@ -332,7 +332,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const isLoss = activeInstance && activeInstance.name === "委任状（滅失）";
 
   if (isLoss) {
-    const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+    const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
     const curBldgIds = Array.isArray(activePick.lossBuildingIds) ? activePick.lossBuildingIds : [];
     const defaultBldgIds = new Set(lossBuildings.map(pb => pb.id));
     const effectiveBldgSet = curBldgIds.length > 0 ? new Set(curBldgIds) : defaultBldgIds;
@@ -365,7 +365,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
         <div className="text-black">
           <label className="block text-[10px] font-bold text-gray-500 mb-2">滅失する建物を選択</label>
           {lossBuildings.length === 0 ? (
-            <p className="text-[10px] text-slate-400">登記原因「滅失」の申請建物がありません。</p>
+            <p className="text-[10px] text-slate-400">滅失に関する登記原因の申請建物がありません。</p>
           ) : (
             <div className="grid grid-cols-1 gap-1">
               {lossBuildings.map((pb) => (
@@ -802,7 +802,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                     <div>
                       <div className="space-y-3">
                         {(() => {
-                          const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => (pb.registrationCause || "").includes("滅失"));
+                          const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
                           const curBldgIds = Array.isArray(activePick.lossBuildingIds) ? activePick.lossBuildingIds : [];
                           const defaultBldgIds = new Set(lossBuildings.map(pb => pb.id));
                           const effectiveBldgSet = curBldgIds.length > 0 ? new Set(curBldgIds) : defaultBldgIds;
@@ -818,7 +818,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                             <div>
                               <label className="block text-[10px] font-bold text-gray-500 mb-2">滅失する建物を選択</label>
                               {lossBuildings.length === 0 ? (
-                                <p className="text-[10px] text-slate-400">登記原因「滅失」の申請建物がありません。</p>
+                                <p className="text-[10px] text-slate-400">滅失に関する登記原因の申請建物がありません。</p>
                               ) : (
                                 <div className="grid grid-cols-1 gap-1">
                                   {lossBuildings.map((pb) => (
