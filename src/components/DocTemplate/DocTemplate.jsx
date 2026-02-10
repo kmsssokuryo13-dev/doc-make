@@ -127,7 +127,8 @@ export const DocTemplate = ({
 
   const getMainSymbolPrefix = (b) => {
     const explicit = stripAllWS(b?.symbol);
-    const sym = explicit || (((b?.annexes || []).length > 0) ? "主" : "");
+    const hasAnnexSymbols = (b?.annexes || []).some(a => stripAllWS(a?.symbol));
+    const sym = explicit || (hasAnnexSymbols ? "主" : "");
     return formatSymbolPrefix(sym);
   };
 
@@ -845,12 +846,17 @@ export const DocTemplate = ({
     const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
     const propsToUse = targetProp ? [targetProp] : sortedProp;
 
+    const hasAnyAnnexes = sortedBuildings.some(b => (b.annexes || []).length > 0)
+      || propsToUse.some(b => (b.annexes || []).length > 0);
+
     const causeEntries = [];
     for (const b of propsToUse) {
+      const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
       if (b.registrationCause) {
         causeEntries.push({
           date: formatWareki(b.registrationDate, b.additionalUnknownDate),
           cause: b.registrationCause,
+          prefix: mainPrefix,
         });
       }
       for (const ac of (b.additionalCauses || [])) {
@@ -858,7 +864,28 @@ export const DocTemplate = ({
           causeEntries.push({
             date: formatWareki(ac.date),
             cause: ac.cause,
+            prefix: mainPrefix,
           });
+        }
+      }
+      for (const a of (b.annexes || [])) {
+        const sym = stripAllWS(a.symbol);
+        const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
+        if (a.registrationCause) {
+          causeEntries.push({
+            date: formatWareki(a.registrationDate, a.additionalUnknownDate),
+            cause: a.registrationCause,
+            prefix: annexPrefix,
+          });
+        }
+        for (const ac of (a.additionalCauses || [])) {
+          if (ac.cause) {
+            causeEntries.push({
+              date: formatWareki(ac.date),
+              cause: ac.cause,
+              prefix: annexPrefix,
+            });
+          }
         }
       }
     }
@@ -866,7 +893,7 @@ export const DocTemplate = ({
     const uniqueCauses = [];
     const seenKeys = new Set();
     for (const entry of causeEntries) {
-      const key = `${entry.date}|${entry.cause}`;
+      const key = `${entry.date}|${entry.prefix}|${entry.cause}`;
       if (!seenKeys.has(key)) {
         seenKeys.add(key);
         uniqueCauses.push(entry);
@@ -877,8 +904,8 @@ export const DocTemplate = ({
       <>
         {uniqueCauses.map((cl, i) => (
           <div key={i}>
-            {cl.date}{cl.cause}
-            {i === uniqueCauses.length - 1 ? "したので建物表題部変更登記" : ""}
+            {cl.date}{cl.prefix}{cl.cause}
+            {i === uniqueCauses.length - 1 ? "したので建物表題部変更登記" : "、"}
           </div>
         ))}
       </>
