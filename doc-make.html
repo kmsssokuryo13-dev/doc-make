@@ -2388,11 +2388,13 @@ const [linkedScrivenerAddrLine, linkedScrivenerNameLine] = getLinkedScrivenerLin
 
 
   const floorLine = (floorAreas) => {
-    // 委任状（保存）は床面積を表示しない
     if (name === "委任状（保存）") return "";
     const arr = Array.isArray(floorAreas) ? floorAreas : [];
-    const t = arr.map(fa => `${fa.floor} ${fa.area || "　"}㎡`).join("  ");
-    return t || "　";
+    const filtered = arr.filter(fa => stripAllWS(fa.area));
+    if (filtered.length === 0) return "　";
+    const isSingleGround = filtered.length === 1 && (filtered[0].floor === "１階" || filtered[0].floor === "1階");
+    if (isSingleGround) return `${filtered[0].area}㎡`;
+    return filtered.map(fa => `${fa.floor} ${fa.area}㎡`).join("  ");
   };
 
   const stripAllWS = (s) =>
@@ -2417,11 +2419,13 @@ const [linkedScrivenerAddrLine, linkedScrivenerNameLine] = getLinkedScrivenerLin
     return formatSymbolPrefix(sym);
   };
 
-  // 床面積：各階ごとにスペース（全角）で区切る
   const floorLineInline = (floorAreas) => {
     const arr = Array.isArray(floorAreas) ? floorAreas : [];
-    const t = arr.map(fa => `${fa.floor} ${fa.area || "　"}㎡`).join("　");
-    return t || "　";
+    const filtered = arr.filter(fa => stripAllWS(fa.area));
+    if (filtered.length === 0) return "　";
+    const isSingleGround = filtered.length === 1 && (filtered[0].floor === "１階" || filtered[0].floor === "1階");
+    if (isSingleGround) return `${filtered[0].area}㎡`;
+    return filtered.map(fa => `${fa.floor} ${fa.area}㎡`).join("　");
   };
 
   // 1行組み立て：符号（必要時のみ）＋種類＋構造＋床面積

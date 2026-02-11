@@ -112,6 +112,8 @@ export const DocTemplate = ({
     const arr = Array.isArray(floorAreas) ? floorAreas : [];
     const filtered = arr.filter(fa => stripAllWS(fa.area));
     if (filtered.length === 0) return "";
+    const isSingleGround = filtered.length === 1 && (filtered[0].floor === "１階" || filtered[0].floor === "1階");
+    if (isSingleGround) return `${filtered[0].area}㎡`;
     return filtered.map(fa => `${fa.floor} ${fa.area}㎡`).join("  ");
   };
 
@@ -141,6 +143,8 @@ export const DocTemplate = ({
     const arr = Array.isArray(floorAreas) ? floorAreas : [];
     const filtered = arr.filter(fa => stripAllWS(fa.area));
     if (filtered.length === 0) return "";
+    const isSingleGround = filtered.length === 1 && (filtered[0].floor === "１階" || filtered[0].floor === "1階");
+    if (isSingleGround) return `${filtered[0].area}㎡`;
     return filtered.map(fa => `${fa.floor} ${fa.area}㎡`).join("　");
   };
 
