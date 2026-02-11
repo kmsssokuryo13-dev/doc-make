@@ -86,6 +86,74 @@ export const parseAnnexStructureToFloors = (struct) => {
   return floors;
 };
 
+export const parseStructParts = (struct) => {
+  const s = struct || "";
+  const hw = toHalfWidth(s);
+  const floorPattern = /(地下\d+階付)?(平家建|\d+階建)$/;
+  const match = hw.match(floorPattern);
+  if (match) {
+    const matchIdx = hw.lastIndexOf(match[0]);
+    return { structMaterial: s.slice(0, matchIdx), structFloor: s.slice(matchIdx) };
+  }
+  return { structMaterial: s, structFloor: "" };
+};
+
+export const computeStructFloor = (floorAreas) => {
+  const areas = floorAreas || [];
+  const isFilled = (a) => (a || "").replace(/[\s\u3000\u00A0]/g, "").length > 0;
+  let maxGround = 0;
+  let maxBasement = 0;
+  areas.forEach(fa => {
+    if (!isFilled(fa.area)) return;
+    const hw = toHalfWidth(fa.floor);
+    const bm = hw.match(/地下(\d+)階/);
+    if (bm) { maxBasement = Math.max(maxBasement, parseInt(bm[1], 10)); return; }
+    const gm = hw.match(/(\d+)階/);
+    if (gm) maxGround = Math.max(maxGround, parseInt(gm[1], 10));
+  });
+  let result = "";
+  if (maxBasement > 0) result += `地下${toFullWidthDigits(String(maxBasement))}階付`;
+  if (maxGround === 0) return result;
+  if (maxGround === 1) result += "平家建";
+  else result += `${toFullWidthDigits(String(maxGround))}階建`;
+  return result;
+};
+
+export const ensureNextFloors = (floorAreas, hasBasement) => {
+  const newAreas = [...floorAreas];
+  const isFilled = (a) => (a || "").replace(/[\s\u3000\u00A0]/g, "").length > 0;
+  const groundAreas = newAreas.filter(fa => !fa.floor.includes("地下"));
+  let maxGroundNum = 0;
+  groundAreas.forEach(fa => {
+    const hw = toHalfWidth(fa.floor);
+    const m = hw.match(/(\d+)階/);
+    if (m && isFilled(fa.area)) maxGroundNum = Math.max(maxGroundNum, parseInt(m[1], 10));
+  });
+  const nextGroundLabel = toFullWidthDigits(`${maxGroundNum + 1}階`);
+  if (maxGroundNum > 0 && !newAreas.some(fa => toHalfWidth(fa.floor) === `${maxGroundNum + 1}階`)) {
+    const insertIdx = newAreas.findIndex(fa => fa.floor.includes("地下"));
+    const entry = { id: generateId(), floor: nextGroundLabel, area: "" };
+    if (insertIdx >= 0) newAreas.splice(insertIdx, 0, entry);
+    else newAreas.push(entry);
+  }
+  if (hasBasement) {
+    const basementAreas = newAreas.filter(fa => fa.floor.includes("地下"));
+    let maxBasementNum = 0;
+    basementAreas.forEach(fa => {
+      const hw = toHalfWidth(fa.floor);
+      const m = hw.match(/地下(\d+)階/);
+      if (m && isFilled(fa.area)) maxBasementNum = Math.max(maxBasementNum, parseInt(m[1], 10));
+    });
+    if (maxBasementNum > 0) {
+      const nextLabel = toFullWidthDigits(`地下${maxBasementNum + 1}階`);
+      if (!newAreas.some(fa => toHalfWidth(fa.floor) === `地下${maxBasementNum + 1}階`)) {
+        newAreas.push({ id: generateId(), floor: nextLabel, area: "" });
+      }
+    }
+  }
+  return newAreas;
+};
+
 export const createNewSite = (name) => ({
   id: generateId(),
   name: name || '新規現場',
@@ -99,8 +167,12 @@ export const createDefaultCauseDate = () => ({ era: "令和", year: "", month: "
 
 export const createNewBuilding = () => ({
   id: generateId(),
-  address: '', symbol: '', houseNum: '', kind: '', struct: '', owner: '',
-  floorAreas: [{ id: generateId(), floor: '1階', area: '' }], annexes: [],
+  address: '', symbol: '', houseNum: '', kind: '',
+  structMaterial: '', structFloor: '', struct: '',
+  owner: '',
+  floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
+  hasBasement: false,
+  annexes: [],
   registrationCause: "",
   registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
   additionalCauses: [],
@@ -108,8 +180,10 @@ export const createNewBuilding = () => ({
 });
 
 export const createNewAnnex = () => ({
-  id: generateId(), symbol: '', kind: '', struct: '', includeBasement: false,
-  floorAreas: [{ id: generateId(), floor: '1階', area: '' }],
+  id: generateId(), symbol: '', kind: '',
+  structMaterial: '', structFloor: '', struct: '',
+  hasBasement: false,
+  floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
   registrationCause: "",
   registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
   additionalCauses: [],
