@@ -6,8 +6,26 @@ export const extractTextFromPdf = async (pdfDoc) => {
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const content = await page.getTextContent();
-    const text = content.items.map(item => item.str).join("");
-    pages.push(text);
+    let lastX = -Infinity;
+    let lastRight = -Infinity;
+    let lastY = null;
+    const parts = [];
+    for (const item of content.items) {
+      if (!item.str) continue;
+      const x = item.transform ? item.transform[4] : 0;
+      const y = item.transform ? item.transform[5] : 0;
+      const w = item.width || 0;
+      if (lastY !== null && Math.abs(y - lastY) > 5) {
+        parts.push(" ");
+      } else if (lastRight !== -Infinity && x > lastRight + 2) {
+        parts.push(" ");
+      }
+      parts.push(item.str);
+      lastX = x;
+      lastRight = x + w;
+      lastY = y;
+    }
+    pages.push(parts.join(""));
   }
   return pages.join("\n");
 };
@@ -200,6 +218,47 @@ export const parseLandRegistration = (text) => {
   return lands;
 };
 
+const splitAddressAndName = (raw) => {
+  const text = (raw || "").trim();
+  if (!text) return { address: "", name: "" };
+
+  const addrEndPatterns = [
+    /(番地?\d*)[\s\u3000]+/,
+    /(丁目[\d０-９]*番地?[\d０-９]*号?)[\s\u3000]+/,
+    /(号)[\s\u3000]+/,
+  ];
+  for (const pat of addrEndPatterns) {
+    const m = text.match(pat);
+    if (m) {
+      const splitIdx = m.index + m[1].length;
+      const address = text.slice(0, splitIdx).replace(/[\s\u3000]+/g, "");
+      const name = text.slice(splitIdx).replace(/[\s\u3000]+/g, " ").trim();
+      if (name) return { address, name };
+    }
+  }
+
+  const parts = text.split(/[\s\u3000]+/).filter(Boolean);
+  if (parts.length >= 3) {
+    const lastTwo = parts.slice(-2).join(" ");
+    const isName = /^[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]+[\s\u3000][\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]+$/.test(lastTwo);
+    if (isName && !lastTwo.includes("番") && !lastTwo.includes("丁目") && !lastTwo.includes("号")) {
+      return {
+        address: parts.slice(0, -2).join(""),
+        name: lastTwo
+      };
+    }
+  }
+
+  if (parts.length >= 2) {
+    return {
+      address: parts.slice(0, -1).join(""),
+      name: parts[parts.length - 1]
+    };
+  }
+
+  return { address: "", name: text };
+};
+
 export const parseOwnerInfo = (text) => {
   const owners = [];
 
@@ -224,28 +283,22 @@ export const parseOwnerInfo = (text) => {
       share = `${shareMatch[2]}/${shareMatch[1]}`;
     }
 
-    const cleaned = after.replace(/[\s\u3000\u00A0]+/g, " ").trim();
-    const parts = cleaned.split(/\s+/);
+    let cleaned = after.replace(/[\s\u3000\u00A0]+/g, " ").trim();
+    const endMarkers = ["原因", "順位", "権利", "共同担保", "表題部"];
+    for (const em of endMarkers) {
+      const ei = cleaned.indexOf(em);
+      if (ei >= 0) cleaned = cleaned.slice(0, ei).trim();
+    }
 
-    let address = "";
-    let name = "";
-    if (parts.length >= 2) {
-      const namePatterns = /^[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]{1,10}[\s\u3000]?[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]{1,10}$/;
-      for (let i = parts.length - 1; i >= 0; i--) {
-        if (namePatterns.test(parts[i]) && !parts[i].includes("番") && !parts[i].includes("丁目")) {
-          name = parts[i];
-          address = parts.slice(0, i).join("");
-          break;
-        }
-      }
-      if (!name && parts.length >= 2) {
-        name = parts[parts.length - 1];
-        address = parts.slice(0, -1).join("");
+    if (shareMatch) {
+      const shareStr = shareMatch[0];
+      const sIdx = cleaned.indexOf(shareStr);
+      if (sIdx >= 0) {
+        cleaned = (cleaned.slice(0, sIdx) + " " + cleaned.slice(sIdx + shareStr.length)).trim();
       }
     }
 
-    address = address.replace(/^\s+|\s+$/g, "").replace(/[\s\u3000]+/g, "");
-    name = name.replace(/^\s+|\s+$/g, "");
+    const { address, name } = splitAddressAndName(cleaned);
 
     if (name || address) {
       owners.push({
