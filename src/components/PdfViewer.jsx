@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, Upload, FileSearch } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, Upload, FileSearch, ScanText } from 'lucide-react';
 import { PDFJS_CDN, PDFJS_WORKER_CDN } from '../constants.js';
 
-export const PdfViewer = ({ pdfUrl, onFileChange }) => {
+export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [pdfDoc, setPdfDoc] = useState(null);
@@ -90,7 +90,10 @@ export const PdfViewer = ({ pdfUrl, onFileChange }) => {
           <button disabled={!pdfUrl} onClick={() => handleZoomChange(1.0)} className="p-1.5 hover:bg-slate-700 rounded ml-1 disabled:opacity-20 text-white"><Maximize size={16} /></button>
           <button disabled={!pdfUrl} onClick={() => handleZoomChange(1.0 / baseFitScale)} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white"><RotateCcw size={16} /></button>
         </div>
-        <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer active:scale-95 transition-all"><Upload size={14} /> <span>PDF読込</span><input type="file" accept="application/pdf" className="hidden" onChange={onFileChange} /></label>
+        <div className="flex items-center gap-2">
+          <button disabled={!pdfDoc || extracting} onClick={() => onExtractText && onExtractText(pdfDoc)} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer active:scale-95 transition-all"><ScanText size={14} /> <span>{extracting ? '読取中...' : 'PDFから読取'}</span></button>
+          <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer active:scale-95 transition-all"><Upload size={14} /> <span>PDF読込</span><input type="file" accept="application/pdf" className="hidden" onChange={onFileChange} /></label>
+        </div>
       </div>
       <div ref={containerRef} className="flex-1 overflow-auto bg-slate-200 shadow-inner relative select-none">
         {pdfUrl ? (

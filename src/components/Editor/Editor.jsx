@@ -6,12 +6,14 @@ import {
 } from 'lucide-react';
 import { createNewSite } from '../../utils.js';
 import { sanitizeSiteData } from '../../sanitize.js';
+import { extractTextFromPdf, parseRegistrationPdf } from '../../pdfExtract.js';
 import { Modal } from '../ui/Modal.jsx';
 import { TabBtn } from '../ui/TabBtn.jsx';
 import { LandSection } from './LandSection.jsx';
 import { BuildingSection } from './BuildingSection.jsx';
 import { PeopleSection } from './PeopleSection.jsx';
 import { MasterManagerModal } from './MasterManagerModal.jsx';
+import { PdfAutoFillModal } from './PdfAutoFillModal.jsx';
 import { PdfViewer } from '../PdfViewer.jsx';
 
 export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contractors, setContractors, scriveners, setScriveners }) => {
@@ -19,6 +21,43 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
   const [activeTab, setActiveTab] = useState('land_reg');
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [isAutoFillModalOpen, setIsAutoFillModalOpen] = useState(false);
+  const [extractedData, setExtractedData] = useState(null);
+
+  const handlePdfExtract = useCallback(async (pdfDoc) => {
+    if (!pdfDoc || !activeSiteId) return;
+    setExtracting(true);
+    try {
+      const text = await extractTextFromPdf(pdfDoc);
+      const data = parseRegistrationPdf(text);
+      setExtractedData(data);
+      setIsAutoFillModalOpen(true);
+    } catch (err) {
+      console.error('PDF extraction error:', err);
+      alert('PDFの読み取りに失敗しました');
+    } finally {
+      setExtracting(false);
+    }
+  }, [activeSiteId]);
+
+  const handleAutoFillApply = useCallback((data) => {
+    if (!activeSiteId) return;
+    setSites(prev => prev.map(s => {
+      if (s.id !== activeSiteId) return s;
+      const updated = { ...s };
+      if (data.buildings && data.buildings.length > 0) {
+        updated.proposedBuildings = [...(s.proposedBuildings || []), ...data.buildings];
+      }
+      if (data.land && data.land.length > 0) {
+        updated.land = [...(s.land || []), ...data.land];
+      }
+      if (data.people && data.people.length > 0) {
+        updated.people = [...(s.people || []), ...data.people];
+      }
+      return sanitizeSiteData(updated);
+    }));
+  }, [activeSiteId, setSites]);
 
   const handlePdfUpload = useCallback((e) => {
     const file = e?.target?.files?.[0];
@@ -122,11 +161,12 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
           ) : <div className="flex-1 flex items-center justify-center text-gray-400 font-bold italic">案件を選択してください</div>}
         </div>
         <div className="w-1/2 bg-gray-200">
-          <PdfViewer pdfUrl={pdfUrl} onFileChange={handlePdfUpload} />
+          <PdfViewer pdfUrl={pdfUrl} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
         </div>
       </div>
 
       <MasterManagerModal isOpen={isMasterModalOpen} onClose={() => setIsMasterModalOpen(false)} contractors={contractors} setContractors={setContractors} scriveners={scriveners} setScriveners={setScriveners} />
+      <PdfAutoFillModal isOpen={isAutoFillModalOpen} onClose={() => setIsAutoFillModalOpen(false)} extractedData={extractedData} onApply={handleAutoFillApply} />
 
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="新規現場の追加" footer={<><button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-medium text-black">キャンセル</button><button onClick={() => { if(!newSiteName.trim()) return; const s = createNewSite(newSiteName); setSites([...sites, s]); setActiveSiteId(s.id); setIsAddModalOpen(false); }} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">追加</button></>}><input autoFocus type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-black font-bold" placeholder="案件名を入力" value={newSiteName} onChange={(e) => setNewSiteName(e.target.value)} onKeyDown={e => e.key === 'Enter' && newSiteName.trim() && (function(){ const s = createNewSite(newSiteName); setSites([...sites, s]); setActiveSiteId(s.id); setIsAddModalOpen(false); })()} /></Modal>
       <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="現場の削除確認" footer={<><button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 text-sm font-medium text-black">キャンセル</button><button onClick={() => { const ns = sites.filter(s => s.id !== siteToDelete.id); setSites(ns); if(activeSiteId === siteToDelete.id) setActiveSiteId(ns[0]?.id || null); setIsDeleteModalOpen(false); }} className="bg-red-500 text-white px-6 py-2 rounded-lg font-bold">削除</button></>}><p className="text-sm font-bold text-black">「{siteToDelete?.name}」を削除しますか？</p></Modal>
