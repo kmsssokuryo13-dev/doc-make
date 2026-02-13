@@ -208,18 +208,9 @@ const parseAnnexSection = (lines) => {
       };
     }
 
-    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind = col1;
+    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind += col1;
     if (col2 && col2 !== "余白" && HAS_KANJI_RE.test(col2)) {
-      const hwS = hw(col2);
-      const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
-      if (fm) {
-        const idx = hwS.lastIndexOf(fm[0]);
-        current.structMaterial = col2.slice(0, idx);
-        current.structFloor = col2.slice(idx);
-      } else {
-        current.structMaterial = col2;
-      }
-      current.struct = current.structMaterial + current.structFloor;
+      current._rawStruct = (current._rawStruct || "") + col2;
     }
     const fa = parseFloorAreaCol(col3raw);
     if (fa) {
@@ -230,11 +221,34 @@ const parseAnnexSection = (lines) => {
   if (current) annexes.push(current);
 
   for (const a of annexes) {
+    if (a._rawStruct) {
+      const hwS = hw(a._rawStruct);
+      const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
+      if (fm) {
+        const idx = hwS.lastIndexOf(fm[0]);
+        a.structMaterial = a._rawStruct.slice(0, idx);
+        a.structFloor = a._rawStruct.slice(idx);
+      } else {
+        a.structMaterial = a._rawStruct;
+      }
+      a.struct = a.structMaterial + a.structFloor;
+      delete a._rawStruct;
+    }
     if (a.floorAreas.length === 0) {
       a.floorAreas.push({ id: generateId(), floor: "１階", area: "" });
     }
   }
-  return annexes;
+
+  const symbolMap = new Map();
+  const noSymbol = [];
+  for (const a of annexes) {
+    if (a.symbol) {
+      symbolMap.set(a.symbol, a);
+    } else {
+      noSymbol.push(a);
+    }
+  }
+  return [...symbolMap.values(), ...noSymbol];
 };
 
 const parseHyodaiBuilding = (lines) => {
@@ -305,10 +319,18 @@ const parseHyodaiBuilding = (lines) => {
   let kinds = [];
   let structs = [];
   let allFloorAreas = [];
+  let currentRowKind = "";
+  let currentRowStruct = "";
 
   for (let i = dataHeaderIdx + 1; i < mainLines.length; i++) {
     const line = mainLines[i];
-    if (isRowSeparator(line)) continue;
+    if (isRowSeparator(line)) {
+      if (currentRowKind) kinds.push(currentRowKind);
+      if (currentRowStruct) structs.push(currentRowStruct);
+      currentRowKind = "";
+      currentRowStruct = "";
+      continue;
+    }
     const stripped = stripBorders(line).replace(/[\s\u3000]+/g, "");
     if (!stripped) continue;
 
@@ -317,13 +339,15 @@ const parseHyodaiBuilding = (lines) => {
       const col0 = clean(cols[0]);
       const col1 = clean(cols[1]);
 
-      if (col0 && col0 !== "余白" && HAS_KANJI_RE.test(col0)) kinds.push(col0);
-      if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) structs.push(col1);
+      if (col0 && col0 !== "余白" && HAS_KANJI_RE.test(col0)) currentRowKind += col0;
+      if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) currentRowStruct += col1;
 
       const fa = parseFloorAreaCol(cols[2] || "");
       if (fa) allFloorAreas.push(fa);
     }
   }
+  if (currentRowKind) kinds.push(currentRowKind);
+  if (currentRowStruct) structs.push(currentRowStruct);
 
   if (kinds.length > 0) result.kind = kinds[kinds.length - 1];
   if (structs.length > 0) {
