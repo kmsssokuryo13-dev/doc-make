@@ -13,13 +13,15 @@ import { LandSection } from './LandSection.jsx';
 import { BuildingSection } from './BuildingSection.jsx';
 import { PeopleSection } from './PeopleSection.jsx';
 import { MasterManagerModal } from './MasterManagerModal.jsx';
-import { PdfAutoFillModal } from './PdfAutoFillModal.jsx';
+import { PdfAutoFillPanel } from './PdfAutoFillModal.jsx';
 import { PdfViewer } from '../PdfViewer.jsx';
 
 export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contractors, setContractors, scriveners, setScriveners }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('land_reg');
-  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfFiles, setPdfFiles] = useState([]);
+  const [activePdfIdx, setActivePdfIdx] = useState(-1);
+  const pdfUrl = activePdfIdx >= 0 && pdfFiles[activePdfIdx] ? pdfFiles[activePdfIdx].url : null;
   const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [isAutoFillModalOpen, setIsAutoFillModalOpen] = useState(false);
@@ -47,7 +49,7 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
       if (s.id !== activeSiteId) return s;
       const updated = { ...s };
       if (data.buildings && data.buildings.length > 0) {
-        updated.proposedBuildings = [...(s.proposedBuildings || []), ...data.buildings];
+        updated.buildings = [...(s.buildings || []), ...data.buildings];
       }
       if (data.land && data.land.length > 0) {
         updated.land = [...(s.land || []), ...data.land];
@@ -59,12 +61,48 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
     }));
   }, [activeSiteId, setSites]);
 
+  const derivePdfLabel = useCallback(async (url) => {
+    try {
+      if (!window.pdfjsLib) return null;
+      const pdf = await window.pdfjsLib.getDocument(url).promise;
+      const text = await extractTextFromPdf(pdf);
+      const data = parseRegistrationPdf(text);
+      if (data.buildings && data.buildings.length > 0) {
+        const b = data.buildings[0];
+        if (b.houseNum) return `家屋番号 ${b.houseNum}`;
+        if (b.address) return `建物 ${b.address}`;
+      }
+      if (data.land && data.land.length > 0) {
+        const l = data.land[0];
+        if (l.lotNumber) return `地番 ${l.lotNumber}`;
+        if (l.address) return `土地 ${l.address}`;
+      }
+    } catch (err) { console.error('PDF label extraction error:', err); }
+    return null;
+  }, []);
+
   const handlePdfUpload = useCallback((e) => {
     const file = e?.target?.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    setPdfFiles(prev => {
+      const next = [...prev, { name: file.name, url, label: null }];
+      setActivePdfIdx(next.length - 1);
+      return next;
+    });
+    derivePdfLabel(url).then(label => {
+      if (label) setPdfFiles(prev => prev.map(f => f.url === url ? { ...f, label } : f));
+    });
     e.target.value = "";
+  }, [derivePdfLabel]);
+
+  const handleRemovePdf = useCallback((idx) => {
+    setPdfFiles(prev => {
+      URL.revokeObjectURL(prev[idx].url);
+      const next = prev.filter((_, i) => i !== idx);
+      setActivePdfIdx(cur => cur >= next.length ? next.length - 1 : (cur > idx ? cur - 1 : cur));
+      return next;
+    });
   }, []);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -128,45 +166,57 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
       </aside>
 
       <div className="flex-1 flex overflow-hidden text-black">
-        <div className="w-1/2 flex flex-col bg-white border-r border-gray-200">
-          {activeSite ? (
-            <>
-              <div className="bg-white border-b border-gray-200 shadow-sm z-10 px-4 py-1 flex items-center gap-1 overflow-x-auto no-scrollbar font-bold">
-                <TabBtn active={activeTab === 'land_reg'} label="土地情報" onClick={() => setActiveTab('land_reg')} icon={<MapIcon size={14}/>} />
-                <TabBtn active={activeTab === 'build_reg'} label="既登記建物" onClick={() => setActiveTab('build_reg')} icon={<Building size={14}/>} />
-                <TabBtn active={activeTab === 'build_prop'} label="申請建物" onClick={() => setActiveTab('build_prop')} icon={<FileText size={14}/>} />
-                <TabBtn active={activeTab === 'people'} label="関係人" onClick={() => setActiveTab('people')} icon={<Users size={14}/>} />
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30 custom-scrollbar">
-                <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm space-y-4">
-                  <h3 className="text-gray-700 text-sm font-bold flex items-center gap-2 border-b pb-2"><Info size={16} className="text-blue-500" /> 案件基本設定</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex-1 col-span-2">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1">連携司法書士</label>
-                      <select className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" value={activeSite.scrivenerId || ""} onChange={e => updateActiveSite({ scrivenerId: e.target.value })}>
-                        <option value="">(未選択)</option>
-                        {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
-                      </select>
-                    </div>
+        {isAutoFillModalOpen ? (
+          <>
+            <div className="w-1/2 flex flex-col bg-white border-r border-gray-200">
+              <PdfAutoFillPanel isOpen={isAutoFillModalOpen} onClose={() => setIsAutoFillModalOpen(false)} extractedData={extractedData} onApply={handleAutoFillApply} />
+            </div>
+            <div className="w-1/2 bg-gray-200">
+              <PdfViewer pdfUrl={pdfUrl} pdfFiles={pdfFiles} activePdfIdx={activePdfIdx} onSelectPdf={setActivePdfIdx} onRemovePdf={handleRemovePdf} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="w-1/2 flex flex-col bg-white border-r border-gray-200">
+              {activeSite ? (
+                <>
+                  <div className="bg-white border-b border-gray-200 shadow-sm z-10 px-4 py-1 flex items-center gap-1 overflow-x-auto no-scrollbar font-bold">
+                    <TabBtn active={activeTab === 'land_reg'} label="土地情報" onClick={() => setActiveTab('land_reg')} icon={<MapIcon size={14}/>} />
+                    <TabBtn active={activeTab === 'build_reg'} label="既登記建物" onClick={() => setActiveTab('build_reg')} icon={<Building size={14}/>} />
+                    <TabBtn active={activeTab === 'build_prop'} label="申請建物" onClick={() => setActiveTab('build_prop')} icon={<FileText size={14}/>} />
+                    <TabBtn active={activeTab === 'people'} label="関係人" onClick={() => setActiveTab('people')} icon={<Users size={14}/>} />
                   </div>
-                </div>
 
-                {activeTab === 'land_reg' && <LandSection site={activeSite} update={updateActiveSite} />}
-                {activeTab === 'build_reg' && <BuildingSection type="registered" site={activeSite} update={updateActiveSite} />}
-                {activeTab === 'build_prop' && <BuildingSection type="proposed" site={activeSite} update={updateActiveSite} />}
-                {activeTab === 'people' && <PeopleSection site={activeSite} update={updateActiveSite} contractors={contractors} openMasterModal={() => setIsMasterModalOpen(true)} />}
-              </div>
-            </>
-          ) : <div className="flex-1 flex items-center justify-center text-gray-400 font-bold italic">案件を選択してください</div>}
-        </div>
-        <div className="w-1/2 bg-gray-200">
-          <PdfViewer pdfUrl={pdfUrl} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
-        </div>
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30 custom-scrollbar">
+                    <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm space-y-4">
+                      <h3 className="text-gray-700 text-sm font-bold flex items-center gap-2 border-b pb-2"><Info size={16} className="text-blue-500" /> 案件基本設定</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex-1 col-span-2">
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">連携司法書士</label>
+                          <select className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" value={activeSite.scrivenerId || ""} onChange={e => updateActiveSite({ scrivenerId: e.target.value })}>
+                            <option value="">(未選択)</option>
+                            {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {activeTab === 'land_reg' && <LandSection site={activeSite} update={updateActiveSite} />}
+                    {activeTab === 'build_reg' && <BuildingSection type="registered" site={activeSite} update={updateActiveSite} />}
+                    {activeTab === 'build_prop' && <BuildingSection type="proposed" site={activeSite} update={updateActiveSite} />}
+                    {activeTab === 'people' && <PeopleSection site={activeSite} update={updateActiveSite} contractors={contractors} openMasterModal={() => setIsMasterModalOpen(true)} />}
+                  </div>
+                </>
+              ) : <div className="flex-1 flex items-center justify-center text-gray-400 font-bold italic">案件を選択してください</div>}
+            </div>
+            <div className="w-1/2 bg-gray-200">
+              <PdfViewer pdfUrl={pdfUrl} pdfFiles={pdfFiles} activePdfIdx={activePdfIdx} onSelectPdf={setActivePdfIdx} onRemovePdf={handleRemovePdf} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
+            </div>
+          </>
+        )}
       </div>
 
       <MasterManagerModal isOpen={isMasterModalOpen} onClose={() => setIsMasterModalOpen(false)} contractors={contractors} setContractors={setContractors} scriveners={scriveners} setScriveners={setScriveners} />
-      <PdfAutoFillModal isOpen={isAutoFillModalOpen} onClose={() => setIsAutoFillModalOpen(false)} extractedData={extractedData} onApply={handleAutoFillApply} />
 
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="新規現場の追加" footer={<><button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-medium text-black">キャンセル</button><button onClick={() => { if(!newSiteName.trim()) return; const s = createNewSite(newSiteName); setSites([...sites, s]); setActiveSiteId(s.id); setIsAddModalOpen(false); }} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">追加</button></>}><input autoFocus type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-black font-bold" placeholder="案件名を入力" value={newSiteName} onChange={(e) => setNewSiteName(e.target.value)} onKeyDown={e => e.key === 'Enter' && newSiteName.trim() && (function(){ const s = createNewSite(newSiteName); setSites([...sites, s]); setActiveSiteId(s.id); setIsAddModalOpen(false); })()} /></Modal>
       <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="現場の削除確認" footer={<><button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 text-sm font-medium text-black">キャンセル</button><button onClick={() => { const ns = sites.filter(s => s.id !== siteToDelete.id); setSites(ns); if(activeSiteId === siteToDelete.id) setActiveSiteId(ns[0]?.id || null); setIsDeleteModalOpen(false); }} className="bg-red-500 text-white px-6 py-2 rounded-lg font-bold">削除</button></>}><p className="text-sm font-bold text-black">「{siteToDelete?.name}」を削除しますか？</p></Modal>

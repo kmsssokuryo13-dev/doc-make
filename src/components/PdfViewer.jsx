@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, Upload, FileSearch, ScanText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, Upload, FileSearch, ScanText, X } from 'lucide-react';
 import { PDFJS_CDN, PDFJS_WORKER_CDN } from '../constants.js';
 
-export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) => {
+export const PdfViewer = ({ pdfUrl, pdfFiles = [], activePdfIdx = -1, onSelectPdf, onRemovePdf, onFileChange, onExtractText, extracting }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [pdfDoc, setPdfDoc] = useState(null);
@@ -12,6 +12,8 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
   const [baseFitScale, setBaseFitScale] = useState(1.0);
   const [loading, setLoading] = useState(false);
   const [pdfjsReady, setPdfjsReady] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
 
   useEffect(() => {
     const loadPdfJs = () => {
@@ -28,7 +30,7 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
     if (!pdfDoc || !containerRef.current) return;
     try {
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.0 });
+      const viewport = page.getViewport({ scale: 1.0, rotation: page.rotate });
       const containerWidth = containerRef.current.clientWidth - 32;
       setBaseFitScale(containerWidth / viewport.width);
     } catch (err) { console.error(err); }
@@ -65,7 +67,7 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
       setLoading(true);
       const page = await pdfDoc.getPage(pageNum);
       const finalScale = baseFitScale * zoom;
-      const viewport = page.getViewport({ scale: finalScale });
+      const viewport = page.getViewport({ scale: finalScale, rotation: page.rotate });
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       canvas.height = viewport.height; canvas.width = viewport.width;
@@ -77,6 +79,16 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden text-black font-sans">
+      {pdfFiles.length > 0 && (
+        <div className="bg-slate-700 flex items-center gap-0 overflow-x-auto no-scrollbar border-b border-slate-600 shrink-0">
+          {pdfFiles.map((f, i) => (
+            <div key={i} onClick={() => onSelectPdf && onSelectPdf(i)} className={`flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold cursor-pointer border-r border-slate-600 shrink-0 max-w-[180px] ${i === activePdfIdx ? 'bg-slate-800 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'}`}>
+              <span className="truncate">{f.label || f.name}</span>
+              <button onClick={(e) => { e.stopPropagation(); onRemovePdf && onRemovePdf(i); }} className="ml-1 p-0.5 rounded hover:bg-slate-500 shrink-0"><X size={10} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="bg-slate-800 text-white p-2 flex items-center justify-between shadow-lg z-20">
         <div className="flex items-center gap-1">
           <button disabled={!pdfUrl || pageNum <= 1} onClick={() => setPageNum(p => Math.max(1, p - 1))} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white"><ChevronLeft size={18} /></button>
@@ -95,7 +107,12 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
           <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer active:scale-95 transition-all"><Upload size={14} /> <span>PDF読込</span><input type="file" accept="application/pdf" className="hidden" onChange={onFileChange} /></label>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 overflow-auto bg-slate-200 shadow-inner relative select-none">
+      <div ref={containerRef} className={`flex-1 overflow-auto bg-slate-200 shadow-inner relative select-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        onMouseDown={(e) => { if (!pdfUrl || zoom <= 1.0) return; setDragging(true); dragStart.current = { x: e.clientX, y: e.clientY, scrollLeft: containerRef.current.scrollLeft, scrollTop: containerRef.current.scrollTop }; }}
+        onMouseMove={(e) => { if (!dragging) return; e.preventDefault(); const dx = e.clientX - dragStart.current.x; const dy = e.clientY - dragStart.current.y; containerRef.current.scrollLeft = dragStart.current.scrollLeft - dx; containerRef.current.scrollTop = dragStart.current.scrollTop - dy; }}
+        onMouseUp={() => setDragging(false)}
+        onMouseLeave={() => setDragging(false)}
+      >
         {pdfUrl ? (
           <div className="flex min-w-full min-h-full p-4"><div className="m-auto relative shadow-2xl bg-white"><canvas ref={canvasRef} className="block transition-opacity duration-200" style={{ opacity: loading ? 0.6 : 1 }} /></div></div>
         ) : (

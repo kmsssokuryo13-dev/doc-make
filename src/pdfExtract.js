@@ -305,10 +305,18 @@ const parseHyodaiBuilding = (lines) => {
   let kinds = [];
   let structs = [];
   let allFloorAreas = [];
+  let currentRowKind = "";
+  let currentRowStruct = "";
 
   for (let i = dataHeaderIdx + 1; i < mainLines.length; i++) {
     const line = mainLines[i];
-    if (isRowSeparator(line)) continue;
+    if (isRowSeparator(line)) {
+      if (currentRowKind) kinds.push(currentRowKind);
+      if (currentRowStruct) structs.push(currentRowStruct);
+      currentRowKind = "";
+      currentRowStruct = "";
+      continue;
+    }
     const stripped = stripBorders(line).replace(/[\s\u3000]+/g, "");
     if (!stripped) continue;
 
@@ -317,13 +325,15 @@ const parseHyodaiBuilding = (lines) => {
       const col0 = clean(cols[0]);
       const col1 = clean(cols[1]);
 
-      if (col0 && col0 !== "余白" && HAS_KANJI_RE.test(col0)) kinds.push(col0);
-      if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) structs.push(col1);
+      if (col0 && col0 !== "余白" && HAS_KANJI_RE.test(col0)) currentRowKind += col0;
+      if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) currentRowStruct += col1;
 
       const fa = parseFloorAreaCol(cols[2] || "");
       if (fa) allFloorAreas.push(fa);
     }
   }
+  if (currentRowKind) kinds.push(currentRowKind);
+  if (currentRowStruct) structs.push(currentRowStruct);
 
   if (kinds.length > 0) result.kind = kinds[kinds.length - 1];
   if (structs.length > 0) {
