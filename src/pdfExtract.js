@@ -137,91 +137,191 @@ const parseHyodaiLand = (lines) => {
   return result;
 };
 
-const parseHyodaiBuilding = (lines) => {
-  const result = { address: "", houseNum: "", kind: "", structMaterial: "", structFloor: "", floorAreas: [] };
+const parseFloorAreaCol = (rawCol) => {
+  const processed = stripBorders(rawCol || "").replace(/：/g, ".").replace(/:/g, ".").replace(/余白/g, "").trim();
+  if (!processed) return null;
+  const hwVal = hw(processed);
+  const floorMatch = hwVal.match(/(?:地下)?(\d+)階\s*([\d.]+)/);
+  if (floorMatch) {
+    const isBasement = hwVal.trimStart().startsWith("地下");
+    const floorLabel = isBasement
+      ? toFullWidthDigits(`地下${floorMatch[1]}階`)
+      : toFullWidthDigits(`${floorMatch[1]}階`);
+    return { id: generateId(), floor: floorLabel, area: toFullWidthDigits(floorMatch[2]) };
+  }
+  const simpleMatch = hwVal.match(/(\d[\d.]*\d|\d+)/);
+  if (simpleMatch) {
+    return { id: generateId(), floor: "１階", area: toFullWidthDigits(simpleMatch[1]) };
+  }
+  return null;
+};
 
-  let addressLines = [];
-  let houseNumLines = [];
-  let inAddress = false;
-  let inHouseNum = false;
+const parseAnnexSection = (lines) => {
+  const annexes = [];
   let dataHeaderIdx = -1;
-
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const cleanedLine = stripBorders(line).replace(/[\s\u3000]+/g, "");
-    if (cleanedLine.includes("所在") && !cleanedLine.includes("所有")) {
-      inAddress = true;
-      inHouseNum = false;
-      const cols = splitColumns(line);
-      if (cols.length >= 2) {
-        const val = clean(cols[1] || "");
-        if (val) addressLines.push(val);
-      }
-      continue;
-    }
-    if (cleanedLine.includes("家屋番号")) {
-      inAddress = false;
-      inHouseNum = true;
-      const cols = splitColumns(line);
-      if (cols.length >= 2) {
-        const val = clean(cols[1] || "");
-        if (val) houseNumLines.push(val);
-      }
-      continue;
-    }
-    if (inAddress && !isRowSeparator(line)) {
-      const cols = splitColumns(line);
-      if (cols.length >= 2) {
-        const val = clean(cols[1] || "");
-        if (val) addressLines.push(val);
-      }
-      continue;
-    }
-    if (inHouseNum && !isRowSeparator(line)) {
-      const cols = splitColumns(line);
-      if (cols.length >= 2) {
-        const val = clean(cols[1] || "");
-        if (val) houseNumLines.push(val);
-      }
-      continue;
-    }
-    if (cleanedLine.includes("①") || (cleanedLine.includes("種") && cleanedLine.includes("類"))) {
-      inAddress = false;
-      inHouseNum = false;
+    const cl = stripBorders(lines[i]).replace(/[\s\u3000]+/g, "");
+    if (cl.includes("符号") && cl.includes("①")) {
       dataHeaderIdx = i;
       break;
     }
+  }
+  if (dataHeaderIdx < 0) return annexes;
+
+  let current = null;
+  for (let i = dataHeaderIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
     if (isRowSeparator(line)) {
-      inAddress = false;
-      inHouseNum = false;
+      if (current) { annexes.push(current); current = null; }
+      continue;
+    }
+    const stripped = stripBorders(line).replace(/[\s\u3000]+/g, "");
+    if (!stripped) continue;
+
+    const cols = splitColumns(line);
+    if (cols.length < 4) continue;
+
+    const col0 = clean(cols[0]);
+    const col1 = clean(cols[1]);
+    const col2 = clean(cols[2]);
+    const col3raw = cols[3] || "";
+
+    if (col0 && /[０-９\d]/.test(col0)) {
+      if (current) annexes.push(current);
+      current = {
+        id: generateId(), symbol: toFullWidthDigits(col0), kind: "",
+        structMaterial: "", structFloor: "", struct: "",
+        hasBasement: false, floorAreas: [],
+        registrationCause: "",
+        registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
+        additionalCauses: [],
+      };
+    }
+    if (!current) {
+      current = {
+        id: generateId(), symbol: "", kind: "",
+        structMaterial: "", structFloor: "", struct: "",
+        hasBasement: false, floorAreas: [],
+        registrationCause: "",
+        registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
+        additionalCauses: [],
+      };
+    }
+
+    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind = col1;
+    if (col2 && col2 !== "余白" && HAS_KANJI_RE.test(col2)) {
+      const hwS = hw(col2);
+      const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
+      if (fm) {
+        const idx = hwS.lastIndexOf(fm[0]);
+        current.structMaterial = col2.slice(0, idx);
+        current.structFloor = col2.slice(idx);
+      } else {
+        current.structMaterial = col2;
+      }
+      current.struct = current.structMaterial + current.structFloor;
+    }
+    const fa = parseFloorAreaCol(col3raw);
+    if (fa) {
+      current.floorAreas.push(fa);
+      current.hasBasement = current.floorAreas.some(f => f.floor.includes("地下"));
+    }
+  }
+  if (current) annexes.push(current);
+
+  for (const a of annexes) {
+    if (a.floorAreas.length === 0) {
+      a.floorAreas.push({ id: generateId(), floor: "１階", area: "" });
+    }
+  }
+  return annexes;
+};
+
+const parseHyodaiBuilding = (lines) => {
+  const result = { address: "", houseNum: "", kind: "", structMaterial: "", structFloor: "", floorAreas: [], annexBuildings: [] };
+
+  let mainLines = [];
+  let annexLines = [];
+  let inAnnex = false;
+  for (const line of lines) {
+    const cl = stripBorders(line).replace(/[\s\u3000]+/g, "");
+    if (cl.includes("附属建物") && cl.includes("表示")) inAnnex = true;
+    if (inAnnex) annexLines.push(line); else mainLines.push(line);
+  }
+
+  let dataHeaderIdx = -1;
+  for (let i = 0; i < mainLines.length; i++) {
+    const cl = stripBorders(mainLines[i]).replace(/[\s\u3000]+/g, "");
+    if (cl.includes("①") && cl.includes("種") && cl.includes("類")) {
+      dataHeaderIdx = i;
+      break;
     }
   }
 
-  if (addressLines.length > 0) result.address = addressLines[addressLines.length - 1];
-  if (houseNumLines.length > 0) result.houseNum = houseNumLines[houseNumLines.length - 1];
+  let houseNumIdx = -1;
+  for (let i = 0; i < mainLines.length; i++) {
+    const cl = stripBorders(mainLines[i]).replace(/[\s\u3000]+/g, "");
+    if (cl.includes("家屋番号")) { houseNumIdx = i; break; }
+  }
 
-  if (dataHeaderIdx < 0) return result;
+  let addressLines = [];
+  let foundShozai = false;
+  const addrEnd = houseNumIdx > 0 ? houseNumIdx : (dataHeaderIdx > 0 ? dataHeaderIdx : mainLines.length);
+  for (let i = 0; i < addrEnd; i++) {
+    const line = mainLines[i];
+    const cl = stripBorders(line).replace(/[\s\u3000]+/g, "");
+    if (cl.includes("所在") && !cl.includes("所有") && !cl.includes("所在図")) foundShozai = true;
+    if (!foundShozai) continue;
+    if (isRowSeparator(line)) continue;
+    const cols = splitColumns(line);
+    if (cols.length >= 2) {
+      const firstCol = clean(cols[0]);
+      if (firstCol && firstCol !== "所在" && HAS_KANJI_RE.test(firstCol)) continue;
+      const val = clean(cols[1] || "");
+      if (val && HAS_KANJI_RE.test(val) && !val.includes("平成") && !val.includes("令和") && !val.includes("昭和") && !val.includes("登記") && !val.includes("変更")) {
+        addressLines.push(val);
+      }
+    }
+  }
+  if (addressLines.length > 0) result.address = addressLines[addressLines.length - 1];
+
+  if (houseNumIdx >= 0) {
+    let houseNumLines = [];
+    const hnEnd = dataHeaderIdx > 0 ? dataHeaderIdx : mainLines.length;
+    for (let i = houseNumIdx; i < hnEnd; i++) {
+      const line = mainLines[i];
+      if (isRowSeparator(line)) continue;
+      const cols = splitColumns(line);
+      if (cols.length >= 2) {
+        const val = clean(cols[1] || "");
+        if (val && /[０-９\d番]/.test(val)) houseNumLines.push(val);
+      }
+    }
+    if (houseNumLines.length > 0) result.houseNum = houseNumLines[houseNumLines.length - 1];
+  }
+
+  if (dataHeaderIdx < 0) { result.annexBuildings = parseAnnexSection(annexLines); return result; }
 
   let kinds = [];
   let structs = [];
-  let floorAreaTexts = [];
+  let allFloorAreas = [];
 
-  for (let i = dataHeaderIdx + 1; i < lines.length; i++) {
-    const line = lines[i];
+  for (let i = dataHeaderIdx + 1; i < mainLines.length; i++) {
+    const line = mainLines[i];
     if (isRowSeparator(line)) continue;
-    const cleanedLine = stripBorders(line).replace(/[\s\u3000]+/g, "");
-    if (cleanedLine.includes("原因及び")) break;
-    if (!cleanedLine) continue;
+    const stripped = stripBorders(line).replace(/[\s\u3000]+/g, "");
+    if (!stripped) continue;
 
     const cols = splitColumns(line);
     if (cols.length >= 3) {
       const col0 = clean(cols[0]);
       const col1 = clean(cols[1]);
-      const col2 = clean(cols[2] || "");
 
-      if (col0 && col0 !== "余白") kinds.push(col0);
-      if (col1 && col1 !== "余白") structs.push(col1);
-      if (col2 && col2 !== "余白") floorAreaTexts.push(col2);
+      if (col0 && col0 !== "余白" && HAS_KANJI_RE.test(col0)) kinds.push(col0);
+      if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) structs.push(col1);
+
+      const fa = parseFloorAreaCol(cols[2] || "");
+      if (fa) allFloorAreas.push(fa);
     }
   }
 
@@ -239,25 +339,11 @@ const parseHyodaiBuilding = (lines) => {
     }
   }
 
-  if (floorAreaTexts.length > 0) {
-    const hwFloor = hw(floorAreaTexts[floorAreaTexts.length - 1]);
-    const pattern = /(?:地下)?(\d+)階\s*([\d.]+)/g;
-    let m;
-    while ((m = pattern.exec(hwFloor)) !== null) {
-      const isBasement = m[0].startsWith("地下");
-      const floorLabel = isBasement
-        ? toFullWidthDigits(`地下${m[1]}階`)
-        : toFullWidthDigits(`${m[1]}階`);
-      result.floorAreas.push({ id: generateId(), floor: floorLabel, area: toFullWidthDigits(m[2]) });
-    }
-    if (result.floorAreas.length === 0) {
-      const simple = hwFloor.match(/([\d.]+)/);
-      if (simple) {
-        result.floorAreas.push({ id: generateId(), floor: "１階", area: toFullWidthDigits(simple[1]) });
-      }
-    }
-  }
+  const floorMap = new Map();
+  for (const fa of allFloorAreas) floorMap.set(fa.floor, fa);
+  result.floorAreas = [...floorMap.values()];
 
+  result.annexBuildings = parseAnnexSection(annexLines);
   return result;
 };
 
@@ -426,7 +512,7 @@ export const parseBuildingRegistration = (text) => {
     owner: "",
     floorAreas: bld.floorAreas,
     hasBasement: bld.floorAreas.some(fa => fa.floor.includes("地下")),
-    annexes: [],
+    annexes: bld.annexBuildings || [],
     registrationCause: cause,
     registrationDate: date,
     additionalCauses: [],

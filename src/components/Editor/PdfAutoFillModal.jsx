@@ -134,6 +134,25 @@ export const PdfAutoFillModal = ({ isOpen, onClose, extractedData, onApply }) =>
                 {b.registrationCause && (
                   <FieldRow label="登記原因" value={b.registrationCause} checked={selections.buildings} onChange={() => toggleSelection('buildings')} />
                 )}
+                {(b.annexes || []).length > 0 && (
+                  <div className="mt-2 border-t border-gray-200 pt-2">
+                    <div className="text-[10px] font-bold text-orange-600 mb-1">附属建物</div>
+                    {b.annexes.map((a, ai) => (
+                      <div key={a.id || ai} className="border border-orange-100 rounded p-2 space-y-1 bg-orange-50/30 mb-1">
+                        <FieldRow label="符号" value={a.symbol} checked={selections.buildings} onChange={() => toggleSelection('buildings')} />
+                        <FieldRow label="種類" value={a.kind} checked={selections.buildings} onChange={() => toggleSelection('buildings')} />
+                        <FieldRow label="構造" value={(a.structMaterial || '') + (a.structFloor || '')} checked={selections.buildings} onChange={() => toggleSelection('buildings')} />
+                        {a.floorAreas && a.floorAreas.length > 0 && (
+                          <label className="flex items-start gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                            <input type="checkbox" className="mt-0.5 w-4 h-4 rounded" checked={selections.buildings} onChange={() => toggleSelection('buildings')} />
+                            <span className="text-[10px] font-bold text-gray-500 min-w-[60px] shrink-0">床面積</span>
+                            <FloorAreaDisplay floorAreas={a.floorAreas} />
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </Section>
