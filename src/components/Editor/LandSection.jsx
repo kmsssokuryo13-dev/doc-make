@@ -29,7 +29,7 @@ export const LandSection = ({ site, update }) => (
           <FormField label="所在" value={item.address} onChange={(v) => update(updateLandItem(site, item.id, { address: v }))} />
           <FormField label="地番" value={item.lotNumber} onChange={(v) => update(updateLandItem(site, item.id, { lotNumber: v }))} />
           <FormField label="地目" value={item.category} onChange={(v) => update(updateLandItem(site, item.id, { category: v }))} />
-          <FormField label="地積" value={item.area} onChange={(v) => update(updateLandItem(site, item.id, { area: v }))} />
+          <FormField label="地積" value={item.area} onChange={(v) => update(updateLandItem(site, item.id, { area: v }))} autoConfirm />
           <FormField label="所有者" value={item.owner} onChange={(v) => update(updateLandItem(site, item.id, { owner: v }))} />
         </div>
 
@@ -55,7 +55,7 @@ export const LandSection = ({ site, update }) => (
         {item.categoryChangeEnabled && (
           <div className="grid grid-cols-2 gap-4 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
             <FormField label="変更後の地目" value={item.newCategory} onChange={(v) => update(updateLandItem(site, item.id, { newCategory: v }))} />
-            <FormField label="変更後の地積" value={item.newArea} onChange={(v) => update(updateLandItem(site, item.id, { newArea: v }))} />
+            <FormField label="変更後の地積" value={item.newArea} onChange={(v) => update(updateLandItem(site, item.id, { newArea: v }))} autoConfirm />
           </div>
         )}
 

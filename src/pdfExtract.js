@@ -420,7 +420,7 @@ const parseKoukuOwner = (lines) => {
     const rightsClean = clean(rightsText);
 
     if (seqCol && /^[０-９\d]+$/.test(hw(seqCol))) {
-      const isOwnership = purposeCol.includes("所有権移転") && !purposeCol.includes("仮登記") && !purposeCol.includes("抹消");
+      const isOwnership = purposeCol.includes("所有権") && !purposeCol.includes("仮登記") && !purposeCol.includes("抹消");
       currentEntry = { seq: seqCol, rightsCol: [], isOwnershipTransfer: isOwnership };
     }
 
@@ -439,6 +439,16 @@ const parseKoukuOwner = (lines) => {
     if (entries[i].isOwnershipTransfer) {
       ownerEntry = entries[i];
       break;
+    }
+  }
+
+  if (!ownerEntry) {
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const rt = entries[i].rightsCol.join(" ");
+      if (rt.includes("所有者")) {
+        ownerEntry = entries[i];
+        break;
+      }
     }
   }
 
