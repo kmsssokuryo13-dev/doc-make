@@ -19,7 +19,9 @@ import { PdfViewer } from '../PdfViewer.jsx';
 export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contractors, setContractors, scriveners, setScriveners }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('land_reg');
-  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfFiles, setPdfFiles] = useState([]);
+  const [activePdfIdx, setActivePdfIdx] = useState(-1);
+  const pdfUrl = activePdfIdx >= 0 && pdfFiles[activePdfIdx] ? pdfFiles[activePdfIdx].url : null;
   const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [isAutoFillModalOpen, setIsAutoFillModalOpen] = useState(false);
@@ -63,8 +65,21 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
     const file = e?.target?.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    setPdfFiles(prev => {
+      const next = [...prev, { name: file.name, url }];
+      setActivePdfIdx(next.length - 1);
+      return next;
+    });
     e.target.value = "";
+  }, []);
+
+  const handleRemovePdf = useCallback((idx) => {
+    setPdfFiles(prev => {
+      URL.revokeObjectURL(prev[idx].url);
+      const next = prev.filter((_, i) => i !== idx);
+      setActivePdfIdx(cur => cur >= next.length ? next.length - 1 : (cur > idx ? cur - 1 : cur));
+      return next;
+    });
   }, []);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -134,7 +149,7 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
               <PdfAutoFillPanel isOpen={isAutoFillModalOpen} onClose={() => setIsAutoFillModalOpen(false)} extractedData={extractedData} onApply={handleAutoFillApply} />
             </div>
             <div className="w-1/2 bg-gray-200">
-              <PdfViewer pdfUrl={pdfUrl} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
+              <PdfViewer pdfUrl={pdfUrl} pdfFiles={pdfFiles} activePdfIdx={activePdfIdx} onSelectPdf={setActivePdfIdx} onRemovePdf={handleRemovePdf} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
             </div>
           </>
         ) : (
@@ -172,7 +187,7 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
               ) : <div className="flex-1 flex items-center justify-center text-gray-400 font-bold italic">案件を選択してください</div>}
             </div>
             <div className="w-1/2 bg-gray-200">
-              <PdfViewer pdfUrl={pdfUrl} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
+              <PdfViewer pdfUrl={pdfUrl} pdfFiles={pdfFiles} activePdfIdx={activePdfIdx} onSelectPdf={setActivePdfIdx} onRemovePdf={handleRemovePdf} onFileChange={handlePdfUpload} onExtractText={handlePdfExtract} extracting={extracting} />
             </div>
           </>
         )}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, Upload, FileSearch, ScanText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize, Upload, FileSearch, ScanText, X } from 'lucide-react';
 import { PDFJS_CDN, PDFJS_WORKER_CDN } from '../constants.js';
 
-export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) => {
+export const PdfViewer = ({ pdfUrl, pdfFiles = [], activePdfIdx = -1, onSelectPdf, onRemovePdf, onFileChange, onExtractText, extracting }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [pdfDoc, setPdfDoc] = useState(null);
@@ -79,6 +79,16 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden text-black font-sans">
+      {pdfFiles.length > 0 && (
+        <div className="bg-slate-700 flex items-center gap-0 overflow-x-auto no-scrollbar border-b border-slate-600 shrink-0">
+          {pdfFiles.map((f, i) => (
+            <div key={i} onClick={() => onSelectPdf && onSelectPdf(i)} className={`flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold cursor-pointer border-r border-slate-600 shrink-0 max-w-[180px] ${i === activePdfIdx ? 'bg-slate-800 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'}`}>
+              <span className="truncate">{f.name}</span>
+              <button onClick={(e) => { e.stopPropagation(); onRemovePdf && onRemovePdf(i); }} className="ml-1 p-0.5 rounded hover:bg-slate-500 shrink-0"><X size={10} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="bg-slate-800 text-white p-2 flex items-center justify-between shadow-lg z-20">
         <div className="flex items-center gap-1">
           <button disabled={!pdfUrl || pageNum <= 1} onClick={() => setPageNum(p => Math.max(1, p - 1))} className="p-1.5 hover:bg-slate-700 rounded disabled:opacity-20 text-white"><ChevronLeft size={18} /></button>
