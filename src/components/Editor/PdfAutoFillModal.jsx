@@ -71,7 +71,12 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
   const updateBuilding = (bIdx, field, value) => {
     setEditData(prev => {
       const next = { ...prev, buildings: [...prev.buildings] };
-      next.buildings[bIdx] = { ...next.buildings[bIdx], [field]: value };
+      const b = { ...next.buildings[bIdx], [field]: value };
+      if (field === 'struct') {
+        delete b.structMaterial;
+        delete b.structFloor;
+      }
+      next.buildings[bIdx] = b;
       return next;
     });
   };
@@ -91,7 +96,12 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
       const next = { ...prev, buildings: [...prev.buildings] };
       const b = { ...next.buildings[bIdx] };
       b.annexes = [...(b.annexes || [])];
-      b.annexes[aIdx] = { ...b.annexes[aIdx], [field]: value };
+      const a = { ...b.annexes[aIdx], [field]: value };
+      if (field === 'struct') {
+        delete a.structMaterial;
+        delete a.structFloor;
+      }
+      b.annexes[aIdx] = a;
       next.buildings[bIdx] = b;
       return next;
     });
@@ -187,7 +197,7 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
                       <div key={a.id || aIdx} className="border border-orange-100 rounded p-2 space-y-1 bg-orange-50/30 mb-1">
                         <EditableFieldRow label="符号" value={a.symbol} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateAnnex(bIdx, aIdx, 'symbol', v)} />
                         <EditableFieldRow label="種類" value={a.kind} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateAnnex(bIdx, aIdx, 'kind', v)} />
-                        <EditableFieldRow label="構造" value={(a.structMaterial || '') + (a.structFloor || '')} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => { updateAnnex(bIdx, aIdx, 'structMaterial', v); updateAnnex(bIdx, aIdx, 'structFloor', ''); }} />
+                        <EditableFieldRow label="構造" value={a.struct || ((a.structMaterial || '') + (a.structFloor || ''))} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateAnnex(bIdx, aIdx, 'struct', v)} />
                         <EditableFloorAreaRow label="床面積" floorAreas={a.floorAreas} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChangeFloor={(fIdx, area) => updateAnnexFloor(bIdx, aIdx, fIdx, area)} />
                       </div>
                     ))}
