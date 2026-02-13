@@ -12,6 +12,8 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
   const [baseFitScale, setBaseFitScale] = useState(1.0);
   const [loading, setLoading] = useState(false);
   const [pdfjsReady, setPdfjsReady] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
 
   useEffect(() => {
     const loadPdfJs = () => {
@@ -28,7 +30,7 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
     if (!pdfDoc || !containerRef.current) return;
     try {
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.0 });
+      const viewport = page.getViewport({ scale: 1.0, rotation: page.rotate });
       const containerWidth = containerRef.current.clientWidth - 32;
       setBaseFitScale(containerWidth / viewport.width);
     } catch (err) { console.error(err); }
@@ -65,7 +67,7 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
       setLoading(true);
       const page = await pdfDoc.getPage(pageNum);
       const finalScale = baseFitScale * zoom;
-      const viewport = page.getViewport({ scale: finalScale });
+      const viewport = page.getViewport({ scale: finalScale, rotation: page.rotate });
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       canvas.height = viewport.height; canvas.width = viewport.width;
@@ -95,7 +97,12 @@ export const PdfViewer = ({ pdfUrl, onFileChange, onExtractText, extracting }) =
           <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer active:scale-95 transition-all"><Upload size={14} /> <span>PDF読込</span><input type="file" accept="application/pdf" className="hidden" onChange={onFileChange} /></label>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 overflow-auto bg-slate-200 shadow-inner relative select-none">
+      <div ref={containerRef} className={`flex-1 overflow-auto bg-slate-200 shadow-inner relative select-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        onMouseDown={(e) => { if (!pdfUrl || zoom <= 1.0) return; setDragging(true); dragStart.current = { x: e.clientX, y: e.clientY, scrollLeft: containerRef.current.scrollLeft, scrollTop: containerRef.current.scrollTop }; }}
+        onMouseMove={(e) => { if (!dragging) return; e.preventDefault(); const dx = e.clientX - dragStart.current.x; const dy = e.clientY - dragStart.current.y; containerRef.current.scrollLeft = dragStart.current.scrollLeft - dx; containerRef.current.scrollTop = dragStart.current.scrollTop - dy; }}
+        onMouseUp={() => setDragging(false)}
+        onMouseLeave={() => setDragging(false)}
+      >
         {pdfUrl ? (
           <div className="flex min-w-full min-h-full p-4"><div className="m-auto relative shadow-2xl bg-white"><canvas ref={canvasRef} className="block transition-opacity duration-200" style={{ opacity: loading ? 0.6 : 1 }} /></div></div>
         ) : (
