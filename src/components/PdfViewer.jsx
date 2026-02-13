@@ -83,7 +83,7 @@ export const PdfViewer = ({ pdfUrl, pdfFiles = [], activePdfIdx = -1, onSelectPd
         <div className="bg-slate-700 flex items-center gap-0 overflow-x-auto no-scrollbar border-b border-slate-600 shrink-0">
           {pdfFiles.map((f, i) => (
             <div key={i} onClick={() => onSelectPdf && onSelectPdf(i)} className={`flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold cursor-pointer border-r border-slate-600 shrink-0 max-w-[180px] ${i === activePdfIdx ? 'bg-slate-800 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'}`}>
-              <span className="truncate">{f.name}</span>
+              <span className="truncate">{f.label || f.name}</span>
               <button onClick={(e) => { e.stopPropagation(); onRemovePdf && onRemovePdf(i); }} className="ml-1 p-0.5 rounded hover:bg-slate-500 shrink-0"><X size={10} /></button>
             </div>
           ))}

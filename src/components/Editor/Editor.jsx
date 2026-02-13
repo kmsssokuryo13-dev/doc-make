@@ -61,17 +61,40 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
     }));
   }, [activeSiteId, setSites]);
 
+  const derivePdfLabel = useCallback(async (url) => {
+    try {
+      if (!window.pdfjsLib) return null;
+      const pdf = await window.pdfjsLib.getDocument(url).promise;
+      const text = await extractTextFromPdf(pdf);
+      const data = parseRegistrationPdf(text);
+      if (data.buildings && data.buildings.length > 0) {
+        const b = data.buildings[0];
+        if (b.houseNum) return `家屋番号 ${b.houseNum}`;
+        if (b.address) return `建物 ${b.address}`;
+      }
+      if (data.land && data.land.length > 0) {
+        const l = data.land[0];
+        if (l.lotNumber) return `地番 ${l.lotNumber}`;
+        if (l.address) return `土地 ${l.address}`;
+      }
+    } catch (err) { console.error('PDF label extraction error:', err); }
+    return null;
+  }, []);
+
   const handlePdfUpload = useCallback((e) => {
     const file = e?.target?.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setPdfFiles(prev => {
-      const next = [...prev, { name: file.name, url }];
+      const next = [...prev, { name: file.name, url, label: null }];
       setActivePdfIdx(next.length - 1);
       return next;
     });
+    derivePdfLabel(url).then(label => {
+      if (label) setPdfFiles(prev => prev.map(f => f.url === url ? { ...f, label } : f));
+    });
     e.target.value = "";
-  }, []);
+  }, [derivePdfLabel]);
 
   const handleRemovePdf = useCallback((idx) => {
     setPdfFiles(prev => {
