@@ -54,6 +54,7 @@ const isRowSeparator = (line) => {
   if (!stripped) return false;
   const borderCount = (stripped.match(BORDER_RE) || []).length;
   const nonBorder = stripped.replace(BORDER_RE, "").replace(/[\s\u3000\u00A0]/g, "");
+  if (HAS_KANJI_RE.test(nonBorder)) return false;
   return borderCount > 5 && nonBorder.length < 3;
 };
 
