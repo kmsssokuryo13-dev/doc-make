@@ -54,6 +54,7 @@ const isRowSeparator = (line) => {
   if (!stripped) return false;
   const borderCount = (stripped.match(BORDER_RE) || []).length;
   const nonBorder = stripped.replace(BORDER_RE, "").replace(/[\s\u3000\u00A0]/g, "");
+  if (HAS_KANJI_RE.test(nonBorder)) return false;
   return borderCount > 5 && nonBorder.length < 3;
 };
 
@@ -208,18 +209,9 @@ const parseAnnexSection = (lines) => {
       };
     }
 
-    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind = col1;
+    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind += col1;
     if (col2 && col2 !== "余白" && HAS_KANJI_RE.test(col2)) {
-      const hwS = hw(col2);
-      const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
-      if (fm) {
-        const idx = hwS.lastIndexOf(fm[0]);
-        current.structMaterial = col2.slice(0, idx);
-        current.structFloor = col2.slice(idx);
-      } else {
-        current.structMaterial = col2;
-      }
-      current.struct = current.structMaterial + current.structFloor;
+      current._rawStruct = (current._rawStruct || "") + col2;
     }
     const fa = parseFloorAreaCol(col3raw);
     if (fa) {
@@ -230,11 +222,34 @@ const parseAnnexSection = (lines) => {
   if (current) annexes.push(current);
 
   for (const a of annexes) {
+    if (a._rawStruct) {
+      const hwS = hw(a._rawStruct);
+      const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
+      if (fm) {
+        const idx = hwS.lastIndexOf(fm[0]);
+        a.structMaterial = a._rawStruct.slice(0, idx);
+        a.structFloor = a._rawStruct.slice(idx);
+      } else {
+        a.structMaterial = a._rawStruct;
+      }
+      a.struct = a.structMaterial + a.structFloor;
+      delete a._rawStruct;
+    }
     if (a.floorAreas.length === 0) {
       a.floorAreas.push({ id: generateId(), floor: "１階", area: "" });
     }
   }
-  return annexes;
+
+  const symbolMap = new Map();
+  const noSymbol = [];
+  for (const a of annexes) {
+    if (a.symbol) {
+      symbolMap.set(a.symbol, a);
+    } else {
+      noSymbol.push(a);
+    }
+  }
+  return [...symbolMap.values(), ...noSymbol];
 };
 
 const parseHyodaiBuilding = (lines) => {
