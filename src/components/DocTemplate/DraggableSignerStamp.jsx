@@ -3,30 +3,28 @@ import { Move } from 'lucide-react';
 
 export const DraggableSignerStamp = ({ index, dx = 0, dy = 0, editable, onChange }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const startPos = useRef({ x: 0, y: 0 });
   const dragOrigin = useRef({ x: 0, y: 0 });
   const dragAxis = useRef(null);
+  const startDxDy = useRef({ dx: 0, dy: 0 });
 
   const handlePointerDown = (e) => {
     if (!editable) return;
     e.preventDefault(); e.stopPropagation();
     setIsDragging(true);
-    startPos.current = { x: e.clientX, y: e.clientY };
     dragOrigin.current = { x: e.clientX, y: e.clientY };
+    startDxDy.current = { dx, dy };
     dragAxis.current = null;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e) => {
     if (!isDragging || !editable) return;
-    let diffX = e.clientX - startPos.current.x;
-    let diffY = e.clientY - startPos.current.y;
+    let diffX = e.clientX - dragOrigin.current.x;
+    let diffY = e.clientY - dragOrigin.current.y;
     if (e.shiftKey) {
       if (dragAxis.current === null) {
-        const totalDx = Math.abs(e.clientX - dragOrigin.current.x);
-        const totalDy = Math.abs(e.clientY - dragOrigin.current.y);
-        if (totalDx > 3 || totalDy > 3) {
-          dragAxis.current = totalDx >= totalDy ? 'x' : 'y';
+        if (Math.abs(diffX) > 3 || Math.abs(diffY) > 3) {
+          dragAxis.current = Math.abs(diffX) >= Math.abs(diffY) ? 'x' : 'y';
         }
       }
       if (dragAxis.current === 'x') diffY = 0;
@@ -35,9 +33,8 @@ export const DraggableSignerStamp = ({ index, dx = 0, dy = 0, editable, onChange
     } else {
       dragAxis.current = null;
     }
-    const snap = v => Math.round(v / 3) * 3;
-    onChange?.(index, snap(dx + diffX), snap(dy + diffY));
-    startPos.current = { x: e.clientX, y: e.clientY };
+    const snap = v => Math.round(v / 7) * 7;
+    onChange?.(index, snap(startDxDy.current.dx + diffX), snap(startDxDy.current.dy + diffY));
   };
 
   const stopDrag = () => { setIsDragging(false); dragAxis.current = null; };
