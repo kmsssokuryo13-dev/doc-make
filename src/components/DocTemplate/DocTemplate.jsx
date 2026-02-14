@@ -317,29 +317,29 @@ export const DocTemplate = ({
           <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
             <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
           </div>
-          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
-            <div style={{ fontSize: '12pt' }}>
+          <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
               <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
             </div>
-            <div />
-            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-              <DraggableSignerStamp
-                index={0}
-                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                editable={!isPrint}
-                onChange={onSignerStampPosChange}
-              />
+            <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
             </div>
           </div>
           ) : (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
+          <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
             <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
               <DraggableSignerStamp
                 index={0}
@@ -351,7 +351,6 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
-          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -488,29 +487,29 @@ export const DocTemplate = ({
           <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
             <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
           </div>
-          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
-            <div style={{ fontSize: '12pt' }}>
+          <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
               <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
             </div>
-            <div />
-            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-              <DraggableSignerStamp
-                index={0}
-                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                editable={!isPrint}
-                onChange={onSignerStampPosChange}
-              />
+            <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
             </div>
           </div>
           ) : (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
+          <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
             <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
               <DraggableSignerStamp
                 index={0}
@@ -522,7 +521,6 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
-          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -616,29 +614,29 @@ export const DocTemplate = ({
             <p>{formatTodayDateBlock()}</p>
           </div>
 
-          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
-            <div style={{ fontSize: '12pt' }}>
+          <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
               <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
             </div>
-            <div />
-            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-              <DraggableSignerStamp
-                index={0}
-                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                editable={!isPrint}
-                onChange={onSignerStampPosChange}
-              />
+            <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
             </div>
           </div>
           ) : (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
+          <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
             <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
               <DraggableSignerStamp
                 index={0}
@@ -650,7 +648,6 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
-          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -769,29 +766,29 @@ export const DocTemplate = ({
             <p>{formatTodayDateBlock()}</p>
           </div>
 
-          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
-            <div style={{ fontSize: '12pt' }}>
+          <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
               <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
               <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
             </div>
-            <div />
-            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-              <DraggableSignerStamp
-                index={0}
-                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                editable={!isPrint}
-                onChange={onSignerStampPosChange}
-              />
+            <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                <DraggableSignerStamp
+                  index={0}
+                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                  editable={!isPrint}
+                  onChange={onSignerStampPosChange}
+                />
+              </div>
             </div>
           </div>
           ) : (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
+          <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
             <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
               <DraggableSignerStamp
                 index={0}
@@ -803,7 +800,6 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
-          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -998,26 +994,27 @@ export const DocTemplate = ({
               {dateBlock ?? formatTodayDateBlock()}
             </div>
 
-            <div contentEditable={false}>
             <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', rowGap: '2mm', fontSize: '11pt', marginTop: '0mm' }}>
-              {signers.map((p, i) => {
-                const pos = getSignerPos(i);
-                return (
-                  <React.Fragment key={p.id || i}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>{formatApplicantLine(p)}</div>
-                    <div />
-                    <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+            <div style={{ position: 'relative', width: 'fit-content', fontSize: '11pt', marginTop: '0mm' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
+                {signers.map((p, i) => (
+                  <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{formatApplicantLine(p)}</div>
+                ))}
+              </div>
+              <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm' }}>
+                {signers.map((p, i) => {
+                  const pos = getSignerPos(i);
+                  return (
+                    <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                       <DraggableSignerStamp
                         index={i} dx={pos.dx} dy={pos.dy}
                         editable={!isPrint} onChange={onSignerStampPosChange}
                       />
                     </div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
             </div>
           </EditableDocBody>
         </div>
@@ -1753,26 +1750,27 @@ export const DocTemplate = ({
             {formatTodayDateBlock()}
           </div>
 
-          <div contentEditable={false}>
           <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
 
-          <div style={{ display: "grid", gridTemplateColumns: "auto 1em 26.6mm", width: "fit-content", rowGap: "2mm", fontSize: "11pt", marginTop: "0mm" }}>
-            {(statementPeople || []).map((p, i) => {
-              const pos = getSignerPos(i);
-              return (
-                <React.Fragment key={p.id || i}>
-                  <div style={{ display: "flex", alignItems: "center" }}>{formatStatementLine(p)}</div>
-                  <div />
-                  <div style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
+          <div style={{ position: "relative", width: "fit-content", fontSize: "11pt", marginTop: "0mm" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2mm", paddingRight: "calc(1em + 26.6mm)" }}>
+              {(statementPeople || []).map((p, i) => (
+                <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }}>{formatStatementLine(p)}</div>
+              ))}
+            </div>
+            <div contentEditable={false} style={{ position: "absolute", top: 0, right: 0, display: "flex", flexDirection: "column", gap: "2mm" }}>
+              {(statementPeople || []).map((p, i) => {
+                const pos = getSignerPos(i);
+                return (
+                  <div key={p.id || i} style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
                       editable={!isPrint} onChange={onSignerStampPosChange}
                     />
                   </div>
-                </React.Fragment>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
           </div>
         </EditableDocBody>
       </div>
