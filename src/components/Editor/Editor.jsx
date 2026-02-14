@@ -190,18 +190,18 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
                   <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30 custom-scrollbar">
                     <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm space-y-4">
                       <h3 className="text-gray-700 text-sm font-bold flex items-center gap-2 border-b pb-2"><Info size={16} className="text-blue-500" /> 案件基本設定</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex-1 col-span-2">
+                      <div className="flex gap-4">
+                        <div className="w-[70%]">
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">連携司法書士</label>
                           <select className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" value={activeSite.scrivenerId || ""} onChange={e => updateActiveSite({ scrivenerId: e.target.value })}>
                             <option value="">(未選択)</option>
                             {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
                           </select>
                         </div>
-                        <div className="flex-1 col-span-2">
+                        <div className="w-[30%]">
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">住居表示の確認</label>
-                          <div className="flex items-center gap-2">
-                            <select className="flex-1 text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" defaultValue="" onChange={e => { if (e.target.value) window.open(e.target.value, '_blank'); e.target.value = ''; }}>
+                          <div className="flex items-center gap-1">
+                            <select className="flex-1 min-w-0 text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" defaultValue="" onChange={e => { if (e.target.value) window.open(e.target.value, '_blank'); e.target.value = ''; }}>
                               <option value="" disabled>市区町村を選択...</option>
                               <option value="https://www.city.toyama.lg.jp/kurashi/sumai/1010276/1010278/1004569.html">富山市</option>
                               <option value="https://www.city.takaoka.toyama.jp/soshiki/kyosomachizukurika/3/4/1/4564.html">高岡市</option>
