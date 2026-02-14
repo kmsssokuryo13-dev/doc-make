@@ -88,16 +88,15 @@ export const BuildingSection = ({ type, site, update }) => {
               </button>}
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-black">
-              <FormField label="所在" value={b.address} onChange={v => updateBuild(b.id, 'address', v)} />
-              <FormField label="家屋番号" value={b.houseNum} onChange={v => updateBuild(b.id, 'houseNum', v)} />
+              <FormField label="所在" value={b.address} onChange={v => updateBuild(b.id, 'address', v)} imeMode="active" />
+              <FormField label="家屋番号" value={b.houseNum} onChange={v => updateBuild(b.id, 'houseNum', v)} imeMode="active" />
               <FormField label="符号" value={(b.annexes || []).some(a => {
                 const sym = (a.symbol || '').replace(/[\s\u3000]/g, '');
                 const hasContent = (a.kind || '').replace(/[\s\u3000]/g, '').length > 0 || (a.struct || '').replace(/[\s\u3000]/g, '').length > 0 || (a.floorAreas || []).some(fa => (fa.area || '').replace(/[\s\u3000]/g, '').length > 0);
                 return sym.length > 0 && hasContent;
               }) ? '主' : ''} readOnly />
-              <FormField label="所有者" value={b.owner} onChange={v => updateBuild(b.id, 'owner', v)} />
-              <FormField label="種類" value={b.kind} onChange={v => updateBuild(b.id, 'kind', v)} />
-              <FormField label="構造（構成材料・屋根の種類）" value={b.structMaterial || ''} onChange={v => updateBuild(b.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" />
+              <FormField label="種類" value={b.kind} onChange={v => updateBuild(b.id, 'kind', v)} imeMode="active" />
+              <FormField label="構造（構成材料・屋根の種類）" value={b.structMaterial || ''} onChange={v => updateBuild(b.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" imeMode="active" />
               <FormField label="構造（階層）" value={b.structFloor || ''} readOnly />
               {(b.floorAreas || []).filter(fa => !fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`床面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = b.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateBuild(b.id, 'floorAreas', n); }} autoConfirm />))}
               {!b.hasBasement ? (
@@ -117,7 +116,7 @@ export const BuildingSection = ({ type, site, update }) => {
               <div className="mt-4 pt-4 border-t border-slate-200 flex flex-col gap-3 text-black">
                 <div className="flex items-center gap-3">
                   <div className="flex-[1.5]">
-                    <FormField label="登記原因" value={b.registrationCause} onChange={v => updateBuild(b.id, 'registrationCause', v)} placeholder="例: 新築" />
+                    <FormField label="登記原因" value={b.registrationCause} onChange={v => updateBuild(b.id, 'registrationCause', v)} placeholder="例: 新築" imeMode="active" />
                   </div>
                   <div className="flex-[3] flex flex-col">
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
@@ -302,9 +301,9 @@ export const BuildingSection = ({ type, site, update }) => {
               {(b.annexes || []).map(a => (
                 <div key={a.id} className="relative bg-gray-50/50 p-3 rounded-lg border border-dashed border-gray-200 font-sans text-black">
                   <div className="grid grid-cols-3 lg:grid-cols-4 gap-3 pr-8 text-black">
-                    <FormField label="符号" value={a.symbol} onChange={v => updateAnnex(b.id, a.id, 'symbol', v)} />
-                    <FormField label="種類" value={a.kind} onChange={v => updateAnnex(b.id, a.id, 'kind', v)} />
-                    <FormField label="構造（構成材料・屋根の種類）" value={a.structMaterial || ''} onChange={v => updateAnnex(b.id, a.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" />
+                    <FormField label="符号" value={a.symbol} onChange={v => updateAnnex(b.id, a.id, 'symbol', v)} autoConfirm />
+                    <FormField label="種類" value={a.kind} onChange={v => updateAnnex(b.id, a.id, 'kind', v)} imeMode="active" />
+                    <FormField label="構造（構成材料・屋根の種類）" value={a.structMaterial || ''} onChange={v => updateAnnex(b.id, a.id, 'structMaterial', v)} placeholder="例: 木造スレート葺" imeMode="active" />
                     <FormField label="構造（階層）" value={a.structFloor || ''} readOnly />
                     {(a.floorAreas || []).filter(fa => !fa.floor.includes("地下")).map((fa) => (<FormField key={fa.id} label={`面積（${fa.floor}）`} value={fa.area} onChange={v => { const n = a.floorAreas.map(f => f.id === fa.id ? {...f, area: v} : f); updateAnnex(b.id, a.id, 'floorAreas', n); }} autoConfirm />))}
                     {!a.hasBasement ? (
@@ -323,7 +322,7 @@ export const BuildingSection = ({ type, site, update }) => {
                     <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex flex-col gap-2">
                       <div className="flex items-center gap-3">
                         <div className="flex-[1.5]">
-                          <FormField label="登記原因" value={a.registrationCause || ""} onChange={v => updateAnnex(b.id, a.id, 'registrationCause', v)} placeholder="例: 新築" />
+                          <FormField label="登記原因" value={a.registrationCause || ""} onChange={v => updateAnnex(b.id, a.id, 'registrationCause', v)} placeholder="例: 新築" imeMode="active" />
                         </div>
                         <div className="flex-[3] flex flex-col">
                           <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">原因日付</label>
@@ -403,14 +402,14 @@ export const BuildingSection = ({ type, site, update }) => {
                     </div>
                   )}
                   <div className="flex items-center gap-2 mt-2">
-                    <button
+                    {!isReg && <button
                       onClick={() => {
-                        if (window.confirm('この附属建物の「符号」「種類」「構造」「床面積」をクリアしますか？')) {
+                        if (window.confirm('この附属建物の「符号」「種類」「構造」「床面積」をクリアし、登記原因に「取壊し」を入力しますか？')) {
                           update({
                             [dataKey]: buildings.map(x => x.id === b.id ? {
                               ...x,
                               annexes: (x.annexes || []).map(ax => ax.id === a.id ? {
-                                ...ax, symbol: '', kind: '', structMaterial: '', structFloor: '', struct: '', hasBasement: false, floorAreas: [{ id: generateId(), floor: '１階', area: '' }]
+                                ...ax, symbol: '', kind: '', structMaterial: '', structFloor: '', struct: '', hasBasement: false, floorAreas: [{ id: generateId(), floor: '１階', area: '' }], registrationCause: '取壊し'
                               } : ax)
                             } : x)
                           });
@@ -418,8 +417,8 @@ export const BuildingSection = ({ type, site, update }) => {
                       }}
                       className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1 transition-all"
                     >
-                      クリア
-                    </button>
+                      この建物を取壊し
+                    </button>}
                     <button
                       onClick={() => {
                         if (window.confirm('この附属建物の「種類」「構造」「床面積」を主である建物に転写しますか？')) {
