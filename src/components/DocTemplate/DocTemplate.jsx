@@ -940,25 +940,20 @@ export const DocTemplate = ({
 
             <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
 
-            <div style={{ fontSize: '11pt', marginTop: '0mm' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', rowGap: '2mm', fontSize: '11pt', marginTop: '0mm' }}>
               {signers.map((p, i) => {
                 const pos = getSignerPos(i);
                 return (
-                  <div
-                    key={p.id || i}
-                    style={{
-                      display: 'grid', gridTemplateColumns: '1fr 26.6mm',
-                      alignItems: 'center', margin: '0 0 2mm 0'
-                    }}
-                  >
-                    <div>{formatApplicantLine(p)}</div>
+                  <React.Fragment key={p.id || i}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>{formatApplicantLine(p)}</div>
+                    <div />
                     <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                       <DraggableSignerStamp
                         index={i} dx={pos.dx} dy={pos.dy}
                         editable={!isPrint} onChange={onSignerStampPosChange}
                       />
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -1698,25 +1693,20 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
 
-          <div style={{ fontSize: "11pt", marginTop: "0mm" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1em 26.6mm", rowGap: "2mm", fontSize: "11pt", marginTop: "0mm" }}>
             {(statementPeople || []).map((p, i) => {
               const pos = getSignerPos(i);
               return (
-                <div
-                  key={p.id || i}
-                  style={{
-                    display: "grid", gridTemplateColumns: "1fr 26.6mm",
-                    alignItems: "center", margin: "0 0 2mm 0",
-                  }}
-                >
-                  <div>{formatStatementLine(p)}</div>
+                <React.Fragment key={p.id || i}>
+                  <div style={{ display: "flex", alignItems: "center" }}>{formatStatementLine(p)}</div>
+                  <div />
                   <div style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
                       editable={!isPrint} onChange={onSignerStampPosChange}
                     />
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
           </div>
