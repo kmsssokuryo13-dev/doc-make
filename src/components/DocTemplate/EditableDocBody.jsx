@@ -27,6 +27,14 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
     draftRef.current = containerRef.current.innerHTML;
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.execCommand('insertLineBreak');
+      handleInput();
+    }
+  };
+
   const handleFocus = () => { focusedRef.current = true; };
   const handleBlur = () => { focusedRef.current = false; flush(); };
 
@@ -46,6 +54,7 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
+        onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         onBlur={handleBlur}
         className="doc-editable focus:outline-none min-h-[50mm]"
@@ -60,6 +69,7 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
       contentEditable
       suppressContentEditableWarning
       onInput={handleInput}
+      onKeyDown={handleKeyDown}
       onFocus={handleFocus}
       onBlur={handleBlur}
       className="doc-editable focus:outline-none min-h-[50mm]"
