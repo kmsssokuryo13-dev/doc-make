@@ -4,25 +4,44 @@ import { Move } from 'lucide-react';
 export const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange }) => {
   const [isDragging, setIsDragging] = useState(false);
   const startPos = useRef({ x: 0, y: 0 });
+  const dragOrigin = useRef({ x: 0, y: 0 });
+  const dragAxis = useRef(null);
   const baseRightMm = 15 + index * (26.6 + 2);
   const baseTopMm = 5;
 
   const handlePointerDown = (e) => {
     if (!editable) return;
     e.preventDefault(); e.stopPropagation();
-    setIsDragging(true); startPos.current = { x: e.clientX, y: e.clientY };
+    setIsDragging(true);
+    startPos.current = { x: e.clientX, y: e.clientY };
+    dragOrigin.current = { x: e.clientX, y: e.clientY };
+    dragAxis.current = null;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e) => {
     if (!isDragging || !editable) return;
-    const diffX = e.clientX - startPos.current.x;
-    const diffY = e.clientY - startPos.current.y;
+    let diffX = e.clientX - startPos.current.x;
+    let diffY = e.clientY - startPos.current.y;
+    if (e.shiftKey) {
+      if (dragAxis.current === null) {
+        const totalDx = Math.abs(e.clientX - dragOrigin.current.x);
+        const totalDy = Math.abs(e.clientY - dragOrigin.current.y);
+        if (totalDx > 3 || totalDy > 3) {
+          dragAxis.current = totalDx >= totalDy ? 'x' : 'y';
+        }
+      }
+      if (dragAxis.current === 'x') diffY = 0;
+      else if (dragAxis.current === 'y') diffX = 0;
+      else { diffX = 0; diffY = 0; }
+    } else {
+      dragAxis.current = null;
+    }
     onChange?.(index, dx + diffX, dy + diffY);
     startPos.current = { x: e.clientX, y: e.clientY };
   };
 
-  const stopDrag = () => setIsDragging(false);
+  const stopDrag = () => { setIsDragging(false); dragAxis.current = null; };
 
   return (
     <div
