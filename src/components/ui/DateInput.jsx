@@ -76,6 +76,8 @@ export function DateInput({ value, onChange, className, placeholder }) {
     <input
       ref={inputRef}
       type="text"
+      inputMode="numeric"
+      style={{ imeMode: 'disabled' }}
       className={className}
       value={localVal}
       onKeyDown={handleKeyDown}
