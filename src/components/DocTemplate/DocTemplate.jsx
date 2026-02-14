@@ -317,6 +317,7 @@ export const DocTemplate = ({
           <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
             <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
           </div>
+          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
@@ -350,6 +351,7 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
+          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -486,6 +488,7 @@ export const DocTemplate = ({
           <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
             <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
           </div>
+          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
@@ -519,6 +522,7 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
+          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -612,6 +616,7 @@ export const DocTemplate = ({
             <p>{formatTodayDateBlock()}</p>
           </div>
 
+          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
@@ -645,6 +650,7 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
+          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -763,6 +769,7 @@ export const DocTemplate = ({
             <p>{formatTodayDateBlock()}</p>
           </div>
 
+          <div contentEditable={false}>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
           {targetContractor ? (
@@ -796,6 +803,7 @@ export const DocTemplate = ({
             </div>
           </div>
           )}
+          </div>
         </EditableDocBody>
         </div>
       </div>
@@ -990,6 +998,7 @@ export const DocTemplate = ({
               {dateBlock ?? formatTodayDateBlock()}
             </div>
 
+            <div contentEditable={false}>
             <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', rowGap: '2mm', fontSize: '11pt', marginTop: '0mm' }}>
@@ -1008,6 +1017,7 @@ export const DocTemplate = ({
                   </React.Fragment>
                 );
               })}
+            </div>
             </div>
           </EditableDocBody>
         </div>
@@ -1743,6 +1753,7 @@ export const DocTemplate = ({
             {formatTodayDateBlock()}
           </div>
 
+          <div contentEditable={false}>
           <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
 
           <div style={{ display: "grid", gridTemplateColumns: "auto 1em 26.6mm", width: "fit-content", rowGap: "2mm", fontSize: "11pt", marginTop: "0mm" }}>
@@ -1761,6 +1772,7 @@ export const DocTemplate = ({
                 </React.Fragment>
               );
             })}
+          </div>
           </div>
         </EditableDocBody>
       </div>
