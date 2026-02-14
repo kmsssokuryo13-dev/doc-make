@@ -319,22 +319,21 @@ export const DocTemplate = ({
           </div>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-          <div style={{ marginTop: '5mm', position: 'relative' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
-              <div style={{ fontSize: '12pt' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
-                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
-              </div>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt' }}>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+              <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+            </div>
+            <div />
+            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+              <DraggableSignerStamp
+                index={0}
+                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                editable={!isPrint}
+                onChange={onSignerStampPosChange}
+              />
             </div>
           </div>
         </EditableDocBody>
@@ -475,22 +474,21 @@ export const DocTemplate = ({
           </div>
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-          <div style={{ marginTop: '5mm', position: 'relative' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
-              <div style={{ fontSize: '12pt' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
-                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
-              </div>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt' }}>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+              <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+            </div>
+            <div />
+            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+              <DraggableSignerStamp
+                index={0}
+                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                editable={!isPrint}
+                onChange={onSignerStampPosChange}
+              />
             </div>
           </div>
         </EditableDocBody>
@@ -588,22 +586,21 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-          <div style={{ marginTop: '5mm', position: 'relative' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
-              <div style={{ fontSize: '12pt' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
-                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
-              </div>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt' }}>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+              <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+            </div>
+            <div />
+            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+              <DraggableSignerStamp
+                index={0}
+                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                editable={!isPrint}
+                onChange={onSignerStampPosChange}
+              />
             </div>
           </div>
         </EditableDocBody>
@@ -726,22 +723,21 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-          <div style={{ marginTop: '5mm', position: 'relative' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 26.6mm', alignItems: 'center' }}>
-              <div style={{ fontSize: '12pt' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
-                <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
-              </div>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', alignItems: 'center', marginTop: '5mm' }}>
+            <div style={{ fontSize: '12pt' }}>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.address || "　"}</p>
+              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor?.name || "　"}</p>
+              <p style={{ margin: '0' }}>{targetContractor?.representative || "　"}</p>
+            </div>
+            <div />
+            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+              <DraggableSignerStamp
+                index={0}
+                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                editable={!isPrint}
+                onChange={onSignerStampPosChange}
+              />
             </div>
           </div>
         </EditableDocBody>
@@ -940,7 +936,7 @@ export const DocTemplate = ({
 
             <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', rowGap: '2mm', fontSize: '11pt', marginTop: '0mm' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1em 26.6mm', width: 'fit-content', rowGap: '2mm', fontSize: '11pt', marginTop: '0mm' }}>
               {signers.map((p, i) => {
                 const pos = getSignerPos(i);
                 return (
@@ -1693,7 +1689,7 @@ export const DocTemplate = ({
 
           <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
 
-          <div style={{ display: "grid", gridTemplateColumns: "auto 1em 26.6mm", rowGap: "2mm", fontSize: "11pt", marginTop: "0mm" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1em 26.6mm", width: "fit-content", rowGap: "2mm", fontSize: "11pt", marginTop: "0mm" }}>
             {(statementPeople || []).map((p, i) => {
               const pos = getSignerPos(i);
               return (

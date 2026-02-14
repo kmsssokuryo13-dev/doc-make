@@ -35,7 +35,8 @@ export const DraggableSignerStamp = ({ index, dx = 0, dy = 0, editable, onChange
     } else {
       dragAxis.current = null;
     }
-    onChange?.(index, dx + diffX, dy + diffY);
+    const snap = v => Math.round(v / 3) * 3;
+    onChange?.(index, snap(dx + diffX), snap(dy + diffY));
     startPos.current = { x: e.clientX, y: e.clientY };
   };
 
