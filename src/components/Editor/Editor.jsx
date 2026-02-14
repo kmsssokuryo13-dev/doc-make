@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Map as MapIcon, Users, Plus, Trash2, Save, Building,
-  Info, Upload, Download, Settings2
+  Info, Upload, Download, Settings2, ExternalLink
 } from 'lucide-react';
 import { createNewSite } from '../../utils.js';
 import { sanitizeSiteData } from '../../sanitize.js';
@@ -197,6 +197,23 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
                             <option value="">(未選択)</option>
                             {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
                           </select>
+                        </div>
+                        <div className="flex-1 col-span-2">
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">住居表示の確認</label>
+                          <div className="flex items-center gap-2">
+                            <select className="flex-1 text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" defaultValue="" onChange={e => { if (e.target.value) window.open(e.target.value, '_blank'); e.target.value = ''; }}>
+                              <option value="" disabled>市区町村を選択...</option>
+                              <option value="https://www.city.toyama.lg.jp/kurashi/sumai/1010276/1010278/1004569.html">富山市</option>
+                              <option value="https://www.city.takaoka.toyama.jp/soshiki/kyosomachizukurika/3/4/1/4564.html">高岡市</option>
+                              <option value="https://www.city.imizu.toyama.jp/faq/svFaqDtl.aspx?servno=438">射水市</option>
+                              <option value="https://www.city.tonami.lg.jp/info/35198p/#gsc.tab=0">砺波市</option>
+                              <option value="https://www.city.himi.toyama.jp/gyosei/soshiki/toshikeikaku/1/3/1297.html">氷見市</option>
+                              <option value="https://www.city.oyabe.toyama.jp/kurashi/1002358/1002377/1002379.html">小矢部市</option>
+                              <option value="https://www.city.uozu.toyama.jp/guide/svGuideDtl.aspx?servno=11441">魚津市</option>
+                              <option value="https://saigai.gsi.go.jp/jusho/view/pref/city/16206.html">滑川市</option>
+                            </select>
+                            <ExternalLink size={14} className="text-gray-400 shrink-0" />
+                          </div>
                         </div>
                       </div>
                     </div>
