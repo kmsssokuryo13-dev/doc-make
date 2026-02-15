@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
