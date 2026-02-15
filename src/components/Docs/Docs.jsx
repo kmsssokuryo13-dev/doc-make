@@ -219,11 +219,29 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(node => node.outerHTML).join("\n");
     const extraPrintCss = `<style>@page { size: A4; margin: 0; } html, body { margin: 0; padding: 0; background: white; } .break-before-page { break-before: page; page-break-before: always; } .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }</style>`;
-    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>印刷</title>${styles}${extraPrintCss}</head><body>${el.innerHTML}</body></html>`;
+    const uniqueNames = [];
+    printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
     const w = window.open("", "_blank");
     if (!w) return;
-    w.document.write(html); w.document.close();
-    w.onload = () => { setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 500); }, 300); };
+    let idx = 0;
+    const printNext = () => {
+      if (idx >= uniqueNames.length) { w.close(); return; }
+      const name = uniqueNames[idx++];
+      const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
+      if (!pages.length) { printNext(); return; }
+      const pagesHtml = pages.map((p, i) => {
+        const clone = p.cloneNode(true);
+        if (i > 0) clone.classList.add('break-before-page');
+        else clone.classList.remove('break-before-page');
+        return clone.outerHTML;
+      }).join('');
+      const safeTitle = name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      w.document.open();
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8" /><title>${safeTitle}</title>${styles}${extraPrintCss}</head><body>${pagesHtml}</body></html>`);
+      w.document.close();
+      setTimeout(() => { w.focus(); w.onafterprint = () => setTimeout(printNext, 300); w.print(); }, 300);
+    };
+    printNext();
   };
 
   const applicantsInPeople = useMemo(
@@ -258,7 +276,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
       <div className="hidden"><div id="print-area">
         {printInstances.map((inst, i) => (
-          <div key={inst.key} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative`}>
+          <div key={inst.key} data-doc-name={inst.name} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative`}>
             <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={siteData?.docPick?.[inst.key] || DEFAULT_PICK} isPrint={true} scriveners={scriveners} />
           </div>
         ))}
