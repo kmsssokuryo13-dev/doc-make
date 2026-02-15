@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2, FolderOpen } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import JSZip from 'jszip';
 import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES } from '../../constants.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
@@ -217,31 +218,61 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
   const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
 
+  const generatePdfBytes = async (el, name, tempContainer) => {
+    const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
+    if (!pages.length) return null;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    for (let i = 0; i < pages.length; i++) {
+      const clone = pages[i].cloneNode(true);
+      clone.style.cssText = 'width:210mm;height:297mm;position:relative;background:white;';
+      tempContainer.appendChild(clone);
+      const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      if (i > 0) pdf.addPage();
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      tempContainer.removeChild(clone);
+    }
+    return pdf.output('arraybuffer');
+  };
+
   const printSelectedInNewWindow = async () => {
     const el = document.getElementById("print-area");
     if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
-    setIsPrinting(true);
     const uniqueNames = [];
     printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
+    const supportsDirectoryPicker = typeof window.showDirectoryPicker === 'function';
+    let dirHandle = null;
+    if (supportsDirectoryPicker) {
+      try { dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch { return; }
+    }
+    setIsPrinting(true);
     const tempContainer = document.createElement('div');
     tempContainer.style.cssText = 'position:fixed;left:-9999px;top:0;';
     document.body.appendChild(tempContainer);
     try {
-      for (const name of uniqueNames) {
-        const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
-        if (!pages.length) continue;
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        for (let i = 0; i < pages.length; i++) {
-          const clone = pages[i].cloneNode(true);
-          clone.style.cssText = 'width:210mm;height:297mm;position:relative;background:white;';
-          tempContainer.appendChild(clone);
-          const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-          if (i > 0) pdf.addPage();
-          const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-          tempContainer.removeChild(clone);
+      if (dirHandle) {
+        for (const name of uniqueNames) {
+          const bytes = await generatePdfBytes(el, name, tempContainer);
+          if (!bytes) continue;
+          const fileHandle = await dirHandle.getFileHandle(`${name}.pdf`, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(bytes);
+          await writable.close();
         }
-        pdf.save(`${name}.pdf`);
+      } else {
+        const zip = new JSZip();
+        for (const name of uniqueNames) {
+          const bytes = await generatePdfBytes(el, name, tempContainer);
+          if (!bytes) continue;
+          zip.file(`${name}.pdf`, bytes);
+        }
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${siteData.name || '書類'}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
       }
     } finally {
       document.body.removeChild(tempContainer);
