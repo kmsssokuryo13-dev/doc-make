@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import JSZip from 'jszip';
 import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES } from '../../constants.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
@@ -231,49 +230,39 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     return pdf.output('arraybuffer');
   };
 
+  const downloadBlob = (bytes, filename) => {
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const printSelectedInNewWindow = async () => {
     const el = document.getElementById("print-area");
     if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
     const uniqueNames = [];
     printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
-    const supportsDirectoryPicker = typeof window.showDirectoryPicker === 'function';
-    let dirHandle = null;
-    if (supportsDirectoryPicker) {
-      try { dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch { return; }
-    }
     setIsPrinting(true);
-    const hiddenWrapper = el.parentElement;
-    hiddenWrapper.style.cssText = 'position:fixed;left:-9999px;top:0;visibility:visible;display:block;';
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      if (dirHandle) {
-        for (const name of uniqueNames) {
-          const bytes = await generatePdfBytes(el, name);
-          if (!bytes) continue;
-          const fileHandle = await dirHandle.getFileHandle(`${name}.pdf`, { create: true });
-          const writable = await fileHandle.createWritable();
-          await writable.write(new Blob([bytes], { type: 'application/pdf' }));
-          await writable.close();
-        }
-      } else {
-        const zip = new JSZip();
-        for (const name of uniqueNames) {
-          const bytes = await generatePdfBytes(el, name);
-          if (!bytes) continue;
-          zip.file(`${name}.pdf`, bytes);
-        }
-        const blob = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${siteData.name || '書類'}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
+      let generated = 0;
+      for (const name of uniqueNames) {
+        const bytes = await generatePdfBytes(el, name);
+        if (!bytes) continue;
+        downloadBlob(bytes, `${name}.pdf`);
+        generated++;
+      }
+      if (generated === 0) {
+        alert("PDFを生成できませんでした。書類が選択されているか確認してください。");
       }
     } catch (err) {
       alert("PDF生成中にエラーが発生しました: " + err.message);
     } finally {
-      hiddenWrapper.style.cssText = '';
-      hiddenWrapper.className = 'hidden';
       setIsPrinting(false);
     }
   };
@@ -308,7 +297,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
         }
       `}</style>
 
-      <div className="hidden"><div id="print-area">
+      <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}><div id="print-area">
         {printInstances.map((inst, i) => (
           <div key={inst.key} data-doc-name={inst.name} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative`}>
             <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={siteData?.docPick?.[inst.key] || DEFAULT_PICK} isPrint={true} scriveners={scriveners} />
