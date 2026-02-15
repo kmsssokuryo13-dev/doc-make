@@ -949,73 +949,73 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <EditableDocBody
-            editable={!isPrint}
-            customHtml={pick.customText}
-            onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
-          >
-            <div style={{ textAlign: 'right', fontSize: '11pt', marginTop: '36mm', marginBottom: '5mm' }}>
-              {topRightBlock ?? (
-                useLinkedScrivenerOnTopRight ? (
-                  <>
-                    <p style={{ margin: '0' }}>{linkedScrivenerAddrLine}</p>
-                    <p style={{ margin: '0' }}>{linkedScrivenerNameLine}</p>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷信泰</p>
-                    <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷一真</p>
-                  </>
-                )
-              )}
-            </div>
-
-            <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
-              {name === "委任状（保存）"
-                ? DEFAULT_DELEGATION_TEXT_SAVE
-                : name === "委任状（住所変更）"
-                  ? DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE
-                  : DEFAULT_DELEGATION_TEXT}
-            </p>
-
-            <div style={{ fontSize: '11pt', marginBottom: '10mm', fontWeight: 'bold' }}>
-              {workText}
-            </div>
-
-            <div style={{ marginTop: '-5mm' }}>
-              <h2 style={{ fontSize: '11pt', margin: '0', fontWeight: 'bold' }}>{buildingTitle}</h2>
-              {buildingSubTitle && <h3 style={{ fontSize: '11pt', margin: '2mm 0 0 0', fontWeight: 'bold' }}>{buildingSubTitle}</h3>}
-              <div style={{ fontSize: '11pt', marginBottom: '10mm' }}>
-                {buildingBlock}
+          <div style={{ position: 'relative' }}>
+            <EditableDocBody
+              editable={!isPrint}
+              customHtml={pick.customText}
+              onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+            >
+              <div style={{ textAlign: 'right', fontSize: '11pt', marginTop: '36mm', marginBottom: '5mm' }}>
+                {topRightBlock ?? (
+                  useLinkedScrivenerOnTopRight ? (
+                    <>
+                      <p style={{ margin: '0' }}>{linkedScrivenerAddrLine}</p>
+                      <p style={{ margin: '0' }}>{linkedScrivenerNameLine}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷信泰</p>
+                      <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷一真</p>
+                    </>
+                  )
+                )}
               </div>
-            </div>
 
-            <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-              {dateBlock ?? formatTodayDateBlock()}
-            </div>
+              <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
+                {name === "委任状（保存）"
+                  ? DEFAULT_DELEGATION_TEXT_SAVE
+                  : name === "委任状（住所変更）"
+                    ? DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE
+                    : DEFAULT_DELEGATION_TEXT}
+              </p>
 
-          </EditableDocBody>
-          <div style={{ pointerEvents: 'auto', fontSize: '11pt' }}>
-            <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
-            <div style={{ position: 'relative', width: 'fit-content', marginTop: '0mm' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
-                {signers.map((p, i) => (
-                  <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{formatApplicantLine(p)}</div>
-                ))}
+              <div style={{ fontSize: '11pt', marginBottom: '10mm', fontWeight: 'bold' }}>
+                {workText}
               </div>
-              <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm' }}>
-                {signers.map((p, i) => {
-                  const pos = getSignerPos(i);
-                  return (
-                    <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                      <DraggableSignerStamp
-                        index={i} dx={pos.dx} dy={pos.dy}
-                        editable={!isPrint} onChange={onSignerStampPosChange}
-                      />
-                    </div>
-                  );
-                })}
+
+              <div style={{ marginTop: '-5mm' }}>
+                <h2 style={{ fontSize: '11pt', margin: '0', fontWeight: 'bold' }}>{buildingTitle}</h2>
+                {buildingSubTitle && <h3 style={{ fontSize: '11pt', margin: '2mm 0 0 0', fontWeight: 'bold' }}>{buildingSubTitle}</h3>}
+                <div style={{ fontSize: '11pt', marginBottom: '10mm' }}>
+                  {buildingBlock}
+                </div>
               </div>
+
+              <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+                {dateBlock ?? formatTodayDateBlock()}
+              </div>
+
+              <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
+              <div style={{ fontSize: '11pt' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
+                  {signers.map((p, i) => (
+                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{formatApplicantLine(p)}</div>
+                  ))}
+                </div>
+              </div>
+            </EditableDocBody>
+            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
+              {signers.map((p, i) => {
+                const pos = getSignerPos(i);
+                return (
+                  <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                    <DraggableSignerStamp
+                      index={i} dx={pos.dx} dy={pos.dy}
+                      editable={!isPrint} onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1720,59 +1720,59 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-        <EditableDocBody
-          editable={!isPrint}
-          customHtml={pick.customText}
-          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
-        >
-          <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm', marginBottom: '2mm' }}>建物の表示</h2>
-          <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
+          <div style={{ position: 'relative' }}>
+            <EditableDocBody
+              editable={!isPrint}
+              customHtml={pick.customText}
+              onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+            >
+              <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm', marginBottom: '2mm' }}>建物の表示</h2>
+              <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
-          <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
-            <div>確認済証の番号{"\u3000\u3000\u3000\u3000\u3000\u3000\u3000"}{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "\u3000"}</div>
-            <div>確認済証記載の建築主名義</div>
-            {(() => {
-              const confirmIds = Array.isArray(pick?.confirmApplicantPersonIds) ? pick.confirmApplicantPersonIds : [];
-              const people = siteData.people || [];
-              const selected = confirmIds.length > 0
-                ? people.filter(p => confirmIds.includes(p.id))
-                : people.filter(p => (p.roles || []).includes("建築申請人"));
-              return selected.length > 0
-                ? selected.map(p => <div key={p.id} style={{ paddingLeft: "15.2em" }}>{p.name || "\u3000"}</div>)
-                : <div style={{ paddingLeft: "15.2em" }}>{"\u3000"}</div>;
-            })()}
-          </div>
-
-          <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
-            {defaultBody}
-          </div>
-
-          <div style={{ textAlign: "left", fontSize: "11pt", margin: "0 0 6mm 0" }}>
-            {formatTodayDateBlock()}
-          </div>
-
-        </EditableDocBody>
-          <div style={{ pointerEvents: 'auto', fontSize: '11pt' }}>
-            <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
-            <div style={{ position: "relative", width: "fit-content", marginTop: "0mm" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "2mm", paddingRight: "calc(1em + 26.6mm)" }}>
-                {(statementPeople || []).map((p, i) => (
-                  <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }}>{formatStatementLine(p)}</div>
-                ))}
+              <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
+                <div>確認済証の番号{"\u3000\u3000\u3000\u3000\u3000\u3000\u3000"}{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "\u3000"}</div>
+                <div>確認済証記載の建築主名義</div>
+                {(() => {
+                  const confirmIds = Array.isArray(pick?.confirmApplicantPersonIds) ? pick.confirmApplicantPersonIds : [];
+                  const people = siteData.people || [];
+                  const selected = confirmIds.length > 0
+                    ? people.filter(p => confirmIds.includes(p.id))
+                    : people.filter(p => (p.roles || []).includes("建築申請人"));
+                  return selected.length > 0
+                    ? selected.map(p => <div key={p.id} style={{ paddingLeft: "15.2em" }}>{p.name || "\u3000"}</div>)
+                    : <div style={{ paddingLeft: "15.2em" }}>{"\u3000"}</div>;
+                })()}
               </div>
-              <div style={{ position: "absolute", top: 0, right: 0, display: "flex", flexDirection: "column", gap: "2mm" }}>
-                {(statementPeople || []).map((p, i) => {
-                  const pos = getSignerPos(i);
-                  return (
-                    <div key={p.id || i} style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
-                      <DraggableSignerStamp
-                        index={i} dx={pos.dx} dy={pos.dy}
-                        editable={!isPrint} onChange={onSignerStampPosChange}
-                      />
-                    </div>
-                  );
-                })}
+
+              <div style={{ fontSize: "11pt", marginBottom: "8mm", whiteSpace: "pre-wrap" }}>
+                {defaultBody}
               </div>
+
+              <div style={{ textAlign: "left", fontSize: "11pt", margin: "0 0 6mm 0" }}>
+                {formatTodayDateBlock()}
+              </div>
+
+              <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
+              <div style={{ fontSize: "11pt" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2mm", paddingRight: "calc(1em + 26.6mm)" }}>
+                  {(statementPeople || []).map((p, i) => (
+                    <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }}>{formatStatementLine(p)}</div>
+                  ))}
+                </div>
+              </div>
+            </EditableDocBody>
+            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
+              {(statementPeople || []).map((p, i) => {
+                const pos = getSignerPos(i);
+                return (
+                  <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                    <DraggableSignerStamp
+                      index={i} dx={pos.dx} dy={pos.dy}
+                      editable={!isPrint} onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
       </div>
