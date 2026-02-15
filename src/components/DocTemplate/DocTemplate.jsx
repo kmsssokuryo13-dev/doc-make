@@ -994,15 +994,16 @@ export const DocTemplate = ({
               {dateBlock ?? formatTodayDateBlock()}
             </div>
 
+          </EditableDocBody>
+          <div style={{ pointerEvents: 'auto', fontSize: '11pt' }}>
             <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
-
-            <div style={{ position: 'relative', width: 'fit-content', fontSize: '11pt', marginTop: '0mm' }}>
+            <div style={{ position: 'relative', width: 'fit-content', marginTop: '0mm' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
                 {signers.map((p, i) => (
                   <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{formatApplicantLine(p)}</div>
                 ))}
               </div>
-              <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm' }}>
+              <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm' }}>
                 {signers.map((p, i) => {
                   const pos = getSignerPos(i);
                   return (
@@ -1016,7 +1017,7 @@ export const DocTemplate = ({
                 })}
               </div>
             </div>
-          </EditableDocBody>
+          </div>
         </div>
       </div>
     );
@@ -1750,29 +1751,30 @@ export const DocTemplate = ({
             {formatTodayDateBlock()}
           </div>
 
-          <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
-
-          <div style={{ position: "relative", width: "fit-content", fontSize: "11pt", marginTop: "0mm" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "2mm", paddingRight: "calc(1em + 26.6mm)" }}>
-              {(statementPeople || []).map((p, i) => (
-                <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }}>{formatStatementLine(p)}</div>
-              ))}
-            </div>
-            <div contentEditable={false} style={{ position: "absolute", top: 0, right: 0, display: "flex", flexDirection: "column", gap: "2mm" }}>
-              {(statementPeople || []).map((p, i) => {
-                const pos = getSignerPos(i);
-                return (
-                  <div key={p.id || i} style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
-                    <DraggableSignerStamp
-                      index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
-                    />
-                  </div>
-                );
-              })}
+        </EditableDocBody>
+          <div style={{ pointerEvents: 'auto', fontSize: '11pt' }}>
+            <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
+            <div style={{ position: "relative", width: "fit-content", marginTop: "0mm" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2mm", paddingRight: "calc(1em + 26.6mm)" }}>
+                {(statementPeople || []).map((p, i) => (
+                  <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }}>{formatStatementLine(p)}</div>
+                ))}
+              </div>
+              <div style={{ position: "absolute", top: 0, right: 0, display: "flex", flexDirection: "column", gap: "2mm" }}>
+                {(statementPeople || []).map((p, i) => {
+                  const pos = getSignerPos(i);
+                  return (
+                    <div key={p.id || i} style={{ position: "relative", width: "26.6mm", height: "26.6mm" }}>
+                      <DraggableSignerStamp
+                        index={i} dx={pos.dx} dy={pos.dy}
+                        editable={!isPrint} onChange={onSignerStampPosChange}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </EditableDocBody>
       </div>
       </div>
     );
