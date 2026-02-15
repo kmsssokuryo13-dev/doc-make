@@ -43,8 +43,8 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
   }, [flush]);
 
   if (!editable) {
-    if (hasCustom) return <div className="doc-editable" dangerouslySetInnerHTML={{ __html: customHtml }} />;
-    return <div className="doc-editable">{children}</div>;
+    if (hasCustom) return <div className="doc-editable" style={{ pointerEvents: 'auto' }} dangerouslySetInnerHTML={{ __html: customHtml }} />;
+    return <div className="doc-editable" style={{ pointerEvents: 'auto' }}>{children}</div>;
   }
 
   if (hasCustom) {
@@ -58,6 +58,7 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
         onFocus={handleFocus}
         onBlur={handleBlur}
         className="doc-editable focus:outline-none min-h-[50mm]"
+        style={{ pointerEvents: 'auto' }}
         dangerouslySetInnerHTML={{ __html: customHtml || "" }}
       />
     );
@@ -73,6 +74,7 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
       onFocus={handleFocus}
       onBlur={handleBlur}
       className="doc-editable focus:outline-none min-h-[50mm]"
+      style={{ pointerEvents: 'auto' }}
     >
       {children}
     </div>

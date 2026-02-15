@@ -282,7 +282,7 @@ export const DocTemplate = ({
           工事完了引渡証明書
         </h1>
 
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
@@ -432,7 +432,7 @@ export const DocTemplate = ({
           工事完了引渡証明書
         </h1>
 
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
@@ -566,7 +566,7 @@ export const DocTemplate = ({
           建物取壊し証明書
         </h1>
 
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
@@ -716,7 +716,7 @@ export const DocTemplate = ({
           建物取壊し証明書
         </h1>
 
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
@@ -840,7 +840,7 @@ export const DocTemplate = ({
 
     return (
       <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
@@ -948,7 +948,7 @@ export const DocTemplate = ({
           委任状
         </h1>
 
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
           <EditableDocBody
             editable={!isPrint}
             customHtml={pick.customText}
@@ -1718,7 +1718,7 @@ export const DocTemplate = ({
                   {titleText}
         </h1>
 
-        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
         <EditableDocBody
           editable={!isPrint}
           customHtml={pick.customText}
