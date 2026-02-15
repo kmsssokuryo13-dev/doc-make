@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 
 export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, children }) => {
   const containerRef = useRef(null);
+  const captureRef = useRef(null);
   const draftRef = useRef(null);
   const focusedRef = useRef(false);
   const isBlankHtml = (html) => {
@@ -24,7 +25,9 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
 
   const handleInput = () => {
     if (!containerRef.current) return;
-    draftRef.current = containerRef.current.innerHTML;
+    const clone = containerRef.current.cloneNode(true);
+    clone.querySelectorAll('[contenteditable="false"]').forEach(el => el.remove());
+    draftRef.current = clone.innerHTML;
   };
 
   const handleKeyDown = (e) => {
@@ -47,6 +50,12 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
     return <div className="doc-editable" style={{ pointerEvents: 'auto' }}>{children}</div>;
   }
 
+  useLayoutEffect(() => {
+    if (editable && !hasCustom && containerRef.current && captureRef.current && !focusedRef.current) {
+      containerRef.current.innerHTML = captureRef.current.innerHTML;
+    }
+  });
+
   if (hasCustom) {
     return (
       <div
@@ -65,18 +74,19 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
   }
 
   return (
-    <div
-      ref={containerRef}
-      contentEditable
-      suppressContentEditableWarning
-      onInput={handleInput}
-      onKeyDown={handleKeyDown}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      className="doc-editable focus:outline-none min-h-[50mm]"
-      style={{ pointerEvents: 'auto' }}
-    >
-      {children}
-    </div>
+    <>
+      <div ref={captureRef} style={{ display: 'none' }}>{children}</div>
+      <div
+        ref={containerRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        className="doc-editable focus:outline-none min-h-[50mm]"
+        style={{ pointerEvents: 'auto' }}
+      />
+    </>
   );
 };
