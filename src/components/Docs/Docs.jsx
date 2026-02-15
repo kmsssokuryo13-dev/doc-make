@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, RotateCcw as ResetIcon } from 'lucide-react';
+import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES } from '../../constants.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
@@ -15,6 +17,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const siteData = sites.find(s => s.id === siteId);
   const [step, setStep] = useState(1);
   const [activeInstanceKey, setActiveInstanceKey] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
 
@@ -214,34 +217,36 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
   const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
 
-  const printSelectedInNewWindow = () => {
+  const printSelectedInNewWindow = async () => {
     const el = document.getElementById("print-area");
     if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(node => node.outerHTML).join("\n");
-    const extraPrintCss = `<style>@page { size: A4; margin: 0; } html, body { margin: 0; padding: 0; background: white; } .break-before-page { break-before: page; page-break-before: always; } .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }</style>`;
+    setIsPrinting(true);
     const uniqueNames = [];
     printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
-    const w = window.open("", "_blank");
-    if (!w) return;
-    let idx = 0;
-    const printNext = () => {
-      if (idx >= uniqueNames.length) { w.close(); return; }
-      const name = uniqueNames[idx++];
-      const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
-      if (!pages.length) { printNext(); return; }
-      const pagesHtml = pages.map((p, i) => {
-        const clone = p.cloneNode(true);
-        if (i > 0) clone.classList.add('break-before-page');
-        else clone.classList.remove('break-before-page');
-        return clone.outerHTML;
-      }).join('');
-      const safeTitle = name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      w.document.open();
-      w.document.write(`<!doctype html><html><head><meta charset="utf-8" /><title>${safeTitle}</title>${styles}${extraPrintCss}</head><body>${pagesHtml}</body></html>`);
-      w.document.close();
-      setTimeout(() => { w.focus(); w.onafterprint = () => setTimeout(printNext, 300); w.print(); }, 300);
-    };
-    printNext();
+    const tempContainer = document.createElement('div');
+    tempContainer.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(tempContainer);
+    try {
+      for (const name of uniqueNames) {
+        const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
+        if (!pages.length) continue;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        for (let i = 0; i < pages.length; i++) {
+          const clone = pages[i].cloneNode(true);
+          clone.style.cssText = 'width:210mm;height:297mm;position:relative;background:white;';
+          tempContainer.appendChild(clone);
+          const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+          if (i > 0) pdf.addPage();
+          const imgData = canvas.toDataURL('image/jpeg', 0.95);
+          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+          tempContainer.removeChild(clone);
+        }
+        pdf.save(`${name}.pdf`);
+      }
+    } finally {
+      document.body.removeChild(tempContainer);
+      setIsPrinting(false);
+    }
   };
 
   const applicantsInPeople = useMemo(
@@ -295,7 +300,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
         <div className="flex gap-2">
           {step > 1 && <button onClick={() => setStep(step - 1)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg">戻る</button>}
           {step < 3 ? <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition-all">次へ進む</button>
-          : <button onClick={printSelectedInNewWindow} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Printer size={18} /> 印刷実行</button>}
+          : <button onClick={printSelectedInNewWindow} disabled={isPrinting} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-wait">{isPrinting ? <><Loader2 size={18} className="animate-spin" /> PDF生成中...</> : <><Printer size={18} /> 印刷実行</>}</button>}
         </div>
       </header>
 
