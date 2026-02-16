@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES } from '../../constants.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
@@ -219,54 +217,57 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
   const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
 
-  const generatePdfBytes = async (el, name) => {
-    const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
-    if (!pages.length) return null;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    for (let i = 0; i < pages.length; i++) {
-      const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: pages[i].scrollWidth, height: pages[i].scrollHeight });
-      if (i > 0) pdf.addPage();
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-    }
-    return pdf.output('arraybuffer');
-  };
-
-  const downloadBlob = (bytes, filename) => {
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const printSelectedInNewWindow = async () => {
+  const printSelectedInNewWindow = () => {
     const el = document.getElementById("print-area");
     if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
-    const uniqueNames = [];
-    printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
     setIsPrinting(true);
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    try {
-      let generated = 0;
-      for (const name of uniqueNames) {
-        const bytes = await generatePdfBytes(el, name);
-        if (!bytes) continue;
-        downloadBlob(bytes, `${name}.pdf`);
-        generated++;
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
+        setIsPrinting(false);
+        return;
       }
-      if (generated === 0) {
-        alert("PDFを生成できませんでした。書類が選択されているか確認してください。");
-      }
-    } catch (err) {
-      alert("PDF生成中にエラーが発生しました: " + err.message);
-    } finally {
-      setIsPrinting(false);
-    }
+
+      const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+        .map(s => s.outerHTML).join('\n');
+
+      const html = el.innerHTML;
+
+      printWindow.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>印刷</title>
+${styles}
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: white; }
+  body { font-family: "MS Mincho","ＭＳ 明朝",serif; }
+  .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }
+  .stamp-circle { border: 0.3mm dotted #666 !important; cursor: default !important; }
+  .stamp-drag-handle { cursor: default !important; }
+  [contenteditable] { outline: none !important; }
+  @media print {
+    @page { size: A4 portrait; margin: 0; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @media screen {
+    body > div > div { margin: 0 auto 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  }
+</style>
+</head><body>
+<div>${html}</div>
+</body></html>`);
+      printWindow.document.close();
+
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          setIsPrinting(false);
+        }, 300);
+      };
+
+      setTimeout(() => setIsPrinting(false), 5000);
+    }));
   };
 
   const applicantsInPeople = useMemo(
