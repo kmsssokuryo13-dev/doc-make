@@ -6,8 +6,8 @@ export const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange }) =>
   const dragOrigin = useRef({ x: 0, y: 0 });
   const dragAxis = useRef(null);
   const startDxDy = useRef({ dx: 0, dy: 0 });
-  const baseRightMm = 15 + index * (26.6 + 2);
-  const baseTopMm = 5;
+  const baseRightMm = 20 + index * (26.6 + 2);
+  const baseTopMm = 8;
 
   const handlePointerDown = (e) => {
     if (!editable) return;
