@@ -217,26 +217,21 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
   const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
 
-  const printSelectedInNewWindow = () => {
-    const el = document.getElementById("print-area");
-    if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
-    setIsPrinting(true);
+  const openPrintWindowForDoc = (pages, title, styles) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return false;
 
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
-        setIsPrinting(false);
-        return;
-      }
+    const pagesHtml = pages.map((p, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = p.className;
+      if (i > 0) wrapper.classList.add('break-before-page');
+      else wrapper.classList.remove('break-before-page');
+      wrapper.innerHTML = p.innerHTML;
+      return wrapper.outerHTML;
+    }).join('\n');
 
-      const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-        .map(s => s.outerHTML).join('\n');
-
-      const html = el.innerHTML;
-
-      printWindow.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>印刷</title>
+    printWindow.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${title}</title>
 ${styles}
 <style>
   *, *::before, *::after { box-sizing: border-box; }
@@ -255,18 +250,42 @@ ${styles}
   }
 </style>
 </head><body>
-<div>${html}</div>
+<div>${pagesHtml}</div>
 </body></html>`);
-      printWindow.document.close();
+    printWindow.document.close();
 
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-          setIsPrinting(false);
-        }, 300);
-      };
+    printWindow.onload = () => {
+      setTimeout(() => printWindow.print(), 300);
+    };
+    return true;
+  };
 
-      setTimeout(() => setIsPrinting(false), 5000);
+  const printSelectedInNewWindow = () => {
+    const el = document.getElementById("print-area");
+    if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
+    setIsPrinting(true);
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+        .map(s => s.outerHTML).join('\n');
+
+      const uniqueNames = [];
+      printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
+
+      let blocked = false;
+      for (const name of uniqueNames) {
+        const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
+        if (!pages.length) continue;
+        if (!openPrintWindowForDoc(pages, name, styles)) {
+          blocked = true;
+          break;
+        }
+      }
+
+      if (blocked) {
+        alert("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
+      }
+      setIsPrinting(false);
     }));
   };
 
