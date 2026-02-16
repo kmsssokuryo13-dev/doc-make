@@ -16,6 +16,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const [step, setStep] = useState(1);
   const [activeInstanceKey, setActiveInstanceKey] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showPrintPanel, setShowPrintPanel] = useState(false);
 
   const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
 
@@ -260,32 +261,23 @@ ${styles}
     return true;
   };
 
-  const printSelectedInNewWindow = () => {
-    const el = document.getElementById("print-area");
-    if (!el || !printInstances.length) { alert("印刷対象がありません。"); return; }
-    setIsPrinting(true);
+  const printDocNames = useMemo(() => {
+    const uniqueNames = [];
+    printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
+    return uniqueNames;
+  }, [printInstances]);
 
+  const printSingleDoc = (name) => {
+    const el = document.getElementById("print-area");
+    if (!el) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
         .map(s => s.outerHTML).join('\n');
-
-      const uniqueNames = [];
-      printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
-
-      let blocked = false;
-      for (const name of uniqueNames) {
-        const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
-        if (!pages.length) continue;
-        if (!openPrintWindowForDoc(pages, name, styles)) {
-          blocked = true;
-          break;
-        }
-      }
-
-      if (blocked) {
+      const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
+      if (!pages.length) return;
+      if (!openPrintWindowForDoc(pages, name, styles)) {
         alert("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
       }
-      setIsPrinting(false);
     }));
   };
 
@@ -340,7 +332,7 @@ ${styles}
         <div className="flex gap-2">
           {step > 1 && <button onClick={() => setStep(step - 1)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg">戻る</button>}
           {step < 3 ? <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition-all">次へ進む</button>
-          : <button onClick={printSelectedInNewWindow} disabled={isPrinting} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-wait">{isPrinting ? <><Loader2 size={18} className="animate-spin" /> PDF生成中...</> : <><Printer size={18} /> 印刷実行</>}</button>}
+          : <button onClick={() => { if (!printInstances.length) { alert("印刷対象がありません。"); return; } setShowPrintPanel(true); }} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Printer size={18} /> 印刷実行</button>}
         </div>
       </header>
 
@@ -1406,6 +1398,39 @@ ${styles}
           </div>
         )}
       </main>
+
+      {showPrintPanel && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPrintPanel(false); }}
+        >
+          <div style={{ background: 'white', borderRadius: '12px', padding: '24px 28px', minWidth: '340px', maxWidth: '480px', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>書類ごとに印刷</h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b', lineHeight: '1.5' }}>
+              各ボタンをクリックすると印刷ウィンドウが開きます。<br/>印刷先を「PDFに保存」にして保存してください。
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {printDocNames.map(name => (
+                <button
+                  key={name}
+                  onClick={() => printSingleDoc(name)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-left hover:bg-blue-50 active:bg-blue-100 transition-colors"
+                  style={{ border: '1px solid #e2e8f0', fontSize: '14px', color: '#1e293b', cursor: 'pointer', background: 'white' }}
+                >
+                  <Printer size={16} className="text-blue-600 flex-shrink-0" />
+                  {name}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowPrintPanel(false)}
+              className="mt-4 w-full px-4 py-2 rounded-lg font-bold hover:bg-slate-100 transition-colors"
+              style={{ border: '1px solid #e2e8f0', fontSize: '13px', color: '#64748b', cursor: 'pointer', background: 'white' }}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
