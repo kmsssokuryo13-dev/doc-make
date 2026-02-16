@@ -1780,6 +1780,127 @@ export const DocTemplate = ({
     );
   };
 
+  // ---- 売渡証明書 ----
+  if (name === "売渡証明書") {
+    const saleBuildingSource = pick?.saleBuildingSource || "proposed";
+    const sortedBuildings = naturalSortList(siteData.buildings || [], 'houseNum');
+    const saleBuilding = (() => {
+      if (saleBuildingSource === "registered") {
+        if (pick.targetBeforeBuildingId) {
+          return sortedBuildings.find(b => b.id === pick.targetBeforeBuildingId) || sortedBuildings[0] || null;
+        }
+        return sortedBuildings[0] || null;
+      }
+      return targetProp;
+    })();
+
+    const saleBuyerIds = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
+    const saleBuyers = saleBuyerIds.length > 0
+      ? allApplicants.filter(p => new Set(saleBuyerIds).has(p.id))
+      : allApplicants;
+    const displayBuyers = saleBuyers.length > 0 ? saleBuyers : allApplicants;
+
+    const sellerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("その他"));
+    const sellerIds = Array.isArray(pick?.saleSellerPersonIds) ? pick.saleSellerPersonIds : [];
+    const displaySellers = sellerIds.length > 0
+      ? sellerCandidates.filter(p => new Set(sellerIds).has(p.id))
+      : sellerCandidates;
+
+    const currentYearReiwa = String(new Date().getFullYear() - 2018);
+    const w = getWarekiNow();
+
+    const buyerText = displayBuyers.map(p => `${p.address || "　"}　${p.name || "　"}様`).join("、");
+
+    return (
+      <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
+        <div className="stamp-area">
+          {(() => {
+            const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+          })()}
+        </div>
+
+        <h1
+          style={{
+            fontSize: '20pt', fontWeight: 'bold', textAlign: 'center',
+            letterSpacing: '0.5em', margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
+          }}
+        >
+          売渡証明書
+        </h1>
+
+        <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
+        <EditableDocBody
+          editable={!isPrint}
+          customHtml={pick.customText}
+          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+        >
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
+          <div style={{ fontSize: '11pt', marginBottom: '4mm' }}>
+            {saleBuilding ? (
+              <>
+                {(pick.showMain ?? true) && renderMainValuesInline(saleBuilding, { showHouseNum: false })}
+                {(pick.showAnnex ?? true) && (saleBuilding.annexes || []).map(a => (
+                  <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+                ))}
+              </>
+            ) : <div>　</div>}
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '11pt', marginBottom: '12mm' }}>以下余白</div>
+
+          <p style={{ fontSize: '11pt', marginBottom: '12mm' }}>
+            上記建物につき、{toFullWidthDigits(`${w.era}`)}　　年　　月　　日に{buyerText}へ売渡したことを証明します。
+          </p>
+
+          <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '6mm' }}>
+            <p>{toFullWidthDigits(`${w.era}${currentYearReiwa}年　　月　　日`)}</p>
+          </div>
+
+          <div style={{ fontSize: '11pt', marginTop: '6mm' }}>
+            {displaySellers.length > 0 ? displaySellers.map((p, i) => (
+              <div key={p.id} style={{ position: 'relative', width: 'fit-content', marginTop: i > 0 ? '4mm' : '0' }}>
+                <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
+                  <p style={{ margin: '0 0 2mm 0' }}>{p.address || "　"}</p>
+                  <p style={{ margin: '0' }}>{p.name || "　"}</p>
+                </div>
+                <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+                  <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                    <DraggableSignerStamp
+                      index={i}
+                      dx={getSignerPos(i).dx}
+                      dy={getSignerPos(i).dy}
+                      editable={!isPrint}
+                      onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div style={{ position: 'relative', width: 'fit-content' }}>
+                <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
+                  <p style={{ margin: '0 0 2mm 0' }}>　</p>
+                  <p style={{ margin: '0' }}>　</p>
+                </div>
+                <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+                  <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                    <DraggableSignerStamp
+                      index={0}
+                      dx={getSignerPos(0).dx}
+                      dy={getSignerPos(0).dy}
+                      editable={!isPrint}
+                      onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </EditableDocBody>
+        </div>
+      </div>
+    );
+  }
+
   if (name === "申述書（共有）") {
     return renderStatementCommon({
       titleText: "申述書",
