@@ -239,7 +239,7 @@ ${styles}
   html, body { margin: 0; padding: 0; background: white; }
   body { font-family: "MS Mincho","ＭＳ 明朝",serif; }
   .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }
-  .stamp-circle { border: 0.3mm dotted #666 !important; cursor: default !important; }
+  .stamp-circle { cursor: default !important; }
   .stamp-drag-handle { cursor: default !important; }
   [contenteditable] { outline: none !important; }
   @media print {
@@ -307,7 +307,7 @@ ${styles}
         .doc-no-bold, .doc-no-bold * { font-weight: normal !important; }
         @media print {
           .doc-editable[contenteditable="true"], .doc-editable[contenteditable="true"]:focus { outline: none !important; }
-          .stamp-drag-handle, .stamp-dragging { cursor: default !important; border: 0.3mm dotted #666 !important; }
+          .stamp-drag-handle, .stamp-dragging { cursor: default !important; }
         }
       `}</style>
 

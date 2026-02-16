@@ -53,13 +53,16 @@ export const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange }) =>
         top: `calc(${baseTopMm}mm + ${dy}px)`,
         right: `calc(${baseRightMm}mm - ${dx}px)`,
         width: '26.6mm', height: '26.6mm',
-        border: '0.3mm dotted #666', borderRadius: '50%',
+        borderRadius: '50%',
         zIndex: 2000, touchAction: 'none',
         pointerEvents: 'auto',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: isDragging ? 'rgba(96, 165, 250, 0.1)' : 'transparent'
       }}
     >
+      <svg viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <circle cx="50" cy="50" r="48" fill="none" stroke="#666" strokeWidth="1" strokeDasharray="2,5" strokeLinecap="round" />
+      </svg>
       {editable && !isDragging && <Move size={16} className="text-blue-500" />}
     </div>
   );
