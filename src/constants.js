@@ -10,7 +10,7 @@ export const DEFAULT_DELEGATION_TEXT = "私は上記の者を代理人と定め�
 export const DEFAULT_DELEGATION_TEXT_SAVE = "私は上記の者を代理人と定め、下記に記載の登記を管轄法務局へ申請の全権及び登記識別情報代理受領の件、原本還付請求並びに受領の件、申請の補正又は取下に関する件、復代理人選任の件を委任する。";
 export const DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE = "私は上記の者を代理人と定め、下記に記載の登記を管轄法務局へ申請の全権及び登記識別情報代理受領の件、原本還付請求並びに受領の件、申請の補正又は取下に関する件、復代理人選任の件を委任する。";
 
-export const DOC_PAGE_PADDING = "25mm 15mm 15mm 15mm";
+export const DOC_PAGE_PADDING = "20mm 20mm 20mm 25mm";
 
 export const ROLE_OPTIONS = ["申請人", "土地所有者", "建物所有者", "建築申請人", "工事人", "その他"];
 

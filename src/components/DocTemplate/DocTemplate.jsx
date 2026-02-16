@@ -297,12 +297,12 @@ export const DocTemplate = ({
                 ))}
               </div>
 
-              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
                 <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}　{targetProp.registrationCause || "　"}</p>
               </div>
 
-              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>建物の表示</h2>
+              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
                 {(applicants || []).map(p => (
                   <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
@@ -456,7 +456,7 @@ export const DocTemplate = ({
             {propsToUse.length === 0 && <div>　</div>}
           </div>
 
-          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>原因日付及び原因</h2>
+          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {filteredCauses.length > 0 ? filteredCauses.map(c => (
               <p key={c.id} style={{ margin: '0' }}>{c.date}{c.prefix}{c.cause}</p>
