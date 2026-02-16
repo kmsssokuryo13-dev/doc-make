@@ -44,7 +44,9 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     mergeBeforeBuildingIds: [],
     splitAfterBuildingIds: [],
     combineBeforeBuildingIds: [],
-    combinePurpose: "combineOnly"
+    combinePurpose: "combineOnly",
+    saleBuildingSource: "proposed",
+    saleSellerPersonIds: []
   };
 
   const allInstances = useMemo(() => {
@@ -1130,6 +1132,123 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
                       </div>
                     </div>
                   )}
+
+                  {activeInstance.name === "売渡証明書" && (() => {
+                    const sortedProp = naturalSortList(siteData.proposedBuildings || [], 'houseNum');
+                    const sortedReg = naturalSortList(siteData.buildings || [], 'houseNum');
+                    const saleSrc = activePick.saleBuildingSource || "proposed";
+
+                    const applicantCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("申請人"));
+                    const curApplIds = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
+                    const defaultApplIds = new Set(applicantCandidates.map(p => p.id));
+                    const effectiveApplSet = curApplIds.length > 0 ? new Set(curApplIds) : defaultApplIds;
+                    const toggleApplicant = (id) => {
+                      const base = new Set(curApplIds.length > 0 ? curApplIds : Array.from(defaultApplIds));
+                      if (base.has(id)) base.delete(id); else base.add(id);
+                      handlePickChange(activeInstanceKey, { applicantPersonIds: Array.from(base) });
+                    };
+
+                    const sellerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("その他"));
+                    const curSellerIds = Array.isArray(activePick.saleSellerPersonIds) ? activePick.saleSellerPersonIds : [];
+                    const defaultSellerIds = new Set(sellerCandidates.map(p => p.id));
+                    const effectiveSellerSet = curSellerIds.length > 0 ? new Set(curSellerIds) : defaultSellerIds;
+                    const toggleSeller = (id) => {
+                      const base = new Set(curSellerIds.length > 0 ? curSellerIds : Array.from(defaultSellerIds));
+                      if (base.has(id)) base.delete(id); else base.add(id);
+                      handlePickChange(activeInstanceKey, { saleSellerPersonIds: Array.from(base) });
+                    };
+
+                    return (
+                    <div className="border-t pt-4">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1">建物情報のソース</label>
+                          <select
+                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                            value={saleSrc}
+                            onChange={e => handlePickChange(activeInstanceKey, { saleBuildingSource: e.target.value })}
+                          >
+                            <option value="proposed">申請建物</option>
+                            <option value="registered">既登記建物</option>
+                          </select>
+                        </div>
+                        {saleSrc === "proposed" ? (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
+                            <select
+                              className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                              value={activePick.targetPropBuildingId || ""}
+                              onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                            >
+                              <option value="">(未選択・最初の建物)</option>
+                              {sortedProp.map(pb => (
+                                <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択（既登記）</label>
+                            <select
+                              className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                              value={activePick.targetBeforeBuildingId || ""}
+                              onChange={e => handlePickChange(activeInstanceKey, { targetBeforeBuildingId: e.target.value })}
+                            >
+                              <option value="">(未選択・最初の建物)</option>
+                              {sortedReg.map(b => (
+                                <option key={b.id} value={b.id}>{b.houseNum || "(家屋番号未入力)"}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-2">申請人（買主）を選択</label>
+                          {applicantCandidates.length === 0 ? (
+                            <p className="text-[10px] text-slate-400">「申請人」が登録されていません。</p>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-1">
+                              {applicantCandidates.map((p) => (
+                                <label
+                                  key={p.id}
+                                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                    effectiveApplSet.has(p.id)
+                                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                                      : "bg-white border-slate-200 text-slate-500"
+                                  }`}
+                                >
+                                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveApplSet.has(p.id)} onChange={() => toggleApplicant(p.id)} />
+                                  <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-2">売渡人を選択（役割「その他」）</label>
+                          {sellerCandidates.length === 0 ? (
+                            <p className="text-[10px] text-slate-400">「その他」の役割の人が登録されていません。</p>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-1">
+                              {sellerCandidates.map((p) => (
+                                <label
+                                  key={p.id}
+                                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                    effectiveSellerSet.has(p.id)
+                                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                                      : "bg-white border-slate-200 text-slate-500"
+                                  }`}
+                                >
+                                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveSellerSet.has(p.id)} onChange={() => toggleSeller(p.id)} />
+                                  <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    );
+                  })()}
 
                   {activeInstance.name === "工事完了引渡証明書（表題部変更）" && (() => {
                     const sortedProp = naturalSortList(siteData.proposedBuildings || [], 'houseNum');
