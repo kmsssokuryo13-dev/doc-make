@@ -956,8 +956,8 @@ export const DocTemplate = ({
                     </>
                   ) : (
                     <>
-                      <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷信泰</p>
-                      <p style={{ margin: '0' }}>射水市善光寺27番1号　土地家屋調査士　塩谷一真</p>
+                                            <p style={{ margin: '0' }}>射水市善光寺27番1号　塩谷信泰</p>
+                                            <p style={{ margin: '0' }}>射水市善光寺27番1号　塩谷一真</p>
                     </>
                   )
                 )}
