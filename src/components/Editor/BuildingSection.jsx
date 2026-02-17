@@ -404,12 +404,12 @@ export const BuildingSection = ({ type, site, update }) => {
                   <div className="flex items-center gap-2 mt-2">
                     {!isReg && <button
                       onClick={() => {
-                        if (window.confirm('この附属建物の「符号」「種類」「構造」「床面積」をクリアし、登記原因に「取壊し」を入力しますか？')) {
+                        if (window.confirm('この附属建物の「種類」「構造」「床面積」をクリアし、登記原因に「取壊し」を入力しますか？')) {
                           update({
                             [dataKey]: buildings.map(x => x.id === b.id ? {
                               ...x,
                               annexes: (x.annexes || []).map(ax => ax.id === a.id ? {
-                                ...ax, symbol: '', kind: '', structMaterial: '', structFloor: '', struct: '', hasBasement: false, floorAreas: [{ id: generateId(), floor: '１階', area: '' }], registrationCause: '取壊し'
+                                ...ax, kind: '', structMaterial: '', structFloor: '', struct: '', hasBasement: false, floorAreas: [{ id: generateId(), floor: '１階', area: '' }], registrationCause: '取壊し'
                               } : ax)
                             } : x)
                           });

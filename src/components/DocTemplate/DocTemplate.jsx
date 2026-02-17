@@ -189,13 +189,13 @@ export const DocTemplate = ({
     if (!a || isAnnexEmpty(a)) return null;
     const line = buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas);
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>{line}</div>
       </div>
     );
   };
 
-  const renderAnnexValuesPlain = (a) => renderAnnexValuesInline(a);
+  const renderAnnexValuesPlain= (a) => renderAnnexValuesInline(a);
 
   const renderMainValues = (b, { showHouseNum } = { showHouseNum: true }) => {
     if (!b) return null;
@@ -218,7 +218,7 @@ export const DocTemplate = ({
   const renderAnnexValues = (a) => {
     if (!a || isAnnexEmpty(a)) return null;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
         {name === "委任状（保存）" ? null : (
           <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}</div>
@@ -264,6 +264,32 @@ export const DocTemplate = ({
     if (!targetProp) return <div className="p-10 text-center font-bold text-black">申請建物データがありません</div>;
     const currentYearReiwa = String(new Date().getFullYear() - 2018);
 
+    const hasAnyAnnexes_title = (targetProp.annexes || []).some(a => !isAnnexEmpty(a));
+    const titleCauseEntries = [];
+    {
+      const mainPrefix = hasAnyAnnexes_title ? "主である建物" : "";
+      if (targetProp.registrationCause) {
+        titleCauseEntries.push({ date: formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate), cause: targetProp.registrationCause, prefix: mainPrefix });
+      }
+      (targetProp.additionalCauses || []).forEach(ac => {
+        if (ac.cause) {
+          titleCauseEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
+        }
+      });
+      (targetProp.annexes || []).forEach(a => {
+        const sym = stripAllWS(a.symbol);
+        const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
+        if (a.registrationCause) {
+          titleCauseEntries.push({ date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause, prefix: annexPrefix });
+        }
+        (a.additionalCauses || []).forEach(ac => {
+          if (ac.cause) {
+            titleCauseEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: annexPrefix });
+          }
+        });
+      });
+    }
+
     return (
       <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
         <div className="stamp-area">
@@ -299,7 +325,9 @@ export const DocTemplate = ({
 
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-                <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}　{targetProp.registrationCause || "　"}</p>
+                {titleCauseEntries.length > 0 ? titleCauseEntries.map((c, i) => (
+                  <p key={i} style={{ margin: '0' }}>{c.date}　{c.prefix}{c.cause}</p>
+                )) : <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}　{targetProp.registrationCause || "　"}</p>}
               </div>
 
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
@@ -576,7 +604,7 @@ export const DocTemplate = ({
                   <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column' }}>
                                         <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
@@ -726,7 +754,7 @@ export const DocTemplate = ({
                   <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column' }}>
                                         <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
@@ -875,7 +903,7 @@ export const DocTemplate = ({
                   <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column' }}>
                     <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
@@ -1172,14 +1200,14 @@ export const DocTemplate = ({
           <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
         </div>
         {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-          <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
+          <div key={a.id} style={{ display: 'flex', flexDirection: 'column' }}>
             <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
           </div>
         ))}
       </div>
     )) : <div>　</div>;
 
-    const lossSigners = (() => {
+    const lossSigners= (() => {
       const allCandidates = (siteData?.people || []).filter(p => {
         const roles = p?.roles || [];
         return roles.includes("建物所有者") || roles.includes("申請人");
