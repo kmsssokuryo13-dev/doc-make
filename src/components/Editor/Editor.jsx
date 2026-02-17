@@ -118,7 +118,7 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
   }, [activeSiteId, setSites]);
 
   const exportToJson = () => {
-    const data = { schemaVersion: 5, exportedAt: new Date().toISOString(), app: "document-builder-building", activeSiteId, sites };
+    const data = { schemaVersion: 6, exportedAt: new Date().toISOString(), app: "document-builder-building", activeSiteId, sites, contractors, scriveners };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `survey_docs_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url);
@@ -133,6 +133,8 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
         if (!data || !Array.isArray(data.sites)) throw new Error("JSON形式不正");
         const sanitized = data.sites.map(sanitizeSiteData);
         setSites(sanitized); setActiveSiteId(sanitized.find(x => x.id === data.activeSiteId) ? data.activeSiteId : sanitized[0].id);
+        if (Array.isArray(data.contractors)) setContractors(data.contractors);
+        if (Array.isArray(data.scriveners)) setScriveners(data.scriveners);
       } catch (err) { alert("読込失敗: " + err.message); }
     };
     reader.readAsText(file);
