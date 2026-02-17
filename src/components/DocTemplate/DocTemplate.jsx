@@ -1718,7 +1718,7 @@ export const DocTemplate = ({
               customHtml={pick.customText}
               onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
             >
-              <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm', marginBottom: '2mm' }}>建物の表示</h2>
+              <h2 style={{ fontSize: "11pt", margin: "0", fontWeight: "bold", marginTop: '36mm' }}>建物の表示</h2>
               <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
               <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
