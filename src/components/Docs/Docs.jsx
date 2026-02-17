@@ -1016,7 +1016,15 @@ ${styles}
                     <div>
                       <div className="space-y-3">
                         {(() => {
-                          const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => { const c = pb.registrationCause || ""; return c.includes("取壊し") || c.includes("焼失") || c.includes("倒壊"); });
+                          const isLossCause = (c) => (c || "").includes("取壊し") || (c || "").includes("焼失") || (c || "").includes("倒壊");
+                          const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => {
+                            if (isLossCause(pb.registrationCause)) return true;
+                            if ((pb.additionalCauses || []).some(ac => isLossCause(ac.cause))) return true;
+                            return (pb.annexes || []).some(a => {
+                              if (isLossCause(a.registrationCause)) return true;
+                              return (a.additionalCauses || []).some(ac => isLossCause(ac.cause));
+                            });
+                          });
                           const curBldgIds = Array.isArray(activePick.lossBuildingIds) ? activePick.lossBuildingIds : [];
                           const defaultBldgIds = new Set(lossBuildings.map(pb => pb.id));
                           const effectiveBldgSet = curBldgIds.length > 0 ? new Set(curBldgIds) : defaultBldgIds;
@@ -1050,6 +1058,82 @@ ${styles}
                                   ))}
                                 </div>
                               )}
+                            </div>
+                          );
+                        })()}
+
+                        {activeInstance.name === "滅失証明書（表題部変更）" && (() => {
+                          const isLossCause = (c) => (c || "").includes("取壊し") || (c || "").includes("焼失") || (c || "").includes("倒壊");
+                          const lossBuildings = (siteData?.proposedBuildings || []).filter(pb => {
+                            if (isLossCause(pb.registrationCause)) return true;
+                            if ((pb.additionalCauses || []).some(ac => isLossCause(ac.cause))) return true;
+                            return (pb.annexes || []).some(a => {
+                              if (isLossCause(a.registrationCause)) return true;
+                              return (a.additionalCauses || []).some(ac => isLossCause(ac.cause));
+                            });
+                          });
+                          const curBldgIds = Array.isArray(activePick.lossBuildingIds) ? activePick.lossBuildingIds : [];
+                          const defaultBldgIds = new Set(lossBuildings.map(pb => pb.id));
+                          const effectiveBldgSet = curBldgIds.length > 0 ? new Set(curBldgIds) : defaultBldgIds;
+                          const selectedBuildings = lossBuildings.filter(pb => effectiveBldgSet.has(pb.id));
+
+                          const hasText = (s) => typeof s === "string" && s.replace(/[\s　]/g, "").length > 0;
+                          const annexHasContent = (a) => {
+                            if (hasText(a.symbol) || hasText(a.kind) || hasText(a.struct)) return true;
+                            const fas = Array.isArray(a.floorAreas) ? a.floorAreas : [];
+                            return fas.some(fa => hasText(fa.floor) || hasText(fa.area));
+                          };
+
+                          const annexCandidates = selectedBuildings.flatMap(pb => (pb.annexes || [])
+                            .filter(a => annexHasContent(a))
+                            .map(a => ({ ...a, __parentHouseNum: pb.houseNum, __parentAddress: pb.address }))
+                          );
+
+                          const showMain = activePick.lossCertShowMain ?? true;
+                          const hidden = new Set(Array.isArray(activePick.lossCertHiddenAnnexIds) ? activePick.lossCertHiddenAnnexIds : []);
+
+                          const toggleHiddenAnnex = (id) => {
+                            const base = new Set(hidden);
+                            if (base.has(id)) base.delete(id);
+                            else base.add(id);
+                            handlePickChange(activeInstanceKey, { lossCertHiddenAnnexIds: Array.from(base) });
+                          };
+
+                          const showAllAnnexes = () => handlePickChange(activeInstanceKey, { lossCertHiddenAnnexIds: [] });
+
+                          return (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-2">建物の表示を選択</label>
+                              <div className="space-y-2 text-xs">
+                                <label className="flex items-center gap-2">
+                                  <input type="checkbox" checked={showMain} onChange={e => handlePickChange(activeInstanceKey, { lossCertShowMain: e.target.checked })} />
+                                  主である建物を表示
+                                </label>
+
+                                {annexCandidates.length > 0 && (
+                                  <div className="space-y-1">
+                                    <button type="button" onClick={showAllAnnexes} className="w-full py-1 text-[9px] font-bold rounded bg-slate-100 hover:bg-slate-200">附属建物を全て表示</button>
+                                    <div className="grid grid-cols-1 gap-1">
+                                      {annexCandidates.map((a) => {
+                                        const sym = (a.symbol || "").replace(/[\s　]/g, "");
+                                        const label = `${a.__parentHouseNum || "(家屋番号未入力)"}${sym ? ` - 符号${sym}の附属建物` : " - 附属建物(符号未入力)"}`;
+                                        const isShown = !hidden.has(a.id);
+                                        return (
+                                          <label
+                                            key={a.id}
+                                            className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                              isShown ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-slate-500"
+                                            }`}
+                                          >
+                                            <input type="checkbox" className="w-3 h-3 rounded" checked={isShown} onChange={() => toggleHiddenAnnex(a.id)} />
+                                            <span className="truncate">{label}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
