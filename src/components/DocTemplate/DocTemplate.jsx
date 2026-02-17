@@ -678,25 +678,31 @@ export const DocTemplate = ({
       : defaultOwners;
     const displayOwners = owners.length > 0 ? owners : defaultOwners;
 
+    const hiddenAnnexIds = new Set(Array.isArray(pick?.lossCertHiddenAnnexIds) ? pick.lossCertHiddenAnnexIds : []);
+    const showMain = pick?.lossCertShowMain ?? true;
+
     const lossCauseEntries = [];
     buildings.forEach(b => {
       const mainPrefix = hasAnyAnnexes_loss ? "主である建物" : "";
-      if (b.registrationCause) {
-        lossCauseEntries.push({ date: formatWareki(b.registrationDate, b.additionalUnknownDate), cause: b.registrationCause, prefix: mainPrefix });
-      }
-      (b.additionalCauses || []).forEach(ac => {
-        if (ac.cause) {
-          lossCauseEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
+      if (showMain) {
+        if (b.registrationCause && isLossCause(b.registrationCause)) {
+          lossCauseEntries.push({ date: formatWareki(b.registrationDate, b.additionalUnknownDate), cause: b.registrationCause, prefix: mainPrefix });
         }
-      });
+        (b.additionalCauses || []).forEach(ac => {
+          if (ac.cause && isLossCause(ac.cause)) {
+            lossCauseEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
+          }
+        });
+      }
       (b.annexes || []).forEach(a => {
+        if (hiddenAnnexIds.has(a.id)) return;
         const sym = stripAllWS(a.symbol);
         const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
-        if (a.registrationCause) {
+        if (a.registrationCause && isLossCause(a.registrationCause)) {
           lossCauseEntries.push({ date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause, prefix: annexPrefix });
         }
         (a.additionalCauses || []).forEach(ac => {
-          if (ac.cause) {
+          if (ac.cause && isLossCause(ac.cause)) {
             lossCauseEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: annexPrefix });
           }
         });
@@ -732,16 +738,18 @@ export const DocTemplate = ({
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {buildings.length > 0 ? buildings.map(b => (
               <div key={b.id} style={{ marginBottom: '4mm' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div>{b.address || "　"}</div>
-                  {b.houseNum ? (
-                    <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
-                  ) : null}
-                  <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
-                </div>
-                {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
+                {showMain && (
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div>{b.address || "　"}</div>
+                    {b.houseNum ? (
+                      <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
+                    ) : null}
+                    <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
+                  </div>
+                )}
+                {(b.annexes || []).filter(a => !isAnnexEmpty(a) && !hiddenAnnexIds.has(a.id)).map(a => (
                   <div key={a.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
+                    <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
               </div>
