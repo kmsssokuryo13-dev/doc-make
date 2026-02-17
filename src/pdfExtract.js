@@ -76,7 +76,8 @@ const parseHyodaiLand = (lines) => {
     }
   }
 
-  let addressLines = [];
+  let addressGroups = [];
+  let currentAddrGroup = [];
   let foundShozai = false;
   const addrEnd = dataHeaderIdx > 0 ? dataHeaderIdx : lines.length;
   for (let i = 0; i < addrEnd; i++) {
@@ -86,20 +87,29 @@ const parseHyodaiLand = (lines) => {
       foundShozai = true;
     }
     if (!foundShozai) continue;
-    if (isRowSeparator(line)) continue;
+    if (isRowSeparator(line)) {
+      if (currentAddrGroup.length > 0) {
+        addressGroups.push(currentAddrGroup.join(""));
+        currentAddrGroup = [];
+      }
+      continue;
+    }
     const cols = splitColumns(line);
     if (cols.length >= 2) {
       const firstCol = clean(cols[0]);
       if (firstCol && firstCol !== "所在" && HAS_KANJI_RE.test(firstCol)) continue;
       const val = clean(cols[1] || "");
       if (val && HAS_KANJI_RE.test(val) && !val.includes("平成") && !val.includes("令和") && !val.includes("昭和") && !val.includes("登記") && !val.includes("変更")) {
-        addressLines.push(val);
+        currentAddrGroup.push(val);
       }
     }
   }
+  if (currentAddrGroup.length > 0) {
+    addressGroups.push(currentAddrGroup.join(""));
+  }
 
-  if (addressLines.length > 0) {
-    result.address = addressLines[addressLines.length - 1];
+  if (addressGroups.length > 0) {
+    result.address = addressGroups[addressGroups.length - 1];
   }
 
   if (dataHeaderIdx < 0) return result;
@@ -264,7 +274,8 @@ const parseHyodaiBuilding = (lines) => {
     if (cl.includes("家屋番号")) { houseNumIdx = i; break; }
   }
 
-  let addressLines = [];
+  let addressGroups = [];
+  let currentAddrGroup = [];
   let foundShozai = false;
   const addrEnd = houseNumIdx > 0 ? houseNumIdx : (dataHeaderIdx > 0 ? dataHeaderIdx : mainLines.length);
   for (let i = 0; i < addrEnd; i++) {
@@ -272,18 +283,27 @@ const parseHyodaiBuilding = (lines) => {
     const cl = stripBorders(line).replace(/[\s\u3000]+/g, "");
     if (cl.includes("所在") && !cl.includes("所有") && !cl.includes("所在図")) foundShozai = true;
     if (!foundShozai) continue;
-    if (isRowSeparator(line)) continue;
+    if (isRowSeparator(line)) {
+      if (currentAddrGroup.length > 0) {
+        addressGroups.push(currentAddrGroup.join(""));
+        currentAddrGroup = [];
+      }
+      continue;
+    }
     const cols = splitColumns(line);
     if (cols.length >= 2) {
       const firstCol = clean(cols[0]);
       if (firstCol && firstCol !== "所在" && HAS_KANJI_RE.test(firstCol)) continue;
       const val = clean(cols[1] || "");
       if (val && HAS_KANJI_RE.test(val) && !val.includes("平成") && !val.includes("令和") && !val.includes("昭和") && !val.includes("登記") && !val.includes("変更")) {
-        addressLines.push(val);
+        currentAddrGroup.push(val);
       }
     }
   }
-  if (addressLines.length > 0) result.address = addressLines[addressLines.length - 1];
+  if (currentAddrGroup.length > 0) {
+    addressGroups.push(currentAddrGroup.join(""));
+  }
+  if (addressGroups.length > 0) result.address = addressGroups[addressGroups.length - 1];
 
   if (houseNumIdx >= 0) {
     let houseNumLines = [];
@@ -533,8 +553,8 @@ export const parseBuildingRegistration = (text) => {
     floorAreas: bld.floorAreas,
     hasBasement: bld.floorAreas.some(fa => fa.floor.includes("地下")),
     annexes: bld.annexBuildings || [],
-    registrationCause: cause,
-    registrationDate: date,
+    registrationCause: "",
+    registrationDate: { era: "令和", year: "", month: "", day: "" },
     additionalCauses: [],
     additionalUnknownDate: false,
     confirmationCert: null
