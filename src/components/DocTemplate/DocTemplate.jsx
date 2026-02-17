@@ -165,7 +165,7 @@ export const DocTemplate = ({
     if (!b) return null;
     const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>{b.address || "　"}</div>
         {showHouseNum && b.houseNum ? (
           <div style={{ fontWeight: 'bold' }}>
@@ -189,7 +189,7 @@ export const DocTemplate = ({
     if (!a || isAnnexEmpty(a)) return null;
     const line = buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas);
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
         <div>{line}</div>
       </div>
     );
@@ -200,7 +200,7 @@ export const DocTemplate = ({
   const renderMainValues = (b, { showHouseNum } = { showHouseNum: true }) => {
     if (!b) return null;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>{b.address || "　"}</div>
         {showHouseNum && b.houseNum ? (
           <div style={{ fontWeight: 'bold' }}>
@@ -218,7 +218,7 @@ export const DocTemplate = ({
   const renderAnnexValues = (a) => {
     if (!a || isAnnexEmpty(a)) return null;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
         <div style={{ fontWeight: 'bold' }}>{a.symbol || "無符号"}</div>
         {name === "委任状（保存）" ? null : (
           <div>{(a.kind || "　")}{a.struct ? `　${a.struct}` : ""}</div>
@@ -398,7 +398,7 @@ export const DocTemplate = ({
       if (!b) return null;
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div>{b.address || "　"}</div>
           {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
           <div>{line}</div>
@@ -568,7 +568,7 @@ export const DocTemplate = ({
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {buildings.length > 0 ? buildings.map(b => (
               <div key={b.id} style={{ marginBottom: '4mm' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div>{b.address || "　"}</div>
                   {b.houseNum ? (
                     <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
@@ -576,7 +576,7 @@ export const DocTemplate = ({
                   <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
                                         <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
@@ -718,7 +718,7 @@ export const DocTemplate = ({
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {buildings.length > 0 ? buildings.map(b => (
               <div key={b.id} style={{ marginBottom: '4mm' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div>{b.address || "　"}</div>
                   {b.houseNum ? (
                     <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
@@ -726,7 +726,7 @@ export const DocTemplate = ({
                   <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
                                         <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
@@ -867,7 +867,7 @@ export const DocTemplate = ({
           <div style={{ fontSize: '11pt', marginBottom: '8mm', minHeight: '30mm', paddingLeft: '4mm' }}>
             {ntrBuildings.length > 0 ? ntrBuildings.map(b => (
               <div key={b.id} style={{ marginBottom: '4mm' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div>{b.address || "　"}</div>
                   {b.houseNum ? (
                     <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
@@ -875,7 +875,7 @@ export const DocTemplate = ({
                   <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
                 </div>
                 {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+                  <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
                     <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
                   </div>
                 ))}
@@ -956,8 +956,8 @@ export const DocTemplate = ({
                     </>
                   ) : (
                     <>
-                                            <p style={{ margin: '0' }}>射水市善光寺27番1号　塩谷信泰</p>
-                                            <p style={{ margin: '0' }}>射水市善光寺27番1号　塩谷一真</p>
+                                                                                        <p style={{ margin: '0' }}>射水市善光寺２７番１号　塩谷信泰</p>
+                                                                                        <p style={{ margin: '0' }}>射水市善光寺２７番１号　塩谷一真</p>
                     </>
                   )
                 )}
@@ -1164,7 +1164,7 @@ export const DocTemplate = ({
 
     const buildingBlock = buildings.length > 0 ? buildings.map(b => (
       <div key={b.id} style={{ marginBottom: '6mm' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div>{b.address || "　"}</div>
           {b.houseNum ? (
             <div style={{ fontWeight: 'bold' }}>家屋番号　{b.houseNum}</div>
@@ -1172,7 +1172,7 @@ export const DocTemplate = ({
           <div>{buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas)}</div>
         </div>
         {(b.annexes || []).filter(a => !isAnnexEmpty(a)).map(a => (
-          <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', marginTop: '2mm' }}>
+          <div key={a.id} style={{ display: 'flex', flexDirection: 'column', marginTop: '2mm' }}>
             <div>{buildKindStructAreaLine(formatSymbolPrefix(a.symbol), a.kind, a.struct, a.floorAreas)}</div>
           </div>
         ))}
@@ -1280,7 +1280,7 @@ export const DocTemplate = ({
       if (!b) return null;
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div>{b.address || "　"}</div>
           {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
           <div>{line}</div>
@@ -1381,7 +1381,7 @@ export const DocTemplate = ({
         if (!b) return null;
         const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div>{b.address || "　"}</div>
             {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
             <div>{line}</div>
@@ -1439,7 +1439,7 @@ export const DocTemplate = ({
       if (!b) return null;
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div>{b.address || "　"}</div>
           {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
           <div>{line}</div>
@@ -1503,7 +1503,7 @@ export const DocTemplate = ({
       if (!b) return null;
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div>{b.address || "　"}</div>
           {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
           <div>{line}</div>
@@ -1602,7 +1602,7 @@ export const DocTemplate = ({
       if (!b) return null;
       const line = buildKindStructAreaLine(getMainSymbolPrefix(b), b.kind, b.struct, b.floorAreas);
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div>{b.address || "　"}</div>
           {b.houseNum ? <div>家屋番号　{b.houseNum}</div> : null}
           <div>{line}</div>
