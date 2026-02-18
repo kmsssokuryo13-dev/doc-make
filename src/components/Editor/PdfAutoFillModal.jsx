@@ -48,14 +48,32 @@ const EditableFloorAreaRow = ({ label, floorAreas, checked, onCheck, onChangeFlo
   );
 };
 
+const buildFieldKeys = (data) => {
+  const keys = {};
+  (data.buildings || []).forEach((b, bIdx) => {
+    ['address', 'houseNum', 'kind', 'struct', 'floorAreas'].forEach(f => { keys[`b_${bIdx}_${f}`] = true; });
+    (b.annexes || []).forEach((a, aIdx) => {
+      ['symbol', 'kind', 'struct', 'floorAreas'].forEach(f => { keys[`b_${bIdx}_a_${aIdx}_${f}`] = true; });
+    });
+  });
+  (data.land || []).forEach((l, lIdx) => {
+    ['address', 'lotNumber', 'category', 'area'].forEach(f => { keys[`l_${lIdx}_${f}`] = true; });
+  });
+  (data.people || []).forEach((p, pIdx) => {
+    ['address', 'name', 'share'].forEach(f => { keys[`p_${pIdx}_${f}`] = true; });
+  });
+  return keys;
+};
+
 export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) => {
   const [editData, setEditData] = useState(null);
-  const [selections, setSelections] = useState({ buildings: true, land: true, people: true });
+  const [fieldChecks, setFieldChecks] = useState({});
 
   useEffect(() => {
     if (extractedData) {
-      setEditData(JSON.parse(JSON.stringify(extractedData)));
-      setSelections({ buildings: true, land: true, people: true });
+      const cloned = JSON.parse(JSON.stringify(extractedData));
+      setEditData(cloned);
+      setFieldChecks(buildFieldKeys(cloned));
     }
   }, [extractedData]);
 
@@ -64,8 +82,24 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
   const { buildings = [], land = [], people = [] } = editData;
   const hasData = buildings.length > 0 || land.length > 0 || people.length > 0;
 
-  const toggleSelection = (key) => {
-    setSelections(prev => ({ ...prev, [key]: !prev[key] }));
+  const isFieldChecked = (key) => !!fieldChecks[key];
+
+  const toggleField = (key) => {
+    setFieldChecks(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const isSectionChecked = (prefix) => {
+    return Object.keys(fieldChecks).filter(k => k.startsWith(prefix)).every(k => fieldChecks[k]);
+  };
+
+  const toggleSection = (prefix) => {
+    const keys = Object.keys(fieldChecks).filter(k => k.startsWith(prefix));
+    const allChecked = keys.every(k => fieldChecks[k]);
+    setFieldChecks(prev => {
+      const next = { ...prev };
+      keys.forEach(k => { next[k] = !allChecked; });
+      return next;
+    });
   };
 
   const updateBuilding = (bIdx, field, value) => {
@@ -138,16 +172,66 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
 
   const handleApply = () => {
     const data = {};
-    const hasBuildings = selections.buildings && buildings.length > 0;
-    const hasLand = selections.land && land.length > 0;
-    if (hasBuildings) data.buildings = editData.buildings;
-    if (hasLand) data.land = editData.land;
-    if (selections.people && people.length > 0) {
-      const ppl = editData.people.map(p => {
-        const roles = new Set(p.roles || ["申請人"]);
-        if (hasBuildings) roles.add("建物所有者");
-        if (hasLand) roles.add("土地所有者");
-        return { ...p, roles: Array.from(roles), role: Array.from(roles).join("、") };
+    const anyBuildingField = Object.keys(fieldChecks).some(k => k.startsWith('b_') && fieldChecks[k]);
+    const anyLandField = Object.keys(fieldChecks).some(k => k.startsWith('l_') && fieldChecks[k]);
+    const anyPeopleField = Object.keys(fieldChecks).some(k => k.startsWith('p_') && fieldChecks[k]);
+
+    if (anyBuildingField && buildings.length > 0) {
+      data.buildings = editData.buildings.map((b, bIdx) => {
+        const filtered = {};
+        if (fieldChecks[`b_${bIdx}_address`]) filtered.address = b.address;
+        if (fieldChecks[`b_${bIdx}_houseNum`]) filtered.houseNum = b.houseNum;
+        if (fieldChecks[`b_${bIdx}_kind`]) filtered.kind = b.kind;
+        if (fieldChecks[`b_${bIdx}_struct`]) {
+          filtered.struct = b.struct;
+          filtered.structMaterial = b.structMaterial;
+          filtered.structFloor = b.structFloor;
+        }
+        if (fieldChecks[`b_${bIdx}_floorAreas`]) {
+          filtered.floorAreas = b.floorAreas;
+          filtered.hasBasement = b.hasBasement;
+        }
+        filtered.id = b.id;
+        filtered.annexes = (b.annexes || []).map((a, aIdx) => {
+          const af = { id: a.id };
+          if (fieldChecks[`b_${bIdx}_a_${aIdx}_symbol`]) af.symbol = a.symbol;
+          if (fieldChecks[`b_${bIdx}_a_${aIdx}_kind`]) af.kind = a.kind;
+          if (fieldChecks[`b_${bIdx}_a_${aIdx}_struct`]) {
+            af.struct = a.struct;
+            af.structMaterial = a.structMaterial;
+            af.structFloor = a.structFloor;
+          }
+          if (fieldChecks[`b_${bIdx}_a_${aIdx}_floorAreas`]) {
+            af.floorAreas = a.floorAreas;
+            af.hasBasement = a.hasBasement;
+          }
+          return af;
+        });
+        return filtered;
+      });
+    }
+    if (anyLandField && land.length > 0) {
+      data.land = editData.land.map((l, lIdx) => {
+        const filtered = { id: l.id };
+        if (fieldChecks[`l_${lIdx}_address`]) filtered.address = l.address;
+        if (fieldChecks[`l_${lIdx}_lotNumber`]) filtered.lotNumber = l.lotNumber;
+        if (fieldChecks[`l_${lIdx}_category`]) filtered.category = l.category;
+        if (fieldChecks[`l_${lIdx}_area`]) filtered.area = l.area;
+        return filtered;
+      });
+    }
+    if (anyPeopleField && people.length > 0) {
+      const ppl = editData.people.map((p, pIdx) => {
+        const filtered = { id: p.id };
+        if (fieldChecks[`p_${pIdx}_address`]) filtered.address = p.address;
+        if (fieldChecks[`p_${pIdx}_name`]) filtered.name = p.name;
+        if (fieldChecks[`p_${pIdx}_share`]) filtered.share = p.share;
+        filtered.roles = new Set(p.roles || ["申請人"]);
+        if (anyBuildingField) filtered.roles.add("建物所有者");
+        if (anyLandField) filtered.roles.add("土地所有者");
+        filtered.roles = Array.from(filtered.roles);
+        filtered.role = filtered.roles.join("、");
+        return filtered;
       });
       data.people = ppl;
     }
@@ -177,28 +261,25 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
             icon={<FileText size={14} className="text-emerald-500" />}
           >
             <label className="flex items-center gap-2 mb-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 rounded" checked={selections.buildings} onChange={() => toggleSelection('buildings')} />
+              <input type="checkbox" className="w-4 h-4 rounded" checked={isSectionChecked('b_')} onChange={() => toggleSection('b_')} />
               <span className="text-xs font-bold text-emerald-600">建物情報を反映する</span>
             </label>
             {buildings.map((b, bIdx) => (
               <div key={b.id || bIdx} className="border border-gray-100 rounded p-2 space-y-1 bg-gray-50/50">
-                <EditableFieldRow label="所在" value={b.address} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateBuilding(bIdx, 'address', v)} />
-                <EditableFieldRow label="家屋番号" value={b.houseNum} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateBuilding(bIdx, 'houseNum', v)} />
-                <EditableFieldRow label="種類" value={b.kind} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateBuilding(bIdx, 'kind', v)} />
-                <EditableFieldRow label="構造" value={b.struct} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateBuilding(bIdx, 'struct', v)} />
-                <EditableFloorAreaRow label="床面積" floorAreas={b.floorAreas} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChangeFloor={(fIdx, area) => updateBuildingFloor(bIdx, fIdx, area)} />
-                {b.registrationCause && (
-                  <EditableFieldRow label="登記原因" value={b.registrationCause} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateBuilding(bIdx, 'registrationCause', v)} />
-                )}
+                <EditableFieldRow label="所在" value={b.address} checked={isFieldChecked(`b_${bIdx}_address`)} onCheck={() => toggleField(`b_${bIdx}_address`)} onChange={(v) => updateBuilding(bIdx, 'address', v)} />
+                <EditableFieldRow label="家屋番号" value={b.houseNum} checked={isFieldChecked(`b_${bIdx}_houseNum`)} onCheck={() => toggleField(`b_${bIdx}_houseNum`)} onChange={(v) => updateBuilding(bIdx, 'houseNum', v)} />
+                <EditableFieldRow label="種類" value={b.kind} checked={isFieldChecked(`b_${bIdx}_kind`)} onCheck={() => toggleField(`b_${bIdx}_kind`)} onChange={(v) => updateBuilding(bIdx, 'kind', v)} />
+                <EditableFieldRow label="構造" value={b.struct} checked={isFieldChecked(`b_${bIdx}_struct`)} onCheck={() => toggleField(`b_${bIdx}_struct`)} onChange={(v) => updateBuilding(bIdx, 'struct', v)} />
+                <EditableFloorAreaRow label="床面積" floorAreas={b.floorAreas} checked={isFieldChecked(`b_${bIdx}_floorAreas`)} onCheck={() => toggleField(`b_${bIdx}_floorAreas`)} onChangeFloor={(fIdx, area) => updateBuildingFloor(bIdx, fIdx, area)} />
                 {(b.annexes || []).length > 0 && (
                   <div className="mt-2 border-t border-gray-200 pt-2">
                     <div className="text-[10px] font-bold text-orange-600 mb-1">附属建物</div>
                     {b.annexes.map((a, aIdx) => (
                       <div key={a.id || aIdx} className="border border-orange-100 rounded p-2 space-y-1 bg-orange-50/30 mb-1">
-                        <EditableFieldRow label="符号" value={a.symbol} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateAnnex(bIdx, aIdx, 'symbol', v)} />
-                        <EditableFieldRow label="種類" value={a.kind} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateAnnex(bIdx, aIdx, 'kind', v)} />
-                        <EditableFieldRow label="構造" value={a.struct || ((a.structMaterial || '') + (a.structFloor || ''))} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChange={(v) => updateAnnex(bIdx, aIdx, 'struct', v)} />
-                        <EditableFloorAreaRow label="床面積" floorAreas={a.floorAreas} checked={selections.buildings} onCheck={() => toggleSelection('buildings')} onChangeFloor={(fIdx, area) => updateAnnexFloor(bIdx, aIdx, fIdx, area)} />
+                        <EditableFieldRow label="符号" value={a.symbol} checked={isFieldChecked(`b_${bIdx}_a_${aIdx}_symbol`)} onCheck={() => toggleField(`b_${bIdx}_a_${aIdx}_symbol`)} onChange={(v) => updateAnnex(bIdx, aIdx, 'symbol', v)} />
+                        <EditableFieldRow label="種類" value={a.kind} checked={isFieldChecked(`b_${bIdx}_a_${aIdx}_kind`)} onCheck={() => toggleField(`b_${bIdx}_a_${aIdx}_kind`)} onChange={(v) => updateAnnex(bIdx, aIdx, 'kind', v)} />
+                        <EditableFieldRow label="構造" value={a.struct || ((a.structMaterial || '') + (a.structFloor || ''))} checked={isFieldChecked(`b_${bIdx}_a_${aIdx}_struct`)} onCheck={() => toggleField(`b_${bIdx}_a_${aIdx}_struct`)} onChange={(v) => updateAnnex(bIdx, aIdx, 'struct', v)} />
+                        <EditableFloorAreaRow label="床面積" floorAreas={a.floorAreas} checked={isFieldChecked(`b_${bIdx}_a_${aIdx}_floorAreas`)} onCheck={() => toggleField(`b_${bIdx}_a_${aIdx}_floorAreas`)} onChangeFloor={(fIdx, area) => updateAnnexFloor(bIdx, aIdx, fIdx, area)} />
                       </div>
                     ))}
                   </div>
@@ -214,15 +295,15 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
             icon={<FileText size={14} className="text-blue-500" />}
           >
             <label className="flex items-center gap-2 mb-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 rounded" checked={selections.land} onChange={() => toggleSelection('land')} />
+              <input type="checkbox" className="w-4 h-4 rounded" checked={isSectionChecked('l_')} onChange={() => toggleSection('l_')} />
               <span className="text-xs font-bold text-blue-600">土地情報を反映する</span>
             </label>
             {land.map((l, lIdx) => (
               <div key={l.id || lIdx} className="border border-gray-100 rounded p-2 space-y-1 bg-gray-50/50">
-                <EditableFieldRow label="所在" value={l.address} checked={selections.land} onCheck={() => toggleSelection('land')} onChange={(v) => updateLand(lIdx, 'address', v)} />
-                <EditableFieldRow label="地番" value={l.lotNumber} checked={selections.land} onCheck={() => toggleSelection('land')} onChange={(v) => updateLand(lIdx, 'lotNumber', v)} />
-                <EditableFieldRow label="地目" value={l.category} checked={selections.land} onCheck={() => toggleSelection('land')} onChange={(v) => updateLand(lIdx, 'category', v)} />
-                <EditableFieldRow label="地積" value={l.area} checked={selections.land} onCheck={() => toggleSelection('land')} onChange={(v) => updateLand(lIdx, 'area', v)} />
+                <EditableFieldRow label="所在" value={l.address} checked={isFieldChecked(`l_${lIdx}_address`)} onCheck={() => toggleField(`l_${lIdx}_address`)} onChange={(v) => updateLand(lIdx, 'address', v)} />
+                <EditableFieldRow label="地番" value={l.lotNumber} checked={isFieldChecked(`l_${lIdx}_lotNumber`)} onCheck={() => toggleField(`l_${lIdx}_lotNumber`)} onChange={(v) => updateLand(lIdx, 'lotNumber', v)} />
+                <EditableFieldRow label="地目" value={l.category} checked={isFieldChecked(`l_${lIdx}_category`)} onCheck={() => toggleField(`l_${lIdx}_category`)} onChange={(v) => updateLand(lIdx, 'category', v)} />
+                <EditableFieldRow label="地積" value={l.area} checked={isFieldChecked(`l_${lIdx}_area`)} onCheck={() => toggleField(`l_${lIdx}_area`)} onChange={(v) => updateLand(lIdx, 'area', v)} />
               </div>
             ))}
           </Section>
@@ -234,14 +315,14 @@ export const PdfAutoFillPanel = ({ isOpen, onClose, extractedData, onApply }) =>
             icon={<Users size={14} className="text-purple-500" />}
           >
             <label className="flex items-center gap-2 mb-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 rounded" checked={selections.people} onChange={() => toggleSelection('people')} />
+              <input type="checkbox" className="w-4 h-4 rounded" checked={isSectionChecked('p_')} onChange={() => toggleSection('p_')} />
               <span className="text-xs font-bold text-purple-600">所有者情報を反映する</span>
             </label>
             {people.map((p, pIdx) => (
               <div key={p.id || pIdx} className="border border-gray-100 rounded p-2 space-y-1 bg-gray-50/50">
-                <EditableFieldRow label="住所" value={p.address} checked={selections.people} onCheck={() => toggleSelection('people')} onChange={(v) => updatePerson(pIdx, 'address', v)} />
-                <EditableFieldRow label="氏名" value={p.name} checked={selections.people} onCheck={() => toggleSelection('people')} onChange={(v) => updatePerson(pIdx, 'name', v)} />
-                {p.share && <EditableFieldRow label="持分" value={p.share} checked={selections.people} onCheck={() => toggleSelection('people')} onChange={(v) => updatePerson(pIdx, 'share', v)} />}
+                <EditableFieldRow label="住所" value={p.address} checked={isFieldChecked(`p_${pIdx}_address`)} onCheck={() => toggleField(`p_${pIdx}_address`)} onChange={(v) => updatePerson(pIdx, 'address', v)} />
+                <EditableFieldRow label="氏名" value={p.name} checked={isFieldChecked(`p_${pIdx}_name`)} onCheck={() => toggleField(`p_${pIdx}_name`)} onChange={(v) => updatePerson(pIdx, 'name', v)} />
+                {p.share && <EditableFieldRow label="持分" value={p.share} checked={isFieldChecked(`p_${pIdx}_share`)} onCheck={() => toggleField(`p_${pIdx}_share`)} onChange={(v) => updatePerson(pIdx, 'share', v)} />}
               </div>
             ))}
           </Section>

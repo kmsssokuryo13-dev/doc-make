@@ -1364,7 +1364,7 @@ export const DocTemplate = ({
     const landBlock = (selectedLand || []).length ? (
       <div style={{ marginBottom: '6mm' }}>
         {(selectedLand || []).map((l, idx) => (
-          <div key={l.id || idx} style={{ marginBottom: '4mm', whiteSpace: 'pre-wrap' }}>
+          <div key={l.id || idx} style={{ whiteSpace: 'pre-wrap' }}>
             <div>
               {(l.address || "　")}
               {""}
