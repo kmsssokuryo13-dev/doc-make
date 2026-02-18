@@ -58,9 +58,7 @@ export const LandSection = ({ site, update }) => (
           </div>
         )}
 
-        <button onClick={() => update({ land: site.land.filter(l => l.id !== item.id)})} className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-md border border-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Trash2 size={14} />
-        </button>
+        <button onClick={() => update({ land: site.land.filter(l => l.id !== item.id)})} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-1 rounded transition-colors"><Trash2 size={16} /></button>
       </div>
     ))}
   </div>
