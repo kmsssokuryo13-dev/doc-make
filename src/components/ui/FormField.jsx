@@ -42,7 +42,9 @@ export function FormField({ label, value, onChange, placeholder, type = "text", 
 
   const handleChange = useCallback((e) => {
     if (readOnly) return;
-    const raw = e.target.value;
+    const el = e.target;
+    const raw = el.value;
+    const cursorPos = el.selectionStart;
     if (composingRef.current) {
       setLocalVal(raw);
       return;
@@ -50,6 +52,11 @@ export function FormField({ label, value, onChange, placeholder, type = "text", 
     const val = toFullWidthDigits(raw);
     setLocalVal(val);
     onChange(val);
+    requestAnimationFrame(() => {
+      if (el && cursorPos !== null) {
+        el.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
   }, [readOnly, onChange]);
 
   const handleCompositionStart = useCallback(() => {
@@ -59,9 +66,16 @@ export function FormField({ label, value, onChange, placeholder, type = "text", 
   const handleCompositionEnd = useCallback((e) => {
     composingRef.current = false;
     if (!readOnly) {
-      const val = toFullWidthDigits(e.target.value);
+      const el = e.target;
+      const cursorPos = el.selectionStart;
+      const val = toFullWidthDigits(el.value);
       setLocalVal(val);
       onChange(val);
+      requestAnimationFrame(() => {
+        if (el && cursorPos !== null) {
+          el.setSelectionRange(cursorPos, cursorPos);
+        }
+      });
     }
   }, [readOnly, onChange]);
 
