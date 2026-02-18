@@ -440,8 +440,10 @@ const parseKoukuOwner = (lines) => {
     const rightsClean = clean(rightsText);
 
     if (seqCol && /^[０-９\d]+$/.test(hw(seqCol))) {
-      const isOwnership = purposeCol.includes("所有権") && !purposeCol.includes("仮登記") && !purposeCol.includes("抹消");
-      currentEntry = { seq: seqCol, rightsCol: [], isOwnershipTransfer: isOwnership };
+      const isOwnership = (
+        purposeCol.includes("所有権") || purposeCol.includes("持分全部移転") || purposeCol.includes("持分一部移転")
+      ) && !purposeCol.includes("仮登記") && !purposeCol.includes("抹消");
+      currentEntry = { seq: seqCol, purpose: purposeCol, rightsCol: [], isOwnershipTransfer: isOwnership };
     }
 
     if (currentEntry && rightsClean) {
@@ -454,38 +456,93 @@ const parseKoukuOwner = (lines) => {
     entries.push(currentEntry);
   }
 
-  let ownerEntry = null;
-  for (let i = entries.length - 1; i >= 0; i--) {
-    if (entries[i].isOwnershipTransfer) {
-      ownerEntry = entries[i];
-      break;
+  let owners = [];
+  for (const entry of entries) {
+    if (!entry.isOwnershipTransfer) continue;
+    const rightsText = entry.rightsCol.join(" ");
+    const purpose = entry.purpose;
+
+    let ownerMarker = "";
+    let markerIdx = rightsText.indexOf("所有者");
+    if (markerIdx >= 0) {
+      ownerMarker = "所有者";
+    } else {
+      markerIdx = rightsText.indexOf("共有者");
+      if (markerIdx >= 0) {
+        ownerMarker = "共有者";
+      }
+    }
+    if (markerIdx < 0) continue;
+
+    const afterMarker = rightsText.slice(markerIdx + 3).trim();
+    const parsedOwners = parseOwnerFromRightsText(afterMarker);
+    if (parsedOwners.length === 0) continue;
+
+    if (purpose.includes("持分全部移転")) {
+      const transferorMatch = purpose.match(/(.+?)持分全部移転/);
+      if (transferorMatch) {
+        const transferorName = transferorMatch[1].replace(/[\s\u3000]/g, "");
+        owners = owners.filter(o => {
+          const cn = o.name.replace(/[\s\u3000]/g, "");
+          return !cn.includes(transferorName) && !transferorName.includes(cn);
+        });
+      }
+      for (const po of parsedOwners) {
+        const existingIdx = owners.findIndex(o =>
+          o.name.replace(/[\s\u3000]/g, "") === po.name.replace(/[\s\u3000]/g, "")
+        );
+        if (existingIdx >= 0) {
+          owners[existingIdx].address = po.address || owners[existingIdx].address;
+        } else {
+          owners.push(po);
+        }
+      }
+      if (owners.length === 1 && ownerMarker === "所有者") {
+        owners[0].share = "１/１";
+      }
+    } else if (purpose.includes("一部移転")) {
+      for (const po of parsedOwners) {
+        const existingIdx = owners.findIndex(o =>
+          o.name.replace(/[\s\u3000]/g, "") === po.name.replace(/[\s\u3000]/g, "")
+        );
+        if (existingIdx < 0) {
+          owners.push(po);
+        }
+      }
+    } else {
+      owners = parsedOwners;
     }
   }
 
-  if (!ownerEntry) {
+  if (owners.length === 0) {
     for (let i = entries.length - 1; i >= 0; i--) {
       const rt = entries[i].rightsCol.join(" ");
-      if (rt.includes("所有者")) {
-        ownerEntry = entries[i];
-        break;
+      let idx = rt.indexOf("所有者");
+      if (idx < 0) idx = rt.indexOf("共有者");
+      if (idx >= 0) {
+        const afterMarker = rt.slice(idx + 3).trim();
+        const parsed = parseOwnerFromRightsText(afterMarker);
+        if (parsed.length > 0) return parsed;
       }
     }
   }
 
-  if (!ownerEntry) return [];
-
-  const rightsText = ownerEntry.rightsCol.join(" ");
-  const ownerMarkerIdx = rightsText.indexOf("所有者");
-  if (ownerMarkerIdx < 0) return [];
-
-  const afterOwner = rightsText.slice(ownerMarkerIdx + 3).trim();
-  return parseOwnerFromRightsText(afterOwner);
+  return owners;
 };
 
 const parseOwnerFromRightsText = (text) => {
   const owners = [];
 
-  const addrNameMatch = text.match(/(.+?(?:[番地号丁目]+[０-９\d]*)+)\s+(.+)/);
+  const hwText = hw(text);
+  const shareMatch = hwText.match(/(\d+)分の(\d+)/);
+  let share = "１/１";
+  if (shareMatch) {
+    share = `${toFullWidthDigits(shareMatch[2])}/${toFullWidthDigits(shareMatch[1])}`;
+  }
+
+  const cleanText = text.replace(/持分\s*[０-９\d]+\s*分の\s*[０-９\d]+/, "").replace(/\s+/g, " ").trim();
+
+  const addrNameMatch = cleanText.match(/(.+?(?:[番地号丁目]+[０-９\d]*)+)\s+(.+)/);
   let address = "";
   let name = "";
 
@@ -493,23 +550,16 @@ const parseOwnerFromRightsText = (text) => {
     address = addrNameMatch[1].replace(/\s+/g, "");
     name = addrNameMatch[2].replace(/\s+/g, " ").trim();
   } else {
-    const segments = text.split(/\s+/).filter(Boolean);
+    const segments = cleanText.split(/\s+/).filter(Boolean);
     if (segments.length >= 2) {
       name = segments[segments.length - 1];
       address = segments.slice(0, -1).join("");
     } else {
-      name = text;
+      name = cleanText;
     }
   }
 
   if (name || address) {
-    const hwText = hw(text);
-    const shareMatch = hwText.match(/(\d+)分の(\d+)/);
-    let share = "１/１";
-    if (shareMatch) {
-      share = `${toFullWidthDigits(shareMatch[2])}/${toFullWidthDigits(shareMatch[1])}`;
-    }
-
     owners.push({
       id: generateId(),
       address,
