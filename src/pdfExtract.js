@@ -529,7 +529,8 @@ export const parseBuildingRegistration = (text) => {
   const sections = splitSections(text);
   if (sections.hyodai.length === 0) return [];
 
-  const isBuilding = text.includes("建物の表示") || text.includes("家屋番号");
+  const hyodaiText = sections.hyodai.join("\n");
+  const isBuilding = hyodaiText.includes("建物の表示") || hyodaiText.includes("家屋番号");
   if (!isBuilding) return [];
 
   const bld = parseHyodaiBuilding(sections.hyodai);
@@ -565,7 +566,8 @@ export const parseLandRegistration = (text) => {
   const sections = splitSections(text);
   if (sections.hyodai.length === 0) return [];
 
-  const isLand = text.includes("土地の表示") || (text.includes("地番") && text.includes("地目") && text.includes("地積"));
+  const hyodaiText = sections.hyodai.join("\n");
+  const isLand = hyodaiText.includes("土地の表示") || (hyodaiText.includes("地番") && hyodaiText.includes("地目") && hyodaiText.includes("地積"));
   if (!isLand) return [];
 
   const land = parseHyodaiLand(sections.hyodai);
