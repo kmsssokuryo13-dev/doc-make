@@ -273,10 +273,10 @@ export const DocTemplate = ({
     const line = typeof formatFn === "function" ? formatFn(p) : formatFn;
     if (!useDecedent) return line;
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>{"被相続人　"}{decedentName}</div>
         <div>{"相続人　　"}{line}</div>
-      </>
+      </div>
     );
   };
 
