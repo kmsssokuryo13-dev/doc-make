@@ -251,12 +251,33 @@ export const DocTemplate = ({
 
   const hasMultipleApplicants = (applicants || []).length >= 2;
 
+  const decedentName = siteData?.decedentName || "";
+
+  const AFFECTED_BY_DECEDENT = [
+    "委任状（表題部変更）", "委任状（地目変更）", "委任状（滅失）",
+    "滅失証明書（滅失）", "非登載証明書",
+    "工事完了引渡証明書（表題部変更）", "滅失証明書（表題部変更）",
+    "委任状（表題部更正）", "委任状（合併）", "委任状（分割）", "委任状（合体）"
+  ];
+  const useDecedent = decedentName && AFFECTED_BY_DECEDENT.includes(name);
+
   const formatApplicantLine = (p) => {
     const parts = [];
     parts.push(p?.address || "　");
     if (hasMultipleApplicants) parts.push(formatShare(p?.share));
     parts.push(p?.name || "　");
     return parts.join("　");
+  };
+
+  const renderOwnerWithDecedent = (p, formatFn) => {
+    const line = typeof formatFn === "function" ? formatFn(p) : formatFn;
+    if (!useDecedent) return line;
+    return (
+      <>
+        <div>{"被相続人　"}{decedentName}</div>
+        <div>{"相続人　　"}{line}</div>
+      </>
+    );
   };
 
   // ---- 工事完了引渡証明書（表題） ----
@@ -466,9 +487,9 @@ export const DocTemplate = ({
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {(applicants || []).map(p => (
-              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
-                {formatApplicantLine(p)}
-              </p>
+              <div key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {renderOwnerWithDecedent(p, formatApplicantLine)}
+              </div>
             ))}
           </div>
 
@@ -592,9 +613,9 @@ export const DocTemplate = ({
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {displayOwners.length > 0 ? displayOwners.map(p => (
-              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
-                {p.address || "　"}　{p.name || "　"}
-              </p>
+              <div key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {renderOwnerWithDecedent(p, (pp) => `${pp.address || "　"}　${pp.name || "　"}`)}
+              </div>
             )) : <div>　</div>}
           </div>
 
@@ -766,9 +787,9 @@ export const DocTemplate = ({
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
             {displayOwners.length > 0 ? displayOwners.map(p => (
-              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
-                {p.address || "　"}　{p.name || "　"}
-              </p>
+              <div key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {renderOwnerWithDecedent(p, (pp) => `${pp.address || "　"}　${pp.name || "　"}`)}
+              </div>
             )) : <div>　</div>}
           </div>
 
@@ -908,9 +929,9 @@ export const DocTemplate = ({
           <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者</h2>
           <div style={{ fontSize: '11pt', marginBottom: '8mm', paddingLeft: '4mm' }}>
             {ntrDisplayOwners.length > 0 ? ntrDisplayOwners.map(p => (
-              <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
-                {p.address || "　"}　{p.name || "　"}
-              </p>
+              <div key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                {renderOwnerWithDecedent(p, (pp) => `${pp.address || "　"}　${pp.name || "　"}`)}
+              </div>
             )) : <div>　</div>}
           </div>
 
@@ -1013,7 +1034,7 @@ export const DocTemplate = ({
               <div style={{ fontSize: '11pt' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
                   {signers.map((p, i) => (
-                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{formatApplicantLine(p)}</div>
+                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{renderOwnerWithDecedent(p, formatApplicantLine)}</div>
                   ))}
                 </div>
               </div>

@@ -158,6 +158,7 @@ export const sanitizeSiteData = (raw = {}) => {
     applications: stableSortKeys({ ...baseApplications, ...(raw.applications || {}) }),
     documents: stableSortKeys(typeof raw.documents === "object" && raw.documents ? raw.documents : {}),
     docPick: stableSortKeys(typeof raw.docPick === "object" && raw.docPick ? raw.docPick : {}),
+    decedentName: raw.decedentName || "",
     contractorId: raw.contractorId || "",
     scrivenerId: raw.scrivenerId || ""
   };
