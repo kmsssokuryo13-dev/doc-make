@@ -198,7 +198,8 @@ export const createNewPerson = (patch = {}) => {
     share: "",
     roles: ["申請人"],
     role: "申請人",
-    contractorMasterId: ""
+    contractorMasterId: "",
+    decedentName: ""
   };
 
   const merged = { ...base, ...(patch || {}) };

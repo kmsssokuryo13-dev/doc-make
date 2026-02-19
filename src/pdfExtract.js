@@ -505,7 +505,7 @@ const parseOwnerFromRightsText = (text) => {
   if (name || address) {
     const hwText = hw(text);
     const shareMatch = hwText.match(/(\d+)分の(\d+)/);
-    let share = "１/１";
+    let share = "";
     if (shareMatch) {
       share = `${toFullWidthDigits(shareMatch[2])}/${toFullWidthDigits(shareMatch[1])}`;
     }
