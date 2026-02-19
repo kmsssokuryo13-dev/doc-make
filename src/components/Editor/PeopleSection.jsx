@@ -8,6 +8,7 @@ import { FormField } from '../ui/FormField.jsx';
 export const PeopleSection = ({ site, update, contractors = [], openMasterModal }) => {
   const people = Array.isArray(site?.people) ? site.people : [];
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [openDecedentIds, setOpenDecedentIds] = useState(() => new Set(people.filter(p => (p.decedentName || "").trim()).map(p => p.id)));
 
   const updatePerson = (id, field, val) => {
     update({ people: people.map(p => {
@@ -50,34 +51,12 @@ export const PeopleSection = ({ site, update, contractors = [], openMasterModal 
     setIsSelectModalOpen(false);
   };
 
-  const decedentName = site?.decedentName || "";
-  const [showDecedent, setShowDecedent] = useState(!!decedentName);
-
-  const handleDeleteDecedent = () => {
-    if (!window.confirm("被相続人の情報を削除しますか？")) return;
-    update({ decedentName: "" });
-    setShowDecedent(false);
-  };
-
   return (
     <div className="space-y-4 animate-in fade-in duration-300 font-sans text-black">
       <div className="flex gap-2 font-sans font-bold mb-4 text-black">
         <button onClick={() => update({ people: [...people, createNewPerson()] })} className="flex-1 text-[10px] bg-purple-600 text-white px-3 py-2.5 rounded-xl font-bold hover:bg-purple-700 active:scale-95 shadow-md flex items-center justify-center gap-2"><UserPlus size={14} /> 申請人を追加</button>
         <button onClick={() => setIsSelectModalOpen(true)} className="flex-1 text-[10px] bg-blue-600 text-white px-3 py-2.5 rounded-xl font-bold hover:bg-blue-700 active:scale-95 shadow-md flex items-center justify-center gap-2"><Briefcase size={14} /> 工事人を追加</button>
       </div>
-
-      {!showDecedent ? (
-        <button onClick={() => setShowDecedent(true)} className="w-full text-[10px] bg-amber-600 text-white px-3 py-2 rounded-xl font-bold hover:bg-amber-700 active:scale-95 shadow-md flex items-center justify-center gap-2"><UserCheck size={14} /> 被相続人を入力</button>
-      ) : (
-        <div className="p-3 border border-amber-200 rounded-xl bg-amber-50 shadow-sm flex items-center gap-3">
-          <div className="p-1.5 rounded-lg bg-amber-100 text-amber-500 shrink-0"><UserCheck size={16} /></div>
-          <div className="flex-1 min-w-0">
-            <label className="block text-[9px] font-black text-amber-600 uppercase mb-1">被相続人の氏名</label>
-            <input type="text" className="w-full text-xs p-1.5 bg-white border border-amber-200 rounded outline-none text-black" placeholder="氏名を入力" value={decedentName} onChange={e => update({ decedentName: e.target.value })} />
-          </div>
-          <button onClick={handleDeleteDecedent} className="text-gray-300 hover:text-red-500 p-1 shrink-0 transition-colors" title="被相続人を削除"><X size={16} /></button>
-        </div>
-      )}
 
       {(people || []).map((p) => {
         const isContractor = (p.roles || []).includes("工事人");
@@ -109,8 +88,25 @@ export const PeopleSection = ({ site, update, contractors = [], openMasterModal 
                 <FormField label="氏名・会社名" value={p.name} onChange={(v) => updatePerson(p.id, "name", v)} />
                 <FormField label="代表者" value={p.representative} onChange={(v) => updatePerson(p.id, "representative", v)} placeholder="法人の場合のみ" />
               </div>
+              <div className="flex gap-3 text-black">
+                <div style={{ maxWidth: '100px' }}>
+                  <FormField label="持分" value={p.share} onChange={(v) => updatePerson(p.id, "share", v)} />
+                </div>
+              </div>
               <div className="flex gap-3 items-end text-black">
-                <FormField label="持分" value={p.share} onChange={(v) => updatePerson(p.id, "share", v)} />
+                <div className="shrink-0" style={{ width: '140px' }}>
+                  {!openDecedentIds.has(p.id) ? (
+                    <button onClick={() => setOpenDecedentIds(prev => new Set(prev).add(p.id))} className="w-full text-[9px] bg-amber-600 text-white px-2 py-1.5 rounded-lg font-bold hover:bg-amber-700 active:scale-95 shadow-sm flex items-center justify-center gap-1"><UserCheck size={12} /> 被相続人を入力</button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <label className="block text-[9px] font-black text-amber-600 mb-0.5">被相続人</label>
+                        <input type="text" className="w-full text-xs p-1 bg-amber-50 border border-amber-200 rounded outline-none text-black" placeholder="氏名" value={p.decedentName || ""} onChange={e => updatePerson(p.id, "decedentName", e.target.value)} />
+                      </div>
+                      <button onClick={() => { if (window.confirm("被相続人の情報を削除しますか？")) { updatePerson(p.id, "decedentName", ""); setOpenDecedentIds(prev => { const s = new Set(prev); s.delete(p.id); return s; }); } }} className="text-gray-300 hover:text-red-500 mt-3 shrink-0" title="被相続人を削除"><X size={14} /></button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 text-black">
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">役割</label>
                   <div className="grid grid-cols-2 gap-1 text-black">

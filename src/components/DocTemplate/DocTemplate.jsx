@@ -251,15 +251,13 @@ export const DocTemplate = ({
 
   const hasMultipleApplicants = (applicants || []).length >= 2;
 
-  const decedentName = siteData?.decedentName || "";
-
   const AFFECTED_BY_DECEDENT = [
     "委任状（表題部変更）", "委任状（地目変更）", "委任状（滅失）",
     "滅失証明書（滅失）", "非登載証明書",
     "工事完了引渡証明書（表題部変更）", "滅失証明書（表題部変更）",
     "委任状（表題部更正）", "委任状（合併）", "委任状（分割）", "委任状（合体）"
   ];
-  const useDecedent = decedentName && AFFECTED_BY_DECEDENT.includes(name);
+  const isAffectedDoc = AFFECTED_BY_DECEDENT.includes(name);
 
   const formatApplicantLine = (p) => {
     const parts = [];
@@ -271,10 +269,11 @@ export const DocTemplate = ({
 
   const renderOwnerWithDecedent = (p, formatFn) => {
     const line = typeof formatFn === "function" ? formatFn(p) : formatFn;
-    if (!useDecedent) return line;
+    const pDecedent = (p?.decedentName || "").trim();
+    if (!isAffectedDoc || !pDecedent) return line;
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <div>{"被相続人　"}{decedentName}</div>
+        <div>{"被相続人　"}{pDecedent}</div>
         <div>{"相続人　　"}{line}</div>
       </div>
     );

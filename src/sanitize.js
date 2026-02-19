@@ -152,13 +152,13 @@ export const sanitizeSiteData = (raw = {}) => {
           ...p,
           id: p.id || generateId(),
           roles: Array.isArray(p.roles) ? p.roles : (p.role ? p.role.split(/[、,]/).map(x => x.trim()).filter(Boolean) : []),
-          contractorMasterId: p.contractorMasterId || ""
+          contractorMasterId: p.contractorMasterId || "",
+          decedentName: p.decedentName || ""
         }))
       : [],
     applications: stableSortKeys({ ...baseApplications, ...(raw.applications || {}) }),
     documents: stableSortKeys(typeof raw.documents === "object" && raw.documents ? raw.documents : {}),
     docPick: stableSortKeys(typeof raw.docPick === "object" && raw.docPick ? raw.docPick : {}),
-    decedentName: raw.decedentName || "",
     contractorId: raw.contractorId || "",
     scrivenerId: raw.scrivenerId || ""
   };
