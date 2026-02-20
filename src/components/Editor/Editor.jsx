@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Map as MapIcon, Users, Plus, Trash2, Save, Building,
@@ -109,6 +109,11 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
   const [newSiteName, setNewSiteName] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [siteToDelete, setSiteToDelete] = useState(null);
+  const [editingSiteId, setEditingSiteId] = useState(null);
+  const [editingSiteName, setEditingSiteName] = useState('');
+  const editInputRef = useRef(null);
+
+  useEffect(() => { if (editingSiteId && editInputRef.current) editInputRef.current.focus(); }, [editingSiteId]);
 
   const activeSite = sites.find(s => s.id === activeSiteId);
 
@@ -157,7 +162,7 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {(sites || []).map(site => (
             <div key={site.id} onClick={() => setActiveSiteId(site.id)} className={`group px-4 py-4 cursor-pointer border-b border-slate-700/50 flex flex-col gap-1 transition-all relative ${activeSiteId === site.id ? 'bg-blue-600/20 border-l-4 border-l-blue-500' : 'hover:bg-slate-700/50 border-l-4 border-l-transparent'}`}>
-              <div className="flex justify-between items-start text-sm truncate font-bold"><span className={activeSiteId === site.id ? 'text-white' : 'text-slate-300'}>{site.name}</span><button onClick={(e) => { e.stopPropagation(); setSiteToDelete(site); setIsDeleteModalOpen(true); }} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity"><Trash2 size={14} /></button></div>
+              <div className="flex justify-between items-start text-sm truncate font-bold">{editingSiteId === site.id ? (<input ref={editInputRef} type="text" className="flex-1 min-w-0 bg-slate-600 text-white text-sm px-1 py-0.5 rounded outline-none focus:ring-1 focus:ring-blue-400 font-bold" value={editingSiteName} onChange={e => setEditingSiteName(e.target.value)} onBlur={() => { if (editingSiteName.trim()) setSites(prev => prev.map(s => s.id === site.id ? { ...s, name: editingSiteName.trim() } : s)); setEditingSiteId(null); }} onKeyDown={e => { if (e.key === 'Enter') { if (editingSiteName.trim()) setSites(prev => prev.map(s => s.id === site.id ? { ...s, name: editingSiteName.trim() } : s)); setEditingSiteId(null); } else if (e.key === 'Escape') { setEditingSiteId(null); } }} />) : (<span className={activeSiteId === site.id ? 'text-white' : 'text-slate-300'} onDoubleClick={(e) => { e.stopPropagation(); setEditingSiteId(site.id); setEditingSiteName(site.name); }}>{site.name}</span>)}<button onClick={(e) => { e.stopPropagation(); setSiteToDelete(site); setIsDeleteModalOpen(true); }} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity"><Trash2 size={14} /></button></div>
               <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                 <span>{site.land?.length||0}筆 / {site.proposedBuildings?.length||0}物件</span>
                 <button onClick={(e) => { e.stopPropagation(); navigate(`/docs?siteId=${site.id}`); }} className="bg-slate-700 px-2 py-0.5 rounded text-slate-300 hover:text-white transition-colors">作成</button>
@@ -187,40 +192,30 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
                     <TabBtn active={activeTab === 'build_reg'} label="既登記建物" onClick={() => setActiveTab('build_reg')} icon={<Building size={14}/>} />
                     <TabBtn active={activeTab === 'build_prop'} label="申請建物" onClick={() => setActiveTab('build_prop')} icon={<FileText size={14}/>} />
                     <TabBtn active={activeTab === 'people'} label="関係人" onClick={() => setActiveTab('people')} icon={<Users size={14}/>} />
+                    <div className="ml-auto flex items-center gap-2 shrink-0">
+                      <select className="text-[10px] py-1 px-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" value={activeSite.scrivenerId || ""} onChange={e => updateActiveSite({ scrivenerId: e.target.value })}>
+                        <option value="">司法書士: 未選択</option>
+                        {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
+                      </select>
+                      <div className="flex items-center gap-0.5">
+                        <select className="text-[10px] py-1 px-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" defaultValue="" onChange={e => { if (e.target.value) window.open(e.target.value, '_blank'); e.target.value = ''; }}>
+                          <option value="" disabled>住居表示...</option>
+                          <option value="https://www.city.toyama.lg.jp/kurashi/sumai/1010276/1010278/1004569.html">富山市</option>
+                          <option value="https://www.city.takaoka.toyama.jp/soshiki/kyosomachizukurika/3/4/1/4564.html">高岡市</option>
+                          <option value="https://www.city.imizu.toyama.jp/faq/svFaqDtl.aspx?servno=438">射水市</option>
+                          <option value="https://www.city.tonami.lg.jp/info/35198p/#gsc.tab=0">砺波市</option>
+                          <option value="https://www.city.himi.toyama.jp/gyosei/soshiki/toshikeikaku/1/3/1297.html">氷見市</option>
+                          <option value="https://www.city.oyabe.toyama.jp/kurashi/1002358/1002377/1002379.html">小矢部市</option>
+                          <option value="https://www.city.uozu.toyama.jp/guide/svGuideDtl.aspx?servno=11441">魚津市</option>
+                          <option value="https://saigai.gsi.go.jp/jusho/view/pref/city/16206.html">滑川市</option>
+                        </select>
+                        <ExternalLink size={12} className="text-gray-400 shrink-0" />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-4 bg-gray-50/30 custom-scrollbar">
-                    <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm space-y-4">
-                      <h3 className="text-gray-700 text-sm font-bold flex items-center gap-2 border-b pb-2"><Info size={16} className="text-blue-500" /> 案件基本設定</h3>
-                      <div className="flex gap-4">
-                        <div className="w-[70%]">
-                          <label className="block text-[10px] font-bold text-gray-500 mb-1">連携司法書士</label>
-                          <select className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" value={activeSite.scrivenerId || ""} onChange={e => updateActiveSite({ scrivenerId: e.target.value })}>
-                            <option value="">(未選択)</option>
-                            {(scriveners || []).map(s => <option key={s.id} value={s.id}>{s.name || "(未入力)"}</option>)}
-                          </select>
-                        </div>
-                        <div className="w-[30%]">
-                          <label className="block text-[10px] font-bold text-gray-500 mb-1">住居表示の確認</label>
-                          <div className="flex items-center gap-1">
-                            <select className="flex-1 min-w-0 text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white" defaultValue="" onChange={e => { if (e.target.value) window.open(e.target.value, '_blank'); e.target.value = ''; }}>
-                              <option value="" disabled>市区町村を選択...</option>
-                              <option value="https://www.city.toyama.lg.jp/kurashi/sumai/1010276/1010278/1004569.html">富山市</option>
-                              <option value="https://www.city.takaoka.toyama.jp/soshiki/kyosomachizukurika/3/4/1/4564.html">高岡市</option>
-                              <option value="https://www.city.imizu.toyama.jp/faq/svFaqDtl.aspx?servno=438">射水市</option>
-                              <option value="https://www.city.tonami.lg.jp/info/35198p/#gsc.tab=0">砺波市</option>
-                              <option value="https://www.city.himi.toyama.jp/gyosei/soshiki/toshikeikaku/1/3/1297.html">氷見市</option>
-                              <option value="https://www.city.oyabe.toyama.jp/kurashi/1002358/1002377/1002379.html">小矢部市</option>
-                              <option value="https://www.city.uozu.toyama.jp/guide/svGuideDtl.aspx?servno=11441">魚津市</option>
-                              <option value="https://saigai.gsi.go.jp/jusho/view/pref/city/16206.html">滑川市</option>
-                            </select>
-                            <ExternalLink size={14} className="text-gray-400 shrink-0" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {activeTab === 'land_reg' && <LandSection site={activeSite} update={updateActiveSite} />}
+                    {activeTab === 'land_reg'&& <LandSection site={activeSite} update={updateActiveSite} />}
                     {activeTab === 'build_reg' && <BuildingSection type="registered" site={activeSite} update={updateActiveSite} />}
                     {activeTab === 'build_prop' && <BuildingSection type="proposed" site={activeSite} update={updateActiveSite} />}
                     {activeTab === 'people' && <PeopleSection site={activeSite} update={updateActiveSite} contractors={contractors} openMasterModal={() => setIsMasterModalOpen(true)} />}

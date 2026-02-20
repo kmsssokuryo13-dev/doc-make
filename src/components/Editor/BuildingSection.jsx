@@ -299,7 +299,7 @@ export const BuildingSection = ({ type, site, update }) => {
             </div>
             <div className="space-y-4 text-black">
               {(b.annexes || []).map(a => (
-                <div key={a.id} className="relative bg-gray-50/50 p-3 rounded-lg border border-dashed border-gray-200 font-sans text-black">
+                <div key={a.id} className="relative bg-orange-50/60 p-3 rounded-lg border border-dashed border-orange-200 font-sans text-black">
                   <div className="grid grid-cols-3 lg:grid-cols-4 gap-3 pr-8 text-black">
                     <FormField label="符号" value={a.symbol} onChange={v => updateAnnex(b.id, a.id, 'symbol', v)} autoConfirm />
                     <FormField label="種類" value={a.kind} onChange={v => updateAnnex(b.id, a.id, 'kind', v)} imeMode="active" />

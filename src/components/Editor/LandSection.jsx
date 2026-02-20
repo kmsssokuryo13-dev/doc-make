@@ -25,11 +25,19 @@ export const LandSection = ({ site, update }) => (
     </div>
     {naturalSortList(site.land || [], 'lotNumber').map((item) => (
       <div key={item.id} className="p-4 border border-gray-200 rounded-xl bg-white relative group shadow-sm hover:shadow-md transition-all font-sans text-black">
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-black">
-          <FormField label="所在" value={item.address} onChange={(v) => update(updateLandItem(site, item.id, { address: v }))} imeMode="active" />
-          <FormField label="地番" value={item.lotNumber} onChange={(v) => update(updateLandItem(site, item.id, { lotNumber: v }))} imeMode="active" />
-          <FormField label="地目" value={item.category} onChange={(v) => update(updateLandItem(site, item.id, { category: v }))} imeMode="active" />
-          <FormField label="地積" value={item.area} onChange={(v) => update(updateLandItem(site, item.id, { area: v }))} autoConfirm />
+        <div className="flex gap-4 text-black">
+          <div className="flex-[3]">
+            <FormField label="所在" value={item.address} onChange={(v) => update(updateLandItem(site, item.id, { address: v }))} imeMode="active" />
+          </div>
+          <div className="flex-[1]">
+            <FormField label="地番" value={item.lotNumber} onChange={(v) => update(updateLandItem(site, item.id, { lotNumber: v }))} imeMode="active" />
+          </div>
+          <div className="flex-[1]">
+            <FormField label="地目" value={item.category} onChange={(v) => update(updateLandItem(site, item.id, { category: v }))} imeMode="active" />
+          </div>
+          <div className="flex-[1]">
+            <FormField label="地積" value={item.area} onChange={(v) => update(updateLandItem(site, item.id, { area: v }))} autoConfirm />
+          </div>
         </div>
 
         <div className="mt-3">
