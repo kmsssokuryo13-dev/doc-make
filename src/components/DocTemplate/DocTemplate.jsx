@@ -445,70 +445,76 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-        <EditableDocBody
-          editable={!isPrint}
-          customHtml={pick.customText}
-          onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
-        >
-          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
-          <h3 style={{ fontSize: '11pt', margin: '2mm 0 0 0', fontWeight: 'bold' }}>変更前</h3>
-          <div style={{ fontSize: '11pt', marginBottom: '4mm' }}>
-            {beforeBuildings.map(b => (
-              <div key={b.id} style={{ marginBottom: '4mm' }}>
-                {(pick.showMain ?? true) && renderBldgForChange(b)}
-                {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
-                  <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+          <div style={{ position: 'relative' }}>
+            <EditableDocBody
+              editable={!isPrint}
+              customHtml={pick.customText}
+              onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
+            >
+              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
+              <h3 style={{ fontSize: '11pt', margin: '2mm 0 0 0', fontWeight: 'bold' }}>変更前</h3>
+              <div style={{ fontSize: '11pt', marginBottom: '4mm' }}>
+                {beforeBuildings.map(b => (
+                  <div key={b.id} style={{ marginBottom: '4mm' }}>
+                    {(pick.showMain ?? true) && renderBldgForChange(b)}
+                    {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                      <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+                    ))}
+                  </div>
+                ))}
+                {beforeBuildings.length === 0 && <div>　</div>}
+              </div>
+              <h3 style={{ fontSize: '11pt', margin: '0', fontWeight: 'bold' }}>変更後</h3>
+              <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+                {propsToUse.map(b => (
+                  <div key={b.id} style={{ marginBottom: '4mm' }}>
+                    {(pick.showMain ?? true) && renderBldgForChange(b)}
+                    {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
+                      <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
+                    ))}
+                  </div>
+                ))}
+                {propsToUse.length === 0 && <div>　</div>}
+              </div>
+
+              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
+              <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+                {filteredCauses.length > 0 ? filteredCauses.map(c => (
+                  <p key={c.id} style={{ margin: '0' }}>{c.date}{c.prefix}{c.cause}</p>
+                )) : <p style={{ margin: '0' }}>　</p>}
+              </div>
+
+              <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
+              <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
+                {(applicants || []).map(p => (
+                  <div key={p.id} style={{ margin: '0 0 2mm 0' }}>
+                    {renderOwnerWithDecedent(p, formatApplicantLine)}
+                  </div>
                 ))}
               </div>
-            ))}
-            {beforeBuildings.length === 0 && <div>　</div>}
-          </div>
-          <h3 style={{ fontSize: '11pt', margin: '0', fontWeight: 'bold' }}>変更後</h3>
-          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            {propsToUse.map(b => (
-              <div key={b.id} style={{ marginBottom: '4mm' }}>
-                {(pick.showMain ?? true) && renderBldgForChange(b)}
-                {(pick.showAnnex ?? true) && (b.annexes || []).map(a => (
-                  <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
-                ))}
+
+              <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
+                上記のとおり工事を完了して引渡したものであることを証明します。
+              </p>
+
+              <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
+                <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
               </div>
-            ))}
-            {propsToUse.length === 0 && <div>　</div>}
-          </div>
+              <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
-          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            {filteredCauses.length > 0 ? filteredCauses.map(c => (
-              <p key={c.id} style={{ margin: '0' }}>{c.date}{c.prefix}{c.cause}</p>
-            )) : <p style={{ margin: '0' }}>　</p>}
-          </div>
-
-          <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
-          <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-            {(applicants || []).map(p => (
-              <div key={p.id} style={{ margin: '0 0 2mm 0' }}>
-                {renderOwnerWithDecedent(p, formatApplicantLine)}
+              {targetContractor ? (
+              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
+                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
+                <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
               </div>
-            ))}
-          </div>
-
-          <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
-            上記のとおり工事を完了して引渡したものであることを証明します。
-          </p>
-
-          <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
-            <p>令和{toFullWidthDigits(currentYearReiwa)}年　　月　　日</p>
-          </div>
-          <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
-
-          {targetContractor ? (
-          <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
-            <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
-              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
-              <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
-              <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
-            </div>
-            <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+              ) : (
+              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
+                <p style={{ margin: '0' }}>　</p>
+              </div>
+              )}
+            </EditableDocBody>
+            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
               <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                 <DraggableSignerStamp
                   index={0}
@@ -520,20 +526,6 @@ export const DocTemplate = ({
               </div>
             </div>
           </div>
-          ) : (
-          <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
-            <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-              <DraggableSignerStamp
-                index={0}
-                dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                editable={!isPrint}
-                onChange={onSignerStampPosChange}
-              />
-            </div>
-          </div>
-          )}
-        </EditableDocBody>
         </div>
       </div>
     );

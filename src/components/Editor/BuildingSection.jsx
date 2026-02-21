@@ -132,11 +132,11 @@ export const BuildingSection = ({ type, site, update }) => {
                         onChange={v => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, year: v })}
                       />
                       <span className="text-[10px] font-bold text-gray-400">年</span>
-                      <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={b.registrationDate?.month || ""} placeholder="月"
+                      <DateInput className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={b.registrationDate?.month || ""} placeholder="月"
                         onChange={v => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, month: v })}
                       />
                       <span className="text-[10px] font-bold text-gray-400">月</span>
-                      <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={b.registrationDate?.day || ""} placeholder="日"
+                      <DateInput className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={b.registrationDate?.day || ""} placeholder="日"
                         onChange={v => updateBuild(b.id, 'registrationDate', { ...b.registrationDate, day: v })}
                       />
                       <span className="text-[10px] font-bold text-gray-400">日</span>
@@ -181,12 +181,12 @@ export const BuildingSection = ({ type, site, update }) => {
                           onChange={v => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, year: v } }; updateBuild(b.id, 'additionalCauses', next); }}
                         />
                         <span className="text-[10px] font-bold text-gray-400">年</span>
-                        <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.month || ""} placeholder="月"
-                          onChange={v => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, month: v } }; updateBuild(b.id, 'additionalCauses', next); }}
+                        <DateInput                        className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.month || ""} placeholder="月"
+                                                  onChange={v => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, month: v } }; updateBuild(b.id, 'additionalCauses', next); }}
                         />
                         <span className="text-[10px] font-bold text-gray-400">月</span>
-                        <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.day || ""} placeholder="日"
-                          onChange={v => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, day: v } }; updateBuild(b.id, 'additionalCauses', next); }}
+                        <DateInput                        className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.day || ""} placeholder="日"
+                                                  onChange={v => { const next = [...(b.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, day: v } }; updateBuild(b.id, 'additionalCauses', next); }}
                         />
                         <span className="text-[10px] font-bold text-gray-400">日</span>
                         <button
@@ -259,7 +259,7 @@ export const BuildingSection = ({ type, site, update }) => {
                           })}
                         />
                         <DateInput
-                          className="w-8 text-center text-sm p-1 border rounded text-black bg-white"
+                          className="w-10 text-center text-sm p-1 border rounded text-black bg-white"
                           value={b.confirmationCert?.date?.month ?? ""}
                           onChange={v => updateBuild(b.id, "confirmationCert", {
                             ...b.confirmationCert,
@@ -268,7 +268,7 @@ export const BuildingSection = ({ type, site, update }) => {
                         />
                         <span className="text-[10px] font-bold text-gray-400">月</span>
                         <DateInput
-                          className="w-8 text-center text-sm p-1 border rounded text-black bg-white"
+                          className="w-10 text-center text-sm p-1 border rounded text-black bg-white"
                           value={b.confirmationCert?.date?.day ?? ""}
                           onChange={v => updateBuild(b.id, "confirmationCert", {
                             ...b.confirmationCert,
@@ -336,11 +336,11 @@ export const BuildingSection = ({ type, site, update }) => {
                               onChange={v => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), year: v })}
                             />
                             <span className="text-[10px] font-bold text-gray-400">年</span>
-                            <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={a.registrationDate?.month || ""} placeholder="月"
+                            <DateInput className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={a.registrationDate?.month || ""} placeholder="月"
                               onChange={v => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), month: v })}
                             />
                             <span className="text-[10px] font-bold text-gray-400">月</span>
-                            <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={a.registrationDate?.day || ""} placeholder="日"
+                            <DateInput className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={a.registrationDate?.day || ""} placeholder="日"
                               onChange={v => updateAnnex(b.id, a.id, 'registrationDate', { ...(a.registrationDate || {}), day: v })}
                             />
                             <span className="text-[10px] font-bold text-gray-400">日</span>
@@ -381,12 +381,12 @@ export const BuildingSection = ({ type, site, update }) => {
                                 onChange={v => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, year: v } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
                               />
                               <span className="text-[10px] font-bold text-gray-400">年</span>
-                              <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.month || ""} placeholder="月"
-                                onChange={v => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, month: v } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
+                              <DateInput                              className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.month || ""} placeholder="月"
+                                                              onChange={v => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, month: v } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
                               />
                               <span className="text-[10px] font-bold text-gray-400">月</span>
-                              <DateInput className="w-8 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.day || ""} placeholder="日"
-                                onChange={v => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, day: v } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
+                              <DateInput                              className="w-10 text-center text-sm p-1 border rounded text-black bg-white" value={ac.date?.day || ""} placeholder="日"
+                                                              onChange={v => { const next = [...(a.additionalCauses || [])]; next[acIdx] = { ...ac, date: { ...ac.date, day: v } }; updateAnnex(b.id, a.id, 'additionalCauses', next); }}
                               />
                               <span className="text-[10px] font-bold text-gray-400">日</span>
                               <button
