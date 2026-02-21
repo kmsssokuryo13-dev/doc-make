@@ -44,19 +44,10 @@ const App = () => {
       }
     } catch (e) {}
 
-    const sample = sanitizeSiteData({
-      name: '令和7年表題登記サンプル案件',
-      proposedBuildings: [{
-        id: 'b1', address: '砺波市中神三丁目71番地2', houseNum: '101番1', kind: '居宅', struct: '木造合金メッキ鋼板ぶき2階建',
-        floorAreas: [{ id: 'f1', floor: '1階', area: '78.66' }, { id: 'f2', floor: '2階', area: '58.32' }], annexes: [],
-        registrationCause: "新築",
-        registrationDate: { era: "令和", year: "7", month: "1", day: "26", unknown: false }
-      }],
-      people: [{ id: 'p1', name: '上島 克之', address: '砺波市中神三丁目71番地', share: '1/1', roles: ["申請人"], role: "申請人" }]
-    });
+    const empty = sanitizeSiteData({ name: '新規案件' });
 
-    setSites([sample]);
-    setActiveSiteId(sample.id);
+    setSites([empty]);
+    setActiveSiteId(empty.id);
     didInitRef.current = true;
     setHydrated(true);
   }, []);
