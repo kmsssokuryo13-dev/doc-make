@@ -491,9 +491,7 @@ const parseKoukuOwner = (lines) => {
 
 const parseCoOwnersFromRightsText = (text) => {
   const owners = [];
-  const hwText = hw(text);
   const tokens = text.split(/\s+/).filter(Boolean);
-  const hwTokens = hwText.split(/\s+/).filter(Boolean);
 
   let i = 0;
   while (i < tokens.length) {
