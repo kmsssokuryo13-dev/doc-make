@@ -465,7 +465,7 @@ const parseKoukuOwner = (lines) => {
   if (!ownerEntry) {
     for (let i = entries.length - 1; i >= 0; i--) {
       const rt = entries[i].rightsCol.join(" ");
-      if (rt.includes("所有者")) {
+      if (rt.includes("所有者") || rt.includes("共有者")) {
         ownerEntry = entries[i];
         break;
       }
@@ -475,11 +475,90 @@ const parseKoukuOwner = (lines) => {
   if (!ownerEntry) return [];
 
   const rightsText = ownerEntry.rightsCol.join(" ");
-  const ownerMarkerIdx = rightsText.indexOf("所有者");
-  if (ownerMarkerIdx < 0) return [];
+  const kyoyushaIdx = rightsText.indexOf("共有者");
+  const shoyushaIdx = rightsText.indexOf("所有者");
 
-  const afterOwner = rightsText.slice(ownerMarkerIdx + 3).trim();
+  if (kyoyushaIdx >= 0) {
+    const afterKyoyusha = rightsText.slice(kyoyushaIdx + 3).trim();
+    return parseCoOwnersFromRightsText(afterKyoyusha);
+  }
+
+  if (shoyushaIdx < 0) return [];
+
+  const afterOwner = rightsText.slice(shoyushaIdx + 3).trim();
   return parseOwnerFromRightsText(afterOwner);
+};
+
+const parseCoOwnersFromRightsText = (text) => {
+  const owners = [];
+  const hwText = hw(text);
+  const tokens = text.split(/\s+/).filter(Boolean);
+  const hwTokens = hwText.split(/\s+/).filter(Boolean);
+
+  let i = 0;
+  while (i < tokens.length) {
+    let address = "";
+    let share = "";
+    let name = "";
+
+    // Collect address tokens (contain address-like kanji with 番地/号/丁目 etc.)
+    let addrParts = [];
+    while (i < tokens.length) {
+      const tok = tokens[i].replace(/\s+/g, "");
+      const hwTok = hw(tok);
+      if (/[番地号丁目]/.test(tok) || (/[都道府県市区町村郡]/.test(tok) && !/(持分|分の)/.test(tok))) {
+        addrParts.push(tok);
+        i++;
+      } else {
+        break;
+      }
+    }
+    address = addrParts.join("");
+
+    // Collect share (持分X分のY or X分のY)
+    while (i < tokens.length) {
+      const tok = tokens[i].replace(/\s+/g, "");
+      const hwTok = hw(tok);
+      if (/持分/.test(tok) || /\d+分の\d+/.test(hwTok)) {
+        const shareMatch = hwTok.match(/(\d+)分の(\d+)/);
+        if (shareMatch) {
+          share = `${toFullWidthDigits(shareMatch[2])}/${toFullWidthDigits(shareMatch[1])}`;
+        }
+        i++;
+      } else {
+        break;
+      }
+    }
+
+    // Next token should be the name
+    if (i < tokens.length) {
+      const tok = tokens[i].replace(/\s+/g, "");
+      const hwTok = hw(tok);
+      // Skip if it looks like an address (next owner) or share
+      if (!(/[番地号丁目]/.test(tok) && /[都道府県市区町村郡]/.test(tok)) && !/\d+分の\d+/.test(hwTok) && !/持分/.test(tok)) {
+        name = tok;
+        i++;
+      }
+    }
+
+    if (name || address) {
+      owners.push({
+        id: generateId(),
+        address,
+        name,
+        representative: "",
+        share,
+        roles: ["申請人"],
+        role: "申請人",
+        contractorMasterId: ""
+      });
+    } else {
+      // Skip unrecognized token to avoid infinite loop
+      i++;
+    }
+  }
+
+  return owners;
 };
 
 const parseOwnerFromRightsText = (text) => {
