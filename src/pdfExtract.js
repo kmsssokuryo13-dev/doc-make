@@ -445,7 +445,8 @@ const parseKoukuOwner = (lines) => {
     }
 
     if (currentEntry && rightsClean) {
-      if (!rightsClean.includes("移記") && !rightsClean.includes("法務省令")) {
+      if (!rightsClean.includes("移記") && !rightsClean.includes("法務省令") &&
+          !rightsClean.includes("転写")) {
         currentEntry.rightsCol.push(rightsClean);
       }
     }
@@ -532,9 +533,14 @@ const parseCoOwnersFromRightsText = (text) => {
     if (i < tokens.length) {
       const tok = tokens[i].replace(/\s+/g, "");
       const hwTok = hw(tok);
-      // Skip if it looks like an address (next owner) or share
-      if (!(/[番地号丁目]/.test(tok) && /[都道府県市区町村郡]/.test(tok)) && !/\d+分の\d+/.test(hwTok) && !/持分/.test(tok)) {
-        name = tok;
+      // Skip if it looks like an address (next owner), share, or registration metadata
+      if (!(/[番地号丁目]/.test(tok) && /[都道府県市区町村郡]/.test(tok)) && !/\d+分の\d+/.test(hwTok) && !/持分/.test(tok) &&
+          !/転写/.test(tok) && !/受付/.test(tok) && !/^第[\d０-９]+号$/.test(hwTok)) {
+        name = tok
+          .replace(/順位[０-９0-9]+番の登記を転写.*$/, "")
+          .replace(/(令和|平成|昭和|大正|明治)[０-９0-9]+年[０-９0-9]+月[０-９0-9]+日受付.*$/, "")
+          .replace(/第[０-９0-9]+号.*$/, "")
+          .trim();
         i++;
       }
     }
@@ -578,6 +584,12 @@ const parseOwnerFromRightsText = (text) => {
       name = text;
     }
   }
+
+  name = name
+    .replace(/\s*順位[０-９0-9]+番の登記を転写.*$/, "")
+    .replace(/\s*(令和|平成|昭和|大正|明治)[０-９0-9]+年[０-９0-9]+月[０-９0-9]+日受付.*$/, "")
+    .replace(/\s*第[０-９0-9]+号.*$/, "")
+    .trim();
 
   if (name || address) {
     const hwText = hw(text);
