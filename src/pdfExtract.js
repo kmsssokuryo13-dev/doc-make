@@ -166,6 +166,23 @@ const parseFloorAreaCol = (rawCol) => {
   return null;
 };
 
+const finalizeAnnexStruct = (annex) => {
+  const rawStruct = annex._rawStruct || "";
+  if (rawStruct) {
+    const hwS = hw(rawStruct);
+    const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
+    if (fm) {
+      const idx = hwS.lastIndexOf(fm[0]);
+      annex.structMaterial = rawStruct.slice(0, idx);
+      annex.structFloor = rawStruct.slice(idx);
+    } else {
+      annex.structMaterial = rawStruct;
+    }
+    annex.struct = annex.structMaterial + annex.structFloor;
+  }
+  delete annex._rawStruct;
+};
+
 const parseAnnexSection = (lines) => {
   const annexes = [];
   let dataHeaderIdx = -1;
@@ -182,7 +199,7 @@ const parseAnnexSection = (lines) => {
   for (let i = dataHeaderIdx + 1; i < lines.length; i++) {
     const line = lines[i];
     if (isRowSeparator(line)) {
-      if (current) { annexes.push(current); current = null; }
+      if (current) { finalizeAnnexStruct(current); annexes.push(current); current = null; }
       continue;
     }
     const stripped = stripBorders(line).replace(/[\s\u3000]+/g, "");
@@ -197,10 +214,11 @@ const parseAnnexSection = (lines) => {
     const col3raw = cols[3] || "";
 
     if (col0 && /[０-９\d]/.test(col0)) {
-      if (current) annexes.push(current);
+      if (current) { finalizeAnnexStruct(current); annexes.push(current); }
       current = {
         id: generateId(), symbol: toFullWidthDigits(col0), kind: "",
         structMaterial: "", structFloor: "", struct: "",
+        _rawStruct: "",
         hasBasement: false, floorAreas: [],
         registrationCause: "",
         registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
@@ -211,6 +229,7 @@ const parseAnnexSection = (lines) => {
       current = {
         id: generateId(), symbol: "", kind: "",
         structMaterial: "", structFloor: "", struct: "",
+        _rawStruct: "",
         hasBasement: false, floorAreas: [],
         registrationCause: "",
         registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
@@ -218,33 +237,30 @@ const parseAnnexSection = (lines) => {
       };
     }
 
-    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind = col1;
-    if (col2 && col2 !== "余白" && HAS_KANJI_RE.test(col2)) {
-      const hwS = hw(col2);
-      const fm = hwS.match(/(地下\d+階付)?(平家建|\d+階建)$/);
-      if (fm) {
-        const idx = hwS.lastIndexOf(fm[0]);
-        current.structMaterial = col2.slice(0, idx);
-        current.structFloor = col2.slice(idx);
-      } else {
-        current.structMaterial = col2;
-      }
-      current.struct = current.structMaterial + current.structFloor;
-    }
+    if (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) current.kind += col1;
+    if (col2 && col2 !== "余白" && HAS_KANJI_RE.test(col2)) current._rawStruct += col2;
     const fa = parseFloorAreaCol(col3raw);
     if (fa) {
       current.floorAreas.push(fa);
       current.hasBasement = current.floorAreas.some(f => f.floor.includes("地下"));
     }
   }
-  if (current) annexes.push(current);
+  if (current) { finalizeAnnexStruct(current); annexes.push(current); }
 
   for (const a of annexes) {
     if (a.floorAreas.length === 0) {
       a.floorAreas.push({ id: generateId(), floor: "１階", area: "" });
     }
   }
-  return annexes;
+
+  // Deduplicate by symbol - keep only the last (latest) entry for each symbol
+  const symbolMap = new Map();
+  for (const a of annexes) {
+    if (a.symbol) {
+      symbolMap.set(a.symbol, a);
+    }
+  }
+  return [...symbolMap.values()];
 };
 
 const parseHyodaiBuilding = (lines) => {
