@@ -196,10 +196,26 @@ const parseAnnexSection = (lines) => {
   if (dataHeaderIdx < 0) return annexes;
 
   let current = null;
+  let sawSeparator = false;
   for (let i = dataHeaderIdx + 1; i < lines.length; i++) {
     const line = lines[i];
     if (isRowSeparator(line)) {
-      if (current) { finalizeAnnexStruct(current); annexes.push(current); current = null; }
+      // Extract any kanji content embedded in the separator line (e.g. "室" merged with borders)
+      if (current) {
+        const sepCols = splitColumns(line);
+        if (sepCols.length >= 4) {
+          const sc1 = clean(sepCols[1]);
+          const sc2 = clean(sepCols[2]);
+          if (sc1 && sc1 !== "余白" && HAS_KANJI_RE.test(sc1)) current.kind += sc1;
+          if (sc2 && sc2 !== "余白" && HAS_KANJI_RE.test(sc2)) current._rawStruct += sc2;
+          const sfa = parseFloorAreaCol(sepCols[3] || "");
+          if (sfa) {
+            current.floorAreas.push(sfa);
+            current.hasBasement = current.floorAreas.some(f => f.floor.includes("地下"));
+          }
+        }
+      }
+      sawSeparator = true;
       continue;
     }
     const stripped = stripBorders(line).replace(/[\s\u3000]+/g, "");
@@ -213,7 +229,22 @@ const parseAnnexSection = (lines) => {
     const col2 = clean(cols[2]);
     const col3raw = cols[3] || "";
 
-    if (col0 && /[０-９\d]/.test(col0)) {
+    const isNewSymbol = col0 && /[０-９\d]/.test(col0);
+    const hasContent = (col1 && col1 !== "余白" && HAS_KANJI_RE.test(col1)) ||
+                       (col2 && col2 !== "余白" && HAS_KANJI_RE.test(col2));
+
+    // On row separator + new symbol, finalize previous entry
+    if (sawSeparator && isNewSymbol) {
+      if (current) { finalizeAnnexStruct(current); annexes.push(current); current = null; }
+    }
+    // On row separator + continuation line (no new symbol and no content),
+    // finalize previous entry
+    if (sawSeparator && !isNewSymbol && !hasContent) {
+      if (current) { finalizeAnnexStruct(current); annexes.push(current); current = null; }
+    }
+    sawSeparator = false;
+
+    if (isNewSymbol) {
       if (current) { finalizeAnnexStruct(current); annexes.push(current); }
       current = {
         id: generateId(), symbol: toFullWidthDigits(col0), kind: "",
