@@ -1479,7 +1479,11 @@ ${styles}
                           const container = document.querySelector('.document-container');
                           if (container && container.contains(range.startContainer)) {
                             window.__savedFontRange = range.cloneRange();
+                          } else {
+                            window.__savedFontRange = null;
                           }
+                        } else {
+                          window.__savedFontRange = null;
                         }
                       }}
                       onChange={e => {
@@ -1504,10 +1508,7 @@ ${styles}
                             const resetRange = sel.getRangeAt(0);
                             container.querySelectorAll('span').forEach(span => {
                               if (!span.style.fontSize) return;
-                              const spanRange = document.createRange();
-                              spanRange.selectNodeContents(span);
-                              if (resetRange.compareBoundaryPoints(Range.END_TO_START, spanRange) < 0 &&
-                                  resetRange.compareBoundaryPoints(Range.START_TO_END, spanRange) > 0) {
+                              if (resetRange.intersectsNode(span)) {
                                 while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
                                 span.remove();
                               }
