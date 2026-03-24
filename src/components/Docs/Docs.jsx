@@ -1491,7 +1491,14 @@ ${styles}
                         sel.removeAllRanges();
                         sel.addRange(savedRange);
                         if (pct === 100) {
-                          document.execCommand('removeFormat', false, null);
+                          document.execCommand('fontSize', false, '7');
+                          const container = document.querySelector('.document-container');
+                          if (container) {
+                            container.querySelectorAll('font[size="7"]').forEach(font => {
+                              while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
+                              font.remove();
+                            });
+                          }
                         } else {
                           document.execCommand('fontSize', false, '7');
                           const container = document.querySelector('.document-container');
