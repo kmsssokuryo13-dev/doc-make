@@ -13,7 +13,7 @@ import { DraggableSignerStamp } from './DraggableSignerStamp.jsx';
 
 export const DocTemplate = ({
   name, siteData, instanceKey, pick, onPickChange,
-  onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners
+  onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners, scale = 1
 }) => {
   const allApplicants = useMemo(
     () => (siteData.people || []).filter(p => (p.roles || []).includes("申請人")),
@@ -289,7 +289,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {(() => {
             const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })()}
         </div>
 
@@ -360,6 +360,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
+                  scale={scale}
                 />
               </div>
             </div>
@@ -431,7 +432,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {(() => {
             const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })()}
         </div>
 
@@ -522,6 +523,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
+                  scale={scale}
                 />
               </div>
             </div>
@@ -557,7 +559,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {(() => {
             const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })()}
         </div>
 
@@ -635,6 +637,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
+                  scale={scale}
                 />
               </div>
             </div>
@@ -648,6 +651,7 @@ export const DocTemplate = ({
                 dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                 editable={!isPrint}
                 onChange={onSignerStampPosChange}
+                scale={scale}
               />
             </div>
           </div>
@@ -727,7 +731,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {(() => {
             const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })()}
         </div>
 
@@ -809,6 +813,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
+                  scale={scale}
                 />
               </div>
             </div>
@@ -822,6 +827,7 @@ export const DocTemplate = ({
                 dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                 editable={!isPrint}
                 onChange={onSignerStampPosChange}
+                scale={scale}
               />
             </div>
           </div>
@@ -960,7 +966,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {signers.map((_, i) => {
             const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })}
         </div>
 
@@ -1037,7 +1043,7 @@ export const DocTemplate = ({
                   <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
+                      editable={!isPrint} onChange={onSignerStampPosChange} scale={scale}
                     />
                   </div>
                 );
@@ -1731,7 +1737,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {(statementPeople || []).map((_, i) => {
             const pos = (pick.stampPositions || []).find(p => p.i === i) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-${i}`} index={i} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })}
         </div>
 
@@ -1794,7 +1800,7 @@ export const DocTemplate = ({
                   <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
+                      editable={!isPrint} onChange={onSignerStampPosChange} scale={scale}
                     />
                   </div>
                 );
@@ -1842,7 +1848,7 @@ export const DocTemplate = ({
         <div className="stamp-area">
           {(() => {
             const pos = (pick.stampPositions || []).find(p => p.i === 0) || { dx: 0, dy: 0 };
-            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} />;
+            return <DraggableStamp key={`topstamp-0`} index={0} dx={pos.dx} dy={pos.dy} editable={!isPrint} onChange={onStampPosChange} scale={scale} />;
           })()}
         </div>
 
@@ -1908,7 +1914,7 @@ export const DocTemplate = ({
                   <div key={p?.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
+                      editable={!isPrint} onChange={onSignerStampPosChange} scale={scale}
                     />
                   </div>
                 );

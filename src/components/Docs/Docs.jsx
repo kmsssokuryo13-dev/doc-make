@@ -1506,7 +1506,7 @@ ${styles}
                         <div style={{ position: 'absolute', top: 0, left: 0, width: `${invScale * 100}%`, height: `${invScale * 100}%`, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
                           <DocTemplate name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                              instanceKey={activeInstanceKey}
-                            pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} />
+                            pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} scale={scale} />
                         </div>
                       );
                     })()}
