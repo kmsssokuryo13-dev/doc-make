@@ -45,7 +45,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     combineBeforeBuildingIds: [],
     combinePurpose: "combineOnly",
     saleBuildingSource: "proposed",
-    saleSellerPersonIds: []
+    saleSellerPersonIds: [],
+    fontScale: 100
   };
 
   const allInstances = useMemo(() => {
@@ -312,11 +313,14 @@ ${styles}
       `}</style>
 
       <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}><div id="print-area">
-        {printInstances.map((inst, i) => (
-          <div key={inst.key} data-doc-name={inst.name} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative`}>
-            <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={siteData?.docPick?.[inst.key] || DEFAULT_PICK} isPrint={true} scriveners={scriveners} />
-          </div>
-        ))}
+        {printInstances.map((inst, i) => {
+          const instPick = siteData?.docPick?.[inst.key] || DEFAULT_PICK;
+          return (
+            <div key={inst.key} data-doc-name={inst.name} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative overflow-hidden`}>
+                <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={instPick} isPrint={true} scriveners={scriveners} />
+            </div>
+          );
+        })}
       </div></div>
 
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-30">
@@ -1463,6 +1467,90 @@ ${styles}
                     );
                   })()}
 
+                  <div className="border-t pt-2">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1">文字サイズ（選択テキスト）</label>
+                    <select
+                      className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                      value={activePick.fontScale || 100}
+                      onMouseDown={() => {
+                        const sel = window.getSelection();
+                        if (sel.rangeCount > 0 && sel.toString().length > 0) {
+                          const range = sel.getRangeAt(0);
+                          const container = document.querySelector('.document-container');
+                          if (container && container.contains(range.startContainer)) {
+                            window.__savedFontRange = range.cloneRange();
+                          } else {
+                            window.__savedFontRange = null;
+                          }
+                        } else {
+                          window.__savedFontRange = null;
+                        }
+                      }}
+                      onChange={e => {
+                        const pct = Number(e.target.value);
+                        const savedRange = window.__savedFontRange;
+                        if (!savedRange || savedRange.toString().length === 0) {
+                          handlePickChange(activeInstanceKey, { fontScale: pct });
+                          return;
+                        }
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(savedRange);
+                        if (pct === 100) {
+                          document.execCommand('fontSize', false, '7');
+                          const container = document.querySelector('.document-container');
+                          if (container) {
+                            container.querySelectorAll('font[size="7"]').forEach(font => {
+                              while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
+                              font.remove();
+                            });
+                            // Only remove font-size spans that intersect with the selection range
+                            const resetRange = sel.getRangeAt(0);
+                            container.querySelectorAll('span').forEach(span => {
+                              if (!span.style.fontSize) return;
+                              if (resetRange.intersectsNode(span)) {
+                                while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+                                span.remove();
+                              }
+                            });
+                          }
+                        } else {
+                          document.execCommand('fontSize', false, '7');
+                          const container = document.querySelector('.document-container');
+                          if (container) {
+                            container.querySelectorAll('font[size="7"]').forEach(font => {
+                              const span = document.createElement('span');
+                              span.style.fontSize = pct + '%';
+                              while (font.firstChild) span.appendChild(font.firstChild);
+                              font.replaceWith(span);
+                            });
+                          }
+                        }
+                        const node = savedRange.startContainer;
+                        const editableEl = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest?.('[contenteditable]');
+                        let customHtml = null;
+                        if (editableEl) {
+                          const clone = editableEl.cloneNode(true);
+                          clone.querySelectorAll('[contenteditable="false"]').forEach(el => el.remove());
+                          customHtml = clone.innerHTML;
+                        }
+                        handlePickChange(activeInstanceKey, { fontScale: pct, customText: customHtml });
+                        window.__savedFontRange = null;
+                      }}
+                    >
+                      <option value={80}>80%</option>
+                      <option value={85}>85%</option>
+                      <option value={90}>90%</option>
+                      <option value={95}>95%</option>
+                      <option value={100}>100%（標準）</option>
+                      <option value={105}>105%</option>
+                      <option value={110}>110%</option>
+                      <option value={115}>115%</option>
+                      <option value={120}>120%</option>
+                    </select>
+                    <p className="text-[9px] text-gray-400 mt-1">テキストを選択してからサイズを変更</p>
+                  </div>
+
                   <div className="border-t pt-2 space-y-2 font-sans font-bold"><button onClick={() => handlePickChange(activeInstanceKey, { customText: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 文言をリセット</button><button onClick={() => handlePickChange(activeInstanceKey, { stampPositions: null, signerStampPositions: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 位置をリセット</button></div>
                 </div>
               )}
@@ -1471,7 +1559,7 @@ ${styles}
             <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scrollbar bg-slate-200 shadow-inner rounded-xl">
               {activeInstance ? (
                 <div className="p-10">
-                  <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative">
+                  <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden">
                     <DocTemplate name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                        instanceKey={activeInstanceKey}
                       pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} />

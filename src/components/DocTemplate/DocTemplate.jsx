@@ -360,7 +360,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -522,7 +522,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -635,7 +635,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -648,7 +648,7 @@ export const DocTemplate = ({
                 dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                 editable={!isPrint}
                 onChange={onSignerStampPosChange}
-              />
+                             />
             </div>
           </div>
           )}
@@ -809,7 +809,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -822,7 +822,7 @@ export const DocTemplate = ({
                 dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                 editable={!isPrint}
                 onChange={onSignerStampPosChange}
-              />
+                             />
             </div>
           </div>
           )}
@@ -1037,8 +1037,7 @@ export const DocTemplate = ({
                   <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
-                    />
+                      editable={!isPrint} onChange={onSignerStampPosChange}                    />
                   </div>
                 );
               })}
@@ -1794,8 +1793,7 @@ export const DocTemplate = ({
                   <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
-                    />
+                      editable={!isPrint} onChange={onSignerStampPosChange}                    />
                   </div>
                 );
               })}
@@ -1908,8 +1906,7 @@ export const DocTemplate = ({
                   <div key={p?.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange}
-                    />
+                      editable={!isPrint} onChange={onSignerStampPosChange}                    />
                   </div>
                 );
               })}
