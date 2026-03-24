@@ -1484,9 +1484,11 @@ ${styles}
                       }}
                       onChange={e => {
                         const pct = Number(e.target.value);
-                        handlePickChange(activeInstanceKey, { fontScale: pct });
                         const savedRange = window.__savedFontRange;
-                        if (!savedRange || savedRange.toString().length === 0) return;
+                        if (!savedRange || savedRange.toString().length === 0) {
+                          handlePickChange(activeInstanceKey, { fontScale: pct });
+                          return;
+                        }
                         const sel = window.getSelection();
                         sel.removeAllRanges();
                         sel.addRange(savedRange);
@@ -1497,6 +1499,12 @@ ${styles}
                             container.querySelectorAll('font[size="7"]').forEach(font => {
                               while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
                               font.remove();
+                            });
+                            container.querySelectorAll('span').forEach(span => {
+                              if (span.style.fontSize) {
+                                while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+                                span.remove();
+                              }
                             });
                           }
                         } else {
@@ -1513,9 +1521,13 @@ ${styles}
                         }
                         const node = savedRange.startContainer;
                         const editableEl = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest?.('[contenteditable]');
+                        let customHtml = null;
                         if (editableEl) {
-                          editableEl.dispatchEvent(new Event('input', { bubbles: true }));
+                          const clone = editableEl.cloneNode(true);
+                          clone.querySelectorAll('[contenteditable="false"]').forEach(el => el.remove());
+                          customHtml = clone.innerHTML;
                         }
+                        handlePickChange(activeInstanceKey, { fontScale: pct, customText: customHtml });
                         window.__savedFontRange = null;
                       }}
                     >
