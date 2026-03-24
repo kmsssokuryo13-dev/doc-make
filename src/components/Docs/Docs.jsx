@@ -1500,8 +1500,14 @@ ${styles}
                               while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
                               font.remove();
                             });
+                            // Only remove font-size spans that intersect with the selection range
+                            const resetRange = sel.getRangeAt(0);
                             container.querySelectorAll('span').forEach(span => {
-                              if (span.style.fontSize) {
+                              if (!span.style.fontSize) return;
+                              const spanRange = document.createRange();
+                              spanRange.selectNodeContents(span);
+                              if (resetRange.compareBoundaryPoints(Range.END_TO_START, spanRange) < 0 &&
+                                  resetRange.compareBoundaryPoints(Range.START_TO_END, spanRange) > 0) {
                                 while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
                                 span.remove();
                               }
