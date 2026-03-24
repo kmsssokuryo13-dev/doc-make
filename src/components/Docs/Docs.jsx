@@ -1493,60 +1493,53 @@ ${styles}
                           handlePickChange(activeInstanceKey, { fontScale: pct });
                           return;
                         }
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(savedRange);
+                        const container = document.querySelector('.document-container');
+                        if (!container) return;
+                        // Find the contenteditable element from the saved range
+                        const startNode = savedRange.startContainer;
+                        const editableEl = (startNode.nodeType === Node.TEXT_NODE ? startNode.parentElement : startNode)?.closest?.('[contenteditable="true"]');
+                        if (!editableEl) return;
                         if (pct === 100) {
-                          document.execCommand('fontSize', false, '7');
-                          const container = document.querySelector('.document-container');
-                          if (container) {
-                            container.querySelectorAll('font[size="7"]').forEach(font => {
-                              while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
-                              font.remove();
-                            });
-                            // Only remove font-size spans that intersect with the selection range
-                            const resetRange = sel.getRangeAt(0);
-                            container.querySelectorAll('span').forEach(span => {
-                              if (!span.style.fontSize) return;
-                              if (resetRange.intersectsNode(span)) {
-                                while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
-                                span.remove();
-                              }
-                            });
-                          }
+                          // Remove font-size spans that intersect with the saved range
+                          const spansToRemove = [];
+                          editableEl.querySelectorAll('span').forEach(span => {
+                            if (!span.style.fontSize) return;
+                            if (savedRange.intersectsNode(span)) {
+                              spansToRemove.push(span);
+                            }
+                          });
+                          spansToRemove.forEach(span => {
+                            while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+                            span.remove();
+                          });
                         } else {
-                          document.execCommand('fontSize', false, '7');
-                          const container = document.querySelector('.document-container');
-                          if (container) {
-                            container.querySelectorAll('font[size="7"]').forEach(font => {
-                              const span = document.createElement('span');
-                              span.style.fontSize = pct + '%';
-                              while (font.firstChild) span.appendChild(font.firstChild);
-                              font.replaceWith(span);
-                            });
-                          }
+                          // Wrap the selected text directly in a <span> with font-size
+                          const contents = savedRange.extractContents();
+                          // Remove any existing font-size spans inside the extracted content
+                          contents.querySelectorAll('span[style]').forEach(span => {
+                            if (span.style.fontSize) {
+                              while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+                              span.remove();
+                            }
+                          });
+                          const wrapper = document.createElement('span');
+                          wrapper.style.fontSize = pct + '%';
+                          wrapper.appendChild(contents);
+                          savedRange.insertNode(wrapper);
                         }
-                        const node = savedRange.startContainer;
-                        const editableEl = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest?.('[contenteditable]');
-                        let customHtml = null;
-                        if (editableEl) {
-                          const clone = editableEl.cloneNode(true);
-                          clone.querySelectorAll('[contenteditable="false"]').forEach(el => el.remove());
-                          customHtml = clone.innerHTML;
-                        }
-                        handlePickChange(activeInstanceKey, { fontScale: pct, customText: customHtml });
+                        // Dispatch input event so EditableDocBody captures the change
+                        editableEl.dispatchEvent(new Event('input', { bubbles: true }));
+                        // Capture the modified HTML
+                        const clone = editableEl.cloneNode(true);
+                        clone.querySelectorAll('[contenteditable="false"]').forEach(el => el.remove());
+                        const customHtml = clone.innerHTML;
+                        handlePickChange(activeInstanceKey, { fontScale: 100, customText: customHtml });
                         window.__savedFontRange = null;
                       }}
                     >
-                      <option value={80}>80%</option>
-                      <option value={85}>85%</option>
-                      <option value={90}>90%</option>
-                      <option value={95}>95%</option>
-                      <option value={100}>100%（標準）</option>
-                      <option value={105}>105%</option>
-                      <option value={110}>110%</option>
-                      <option value={115}>115%</option>
-                      <option value={120}>120%</option>
+                      {Array.from({ length: 21 }, (_, i) => 90 + i).map(v => (
+                        <option key={v} value={v}>{v === 100 ? '100%（標準）' : `${v}%`}</option>
+                      ))}
                     </select>
                     <p className="text-[9px] text-gray-400 mt-1">テキストを選択してからサイズを変更</p>
                   </div>
