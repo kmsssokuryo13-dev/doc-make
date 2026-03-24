@@ -13,7 +13,7 @@ import { DraggableSignerStamp } from './DraggableSignerStamp.jsx';
 
 export const DocTemplate = ({
   name, siteData, instanceKey, pick, onPickChange,
-  onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners, scale = 1
+  onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners
 }) => {
   const allApplicants = useMemo(
     () => (siteData.people || []).filter(p => (p.roles || []).includes("申請人")),
@@ -360,8 +360,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                  scale={scale}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -523,8 +522,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                  scale={scale}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -637,8 +635,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                  scale={scale}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -651,8 +648,7 @@ export const DocTemplate = ({
                 dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                 editable={!isPrint}
                 onChange={onSignerStampPosChange}
-                scale={scale}
-              />
+                             />
             </div>
           </div>
           )}
@@ -813,8 +809,7 @@ export const DocTemplate = ({
                   dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                   editable={!isPrint}
                   onChange={onSignerStampPosChange}
-                  scale={scale}
-                />
+                                 />
               </div>
             </div>
           </div>
@@ -827,8 +822,7 @@ export const DocTemplate = ({
                 dy={(pick.signerStampPositions?.[0]?.dy || 0)}
                 editable={!isPrint}
                 onChange={onSignerStampPosChange}
-                scale={scale}
-              />
+                             />
             </div>
           </div>
           )}
@@ -1043,8 +1037,7 @@ export const DocTemplate = ({
                   <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange} scale={scale}
-                    />
+                      editable={!isPrint} onChange={onSignerStampPosChange}                    />
                   </div>
                 );
               })}
@@ -1800,8 +1793,7 @@ export const DocTemplate = ({
                   <div key={p.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange} scale={scale}
-                    />
+                      editable={!isPrint} onChange={onSignerStampPosChange}                    />
                   </div>
                 );
               })}
@@ -1914,8 +1906,7 @@ export const DocTemplate = ({
                   <div key={p?.id || i} style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
                     <DraggableSignerStamp
                       index={i} dx={pos.dx} dy={pos.dy}
-                      editable={!isPrint} onChange={onSignerStampPosChange} scale={scale}
-                    />
+                      editable={!isPrint} onChange={onSignerStampPosChange}                    />
                   </div>
                 );
               })}

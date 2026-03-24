@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Move } from 'lucide-react';
 
-export const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange, scale = 1 }) => {
+export const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange }) => {
   const [isDragging, setIsDragging] = useState(false);
   const dragOrigin = useRef({ x: 0, y: 0 });
   const dragAxis = useRef(null);
@@ -36,7 +36,7 @@ export const DraggableStamp = ({ index, dx = 0, dy = 0, editable, onChange, scal
       dragAxis.current = null;
     }
     const snap = v => Math.round(v / 7) * 7;
-    onChange?.(index, snap(startDxDy.current.dx + diffX / scale), snap(startDxDy.current.dy + diffY / scale));
+    onChange?.(index, snap(startDxDy.current.dx + diffX), snap(startDxDy.current.dy + diffY));
   };
 
   const stopDrag = () => { setIsDragging(false); dragAxis.current = null; };
