@@ -1493,25 +1493,20 @@ ${styles}
                           handlePickChange(activeInstanceKey, { fontScale: pct });
                           return;
                         }
-                        const container = document.querySelector('.document-container');
-                        if (!container) return;
                         // Find the contenteditable element from the saved range
                         const startNode = savedRange.startContainer;
                         const editableEl = (startNode.nodeType === Node.TEXT_NODE ? startNode.parentElement : startNode)?.closest?.('[contenteditable="true"]');
                         if (!editableEl) return;
                         if (pct === 100) {
-                          // Remove font-size spans that intersect with the saved range
-                          const spansToRemove = [];
-                          editableEl.querySelectorAll('span').forEach(span => {
-                            if (!span.style.fontSize) return;
-                            if (savedRange.intersectsNode(span)) {
-                              spansToRemove.push(span);
+                          // Extract selected content, strip font-size spans, re-insert
+                          const contents = savedRange.extractContents();
+                          contents.querySelectorAll('span[style]').forEach(span => {
+                            if (span.style.fontSize) {
+                              while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+                              span.remove();
                             }
                           });
-                          spansToRemove.forEach(span => {
-                            while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
-                            span.remove();
-                          });
+                          savedRange.insertNode(contents);
                         } else {
                           // Wrap the selected text directly in a <span> with font-size
                           const contents = savedRange.extractContents();
