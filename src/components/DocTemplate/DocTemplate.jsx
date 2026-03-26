@@ -567,7 +567,7 @@ export const DocTemplate = ({
             margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
           }}
         >
-          建物取壊し証明書
+          建物滅失証明書
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
@@ -737,7 +737,7 @@ export const DocTemplate = ({
             margin: '0', position: 'absolute', left: '0', right: '0', top: '40mm'
           }}
         >
-          建物取壊し証明書
+          建物滅失証明書
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
