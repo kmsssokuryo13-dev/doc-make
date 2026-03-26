@@ -947,8 +947,7 @@ export const DocTemplate = ({
           </div>
 
           <div style={{ fontSize: '12pt', marginTop: 'auto', marginLeft: 'auto', width: 'fit-content' }}>
-            <p style={{ margin: '0 0 2mm 0' }}>{linkedScrivener?.address || "　"}</p>
-            <p style={{ margin: '0' }}>土地家屋調査士　{linkedScrivener?.name || "　"}</p>
+            <p style={{ margin: '0' }}>土地家屋調査士</p>
           </div>
         </EditableDocBody>
         </div>
