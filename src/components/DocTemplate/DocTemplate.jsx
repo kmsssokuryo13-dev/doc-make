@@ -341,28 +341,38 @@ export const DocTemplate = ({
               <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
               {targetContractor ? (
-              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
-                <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
+              <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
+                <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
+                  <p style={{ margin: '0 0 2mm 0' }}>住所　{targetContractor.address || "　"}</p>
+                  <p style={{ margin: '0 0 2mm 0' }}>氏名　{targetContractor.name || "　"}</p>
+                  <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
+                </div>
+                <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+                  <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                    <DraggableSignerStamp
+                      index={0}
+                      dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                      dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                      editable={!isPrint}
+                      onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                </div>
               </div>
               ) : (
-              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0' }}>　</p>
+              <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
+                <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                  <DraggableSignerStamp
+                    index={0}
+                    dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                    dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                    editable={!isPrint}
+                    onChange={onSignerStampPosChange}
+                  />
+                </div>
               </div>
               )}
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                                 />
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -503,28 +513,38 @@ export const DocTemplate = ({
               <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
               {targetContractor ? (
-              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>{targetContractor.name || "　"}</p>
-                <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
+              <div style={{ position: 'relative', width: 'fit-content', marginTop: '5mm' }}>
+                <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
+                  <p style={{ margin: '0 0 2mm 0' }}>住所　{targetContractor.address || "　"}</p>
+                  <p style={{ margin: '0 0 2mm 0' }}>氏名　{targetContractor.name || "　"}</p>
+                  <p style={{ margin: '0' }}>{targetContractor.representative || "　"}</p>
+                </div>
+                <div contentEditable={false} style={{ position: 'absolute', top: 0, right: 0 }}>
+                  <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                    <DraggableSignerStamp
+                      index={0}
+                      dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                      dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                      editable={!isPrint}
+                      onChange={onSignerStampPosChange}
+                    />
+                  </div>
+                </div>
               </div>
               ) : (
-              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0' }}>　</p>
+              <div contentEditable={false} style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5mm' }}>
+                <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+                  <DraggableSignerStamp
+                    index={0}
+                    dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+                    dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+                    editable={!isPrint}
+                    onChange={onSignerStampPosChange}
+                  />
+                </div>
               </div>
               )}
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                                 />
-              </div>
-            </div>
           </div>
         </div>
       </div>
