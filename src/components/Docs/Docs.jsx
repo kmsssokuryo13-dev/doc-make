@@ -262,21 +262,24 @@ ${styles}
     return true;
   };
 
-  const printDocNames = useMemo(() => {
-    const uniqueNames = [];
-    printInstances.forEach(inst => { if (!uniqueNames.includes(inst.name)) uniqueNames.push(inst.name); });
-    return uniqueNames;
+  const printDocEntries = useMemo(() => {
+    const nameCount = {};
+    printInstances.forEach(inst => { nameCount[inst.name] = (nameCount[inst.name] || 0) + 1; });
+    return printInstances.map(inst => ({
+      key: inst.key,
+      label: nameCount[inst.name] > 1 ? `${inst.name}${inst.index}` : inst.name
+    }));
   }, [printInstances]);
 
-  const printSingleDoc = (name) => {
+  const printSingleDoc = (docKey, title) => {
     const el = document.getElementById("print-area");
     if (!el) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
         .map(s => s.outerHTML).join('\n');
-      const pages = Array.from(el.children).filter(c => c.dataset.docName === name);
+      const pages = Array.from(el.children).filter(c => c.dataset.docKey === docKey);
       if (!pages.length) return;
-      if (!openPrintWindowForDoc(pages, name, styles)) {
+      if (!openPrintWindowForDoc(pages, title, styles)) {
         alert("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
       }
     }));
@@ -316,7 +319,7 @@ ${styles}
         {printInstances.map((inst, i) => {
           const instPick = siteData?.docPick?.[inst.key] || DEFAULT_PICK;
           return (
-            <div key={inst.key} data-doc-name={inst.name} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative overflow-hidden`}>
+            <div key={inst.key} data-doc-name={inst.name} data-doc-key={inst.key} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative overflow-hidden`}>
                 <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={instPick} isPrint={true} scriveners={scriveners} />
             </div>
           );
@@ -1569,15 +1572,15 @@ ${styles}
               各ボタンをクリックすると印刷ウィンドウが開きます。<br/>印刷先を「PDFに保存」にして保存してください。
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {printDocNames.map(name => (
+              {printDocEntries.map(entry => (
                 <button
-                  key={name}
-                  onClick={() => printSingleDoc(name)}
+                  key={entry.key}
+                  onClick={() => printSingleDoc(entry.key, entry.label)}
                   className="flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-left hover:bg-blue-50 active:bg-blue-100 transition-colors"
                   style={{ border: '1px solid #e2e8f0', fontSize: '14px', color: '#1e293b', cursor: 'pointer', background: 'white' }}
                 >
                   <Printer size={16} className="text-blue-600 flex-shrink-0" />
-                  {name}
+                  {entry.label}
                 </button>
               ))}
             </div>
