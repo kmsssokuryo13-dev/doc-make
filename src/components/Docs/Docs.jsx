@@ -273,15 +273,19 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
       if (Number(merged[name] || 0) !== total) { merged[name] = total; changed = true; }
     }
     // Remove document counts that no longer exist in any RA
-    for (const name of Object.keys(merged)) {
-      if (!(name in aggregated) && Number(merged[name] || 0) > 0) {
-        // Check if this doc comes from an application type - only clear those
-        const allRaDocNames = new Set();
-        regApps.forEach(ra => {
-          const def = APPLICATION_TO_DOCS[ra.type];
-          if (def) { (def.required || []).forEach(d => allRaDocNames.add(d)); (def.optional || []).forEach(d => allRaDocNames.add(d)); }
-        });
-        if (allRaDocNames.has(name)) { merged[name] = 0; changed = true; }
+    // Skip clearing when all RAs have empty documents (fresh migration from legacy data)
+    const allRaDocsEmpty = regApps.every(ra => Object.keys(ra.documents || {}).length === 0);
+    if (!allRaDocsEmpty) {
+      for (const name of Object.keys(merged)) {
+        if (!(name in aggregated) && Number(merged[name] || 0) > 0) {
+          // Check if this doc comes from an application type - only clear those
+          const allRaDocNames = new Set();
+          regApps.forEach(ra => {
+            const def = APPLICATION_TO_DOCS[ra.type];
+            if (def) { (def.required || []).forEach(d => allRaDocNames.add(d)); (def.optional || []).forEach(d => allRaDocNames.add(d)); }
+          });
+          if (allRaDocNames.has(name)) { merged[name] = 0; changed = true; }
+        }
       }
     }
     if (changed) {
