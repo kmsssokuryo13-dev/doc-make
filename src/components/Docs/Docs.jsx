@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
-import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
-import { APPLICATION_TYPES } from '../../constants.js';
+import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki, generateId } from '../../utils.js';
+import { APPLICATION_TYPES, APPLICATION_TO_DOCS } from '../../constants.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
@@ -51,20 +51,44 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
   const allInstances = useMemo(() => {
     if (!siteData) return [];
-    const docs = siteData.documents || {};
+    const regApps = siteData.registrationApplications || [];
     const instances = [];
-    const orderedNames = (orderedDocs || []).map(d => d.name);
-    const orderedSet = new Set(orderedNames);
-    (orderedDocs || []).forEach((d) => {
-      const name = d.name;
-      const c = Number(docs?.[name] || 0);
-      if (!name || c <= 0) return;
-      for (let i = 1; i <= c; i++) instances.push({ name, index: i, key: `${name}__${i}`, sources: d.sources || [] });
-    });
-    Object.entries(docs).forEach(([name, count]) => {
-      if (!name || orderedSet.has(name)) return;
-      for (let i = 1; i <= (Number(count) || 0); i++) instances.push({ name, index: i, key: `${name}__${i}`, sources: [] });
-    });
+
+    if (regApps.length > 0) {
+      // Phase 2: generate instances per registration application
+      const globalIndex = {}; // track global index per doc name
+      regApps.forEach((ra) => {
+        const def = APPLICATION_TO_DOCS[ra.type];
+        if (!def) return;
+        const allDocNames = [...(def.required || []), ...(def.optional || [])];
+        const raDocs = ra.documents || {};
+        allDocNames.forEach(docName => {
+          const c = Number(raDocs[docName] || 0);
+          if (c <= 0) return;
+          if (!globalIndex[docName]) globalIndex[docName] = 0;
+          for (let j = 0; j < c; j++) {
+            globalIndex[docName]++;
+            const idx = globalIndex[docName];
+            instances.push({ name: docName, index: idx, key: `${docName}__${idx}`, raId: ra.id, sources: [ra.type] });
+          }
+        });
+      });
+    } else {
+      // Legacy: flat document list (backward compat)
+      const docs = siteData.documents || {};
+      const orderedNames = (orderedDocs || []).map(d => d.name);
+      const orderedSet = new Set(orderedNames);
+      (orderedDocs || []).forEach((d) => {
+        const name = d.name;
+        const c = Number(docs?.[name] || 0);
+        if (!name || c <= 0) return;
+        for (let i = 1; i <= c; i++) instances.push({ name, index: i, key: `${name}__${i}`, raId: null, sources: d.sources || [] });
+      });
+      Object.entries(docs).forEach(([name, count]) => {
+        if (!name || orderedSet.has(name)) return;
+        for (let i = 1; i <= (Number(count) || 0); i++) instances.push({ name, index: i, key: `${name}__${i}`, raId: null, sources: [] });
+      });
+    }
     return instances;
   }, [siteData, orderedDocs]);
 
@@ -120,7 +144,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
           }
 
           const assignedBldg = buildings.find(b => b.id === base.targetPropBuildingId);
-          if (assignedBldg && Array.isArray(assignedBldg.ownerPersonIds) && assignedBldg.ownerPersonIds.length > 0) {
+          if (!before && assignedBldg && Array.isArray(assignedBldg.ownerPersonIds) && assignedBldg.ownerPersonIds.length > 0) {
             if (!base.applicantPersonIds || base.applicantPersonIds.length === 0) {
               base.applicantPersonIds = assignedBldg.ownerPersonIds;
             }
@@ -192,6 +216,163 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     if (!changed) return;
     setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: stableSortKeys(nextDocs) } : s));
   }, [step, siteId, siteData, orderedDocs, setSites]);
+
+  // Sync registrationApplications when application counts change
+  useEffect(() => {
+    if (!siteId || !siteData) return;
+    const apps = siteData.applications || {};
+    const regApps = siteData.registrationApplications || [];
+    let changed = false;
+    let next = [...regApps];
+
+    for (const type of APPLICATION_TYPES) {
+      const desired = Number(apps[type] || 0);
+      const current = next.filter(ra => ra.type === type);
+      if (current.length < desired) {
+        for (let i = current.length; i < desired; i++) {
+          next.push({ id: generateId(), type, targetBuildingIds: [], applicantPersonIds: [], documents: {} });
+          changed = true;
+        }
+      } else if (current.length > desired) {
+        let toRemove = current.length - desired;
+        next = next.filter(ra => {
+          if (ra.type === type && toRemove > 0) { toRemove--; return false; }
+          return true;
+        });
+        changed = true;
+      }
+    }
+    // Remove entries for types not in APPLICATION_TYPES
+    const validTypes = new Set(APPLICATION_TYPES);
+    const filtered = next.filter(ra => validTypes.has(ra.type));
+    if (filtered.length !== next.length) { next = filtered; changed = true; }
+
+    if (changed) {
+      setSites(prev => prev.map(s => s.id === siteId ? { ...s, registrationApplications: next } : s));
+    }
+  }, [siteId, siteData?.applications]);
+
+  // Sync siteData.documents from registrationApplications documents
+  useEffect(() => {
+    if (!siteId || !siteData) return;
+    const regApps = siteData.registrationApplications || [];
+    if (regApps.length === 0) return;
+
+    const aggregated = {};
+    regApps.forEach(ra => {
+      Object.entries(ra.documents || {}).forEach(([docName, count]) => {
+        aggregated[docName] = (aggregated[docName] || 0) + Number(count || 0);
+      });
+    });
+
+    const currentDocs = siteData.documents || {};
+    let changed = false;
+    const merged = { ...currentDocs };
+    for (const [name, total] of Object.entries(aggregated)) {
+      if (Number(merged[name] || 0) !== total) { merged[name] = total; changed = true; }
+    }
+    // Remove document counts that no longer exist in any RA
+    for (const name of Object.keys(merged)) {
+      if (!(name in aggregated) && Number(merged[name] || 0) > 0) {
+        // Check if this doc comes from an application type - only clear those
+        const allRaDocNames = new Set();
+        regApps.forEach(ra => {
+          const def = APPLICATION_TO_DOCS[ra.type];
+          if (def) { (def.required || []).forEach(d => allRaDocNames.add(d)); (def.optional || []).forEach(d => allRaDocNames.add(d)); }
+        });
+        if (allRaDocNames.has(name)) { merged[name] = 0; changed = true; }
+      }
+    }
+    if (changed) {
+      setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: stableSortKeys(merged) } : s));
+    }
+  }, [siteId, siteData?.registrationApplications]);
+
+  // Auto-fill docPick from registration application when entering Step 3
+  useEffect(() => {
+    if (!siteId || !siteData || step !== 3) return;
+    const regApps = siteData.registrationApplications || [];
+    if (regApps.length === 0) return;
+
+    const pick = { ...(siteData.docPick || {}) };
+    let changed = false;
+
+    allInstances.forEach(inst => {
+      if (!inst.raId) return;
+      const ra = regApps.find(r => r.id === inst.raId);
+      if (!ra) return;
+
+      const existing = pick[inst.key];
+      if (existing && existing._raApplied === ra.id) return; // already applied for this RA
+
+      const patch = { ...(existing || {}), _raApplied: ra.id };
+      const bid = ra.targetBuildingIds?.[0] || "";
+
+      // Auto-fill building selection based on application type
+      const needsProposed = ["建物表題登記"].includes(ra.type);
+      const needsBefore = ["建物表題部変更登記", "建物表題部更正登記", "建物合併登記", "建物分割登記", "建物合体登記"].includes(ra.type);
+      const isLoss = ra.type === "建物滅失登記";
+
+      if (needsProposed && bid) {
+        patch.targetPropBuildingId = bid;
+      }
+      if (needsBefore && bid) {
+        patch.targetBeforeBuildingId = bid;
+      }
+      if (isLoss && bid) {
+        patch.lossBuildingIds = [bid];
+      }
+
+      // Auto-fill applicant
+      if (ra.applicantPersonIds && ra.applicantPersonIds.length > 0) {
+        patch.applicantPersonIds = ra.applicantPersonIds;
+      }
+
+      pick[inst.key] = { ...DEFAULT_PICK, ...patch };
+      changed = true;
+    });
+
+    if (changed) {
+      setSites(prev => prev.map(s => s.id === siteId ? { ...s, docPick: pick } : s));
+    }
+  }, [step, siteId, allInstances, siteData?.registrationApplications]);
+
+  // Helper to get a label for a registration application
+  const getRegAppLabel = (ra) => {
+    if (!ra) return "";
+    const regApps = siteData?.registrationApplications || [];
+    const sameType = regApps.filter(r => r.type === ra.type);
+    const idx = sameType.findIndex(r => r.id === ra.id) + 1;
+    const buildingSource = ["建物表題登記", "建物滅失登記"].includes(ra.type) ? (siteData?.proposedBuildings || [])
+      : ["建物表題部変更登記", "建物表題部更正登記", "建物合併登記", "建物分割登記", "建物合体登記"].includes(ra.type) ? (siteData?.buildings || [])
+      : [];
+    const isLandType = ra.type === "土地地目変更登記";
+    const targetId = ra.targetBuildingIds?.[0];
+    let targetLabel = "";
+    if (isLandType) {
+      const land = (siteData?.land || []).find(l => l.id === targetId);
+      targetLabel = land ? (land.lotNumber || land.address || "") : "";
+    } else {
+      const bldg = buildingSource.find(b => b.id === targetId);
+      targetLabel = bldg ? (bldg.houseNum || "") : "";
+    }
+    const people = siteData?.people || [];
+    const applicantNames = (ra.applicantPersonIds || []).map(pid => people.find(p => p.id === pid)?.name || "").filter(Boolean).join("・");
+    const parts = [ra.type];
+    if (sameType.length > 1) parts[0] += ` #${idx}`;
+    if (targetLabel) parts.push(targetLabel);
+    if (applicantNames) parts.push(applicantNames);
+    return parts.join("（") + (parts.length > 1 ? "）" : "");
+  };
+
+  const updateRegApp = (raId, patch) => {
+    setSites(prev => prev.map(s => s.id === siteId ? {
+      ...s,
+      registrationApplications: (s.registrationApplications || []).map(ra =>
+        ra.id === raId ? { ...ra, ...patch } : ra
+      )
+    } : s));
+  };
 
   useEffect(() => {
     if (step !== 3 || !allInstances.length) return;
@@ -354,36 +535,226 @@ ${styles}
         {step === 1 && (
           <div className="max-w-3xl mx-auto space-y-4">
             <h2 className="text-lg font-black text-slate-800 mb-6">1. 申請する登記を選択</h2>
-            {APPLICATION_TYPES.map(type => (
-              <CountRow key={type} label={type} count={siteData?.applications?.[type] || 0}
-                onChange={(d) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, applications: { ...s.applications, [type]: Math.max(0, (s.applications[type]||0) + d) } } : s))} />
-            ))}
+            {APPLICATION_TYPES.map(type => {
+              const count = siteData?.applications?.[type] || 0;
+              const regAppsForType = (siteData?.registrationApplications || []).filter(ra => ra.type === type);
+              const needsProposed = ["建物表題登記", "建物滅失登記"].includes(type);
+              const needsBefore = ["建物表題部変更登記", "建物表題部更正登記", "建物合併登記", "建物分割登記", "建物合体登記"].includes(type);
+              const buildingSource = needsProposed ? (siteData?.proposedBuildings || []) : needsBefore ? (siteData?.buildings || []) : [];
+              const isLandType = type === "土地地目変更登記";
+              return (
+                <div key={type}>
+                  <CountRow label={type} count={count}
+                    onChange={(d) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, applications: { ...s.applications, [type]: Math.max(0, (s.applications[type]||0) + d) } } : s))} />
+                  {regAppsForType.length > 0 && (
+                    <div className="ml-4 mt-2 space-y-2">
+                      {regAppsForType.map((ra, idx) => (
+                        <div key={ra.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">申請 #{idx + 1}</div>
+                          {!isLandType && buildingSource.length > 0 && (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物</label>
+                              <select
+                                className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                                value={ra.targetBuildingIds?.[0] || ""}
+                                onChange={e => {
+                                  const bid = e.target.value;
+                                  const patch = { targetBuildingIds: bid ? [bid] : [] };
+                                  const bldg = buildingSource.find(b => b.id === bid);
+                                  if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                                    patch.applicantPersonIds = bldg.ownerPersonIds;
+                                  }
+                                  updateRegApp(ra.id, patch);
+                                }}
+                              >
+                                <option value="">(未選択)</option>
+                                {naturalSortList(buildingSource, 'houseNum').map(b => (
+                                  <option key={b.id} value={b.id}>{b.houseNum || "(家屋番号未入力)"}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          {isLandType && (siteData?.land || []).length > 0 && (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-1">対象土地</label>
+                              <select
+                                className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                                value={ra.targetBuildingIds?.[0] || ""}
+                                onChange={e => {
+                                  const lid = e.target.value;
+                                  const patch = { targetBuildingIds: lid ? [lid] : [] };
+                                  const land = (siteData?.land || []).find(l => l.id === lid);
+                                  if (land && Array.isArray(land.ownerPersonIds) && land.ownerPersonIds.length > 0) {
+                                    patch.applicantPersonIds = land.ownerPersonIds;
+                                  }
+                                  updateRegApp(ra.id, patch);
+                                }}
+                              >
+                                <option value="">(未選択)</option>
+                                {(siteData?.land || []).map(l => (
+                                  <option key={l.id} value={l.id}>{l.lotNumber || l.address || "(地番未入力)"}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">申請人</label>
+                            {(siteData?.people || []).filter(p => {
+                              const roles = p?.roles || [];
+                              return roles.includes("建物所有者") || roles.includes("申請人") || roles.includes("土地所有者");
+                            }).length === 0 ? (
+                              <p className="text-[9px] text-slate-400">関係人が登録されていません。</p>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-1">
+                                {(siteData?.people || []).filter(p => {
+                                  const roles = p?.roles || [];
+                                  return roles.includes("建物所有者") || roles.includes("申請人") || roles.includes("土地所有者");
+                                }).map(p => {
+                                  const checked = (ra.applicantPersonIds || []).includes(p.id);
+                                  return (
+                                    <label key={p.id} className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${checked ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-slate-200 text-slate-500"}`}>
+                                      <input type="checkbox" className="w-3 h-3 accent-blue-600" checked={checked}
+                                        onChange={() => {
+                                          const cur = new Set(ra.applicantPersonIds || []);
+                                          if (cur.has(p.id)) cur.delete(p.id); else cur.add(p.id);
+                                          updateRegApp(ra.id, { applicantPersonIds: Array.from(cur) });
+                                        }}
+                                      />
+                                      <span className="truncate">{p.name || "(氏名未入力)"}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {step === 2 && (
-          <div className="max-w-4xl mx-auto space-y-4 font-sans font-bold">
-            <h2 className="text-lg font-black text-slate-800 mb-6">2. 作成する書類を選定</h2>
-            {orderedDocs.length === 0 ? <p className="p-12 text-center text-gray-400 bg-white border border-dashed rounded-2xl">登記申請を選択してください。</p>
-            : <div className="space-y-3">{orderedDocs.map(d => (
-                <DocRow key={d.name} name={d.name} count={siteData?.documents?.[d.name] || 0} isRequired={d.isRequired} sources={d.sources}
-                  onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.max(0, (s.documents?.[d.name]||0) + delta) } } : s))} />
-              ))}</div>}
-          </div>
-        )}
+        {step === 2 && (() => {
+          const regApps = siteData?.registrationApplications || [];
+          if (regApps.length > 0) {
+            return (
+              <div className="max-w-4xl mx-auto space-y-6 font-sans font-bold">
+                <h2 className="text-lg font-black text-slate-800 mb-6">2. 作成する書類を選定</h2>
+                {regApps.map(ra => {
+                  const def = APPLICATION_TO_DOCS[ra.type];
+                  if (!def) return null;
+                  const allDocNames = [...(def.required || []), ...(def.optional || [])];
+                  const requiredSet = new Set(def.required || []);
+                  const raDocs = ra.documents || {};
+                  return (
+                    <div key={ra.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                      <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]">申請</span>
+                        {getRegAppLabel(ra)}
+                      </h3>
+                      <div className="space-y-2">
+                        {allDocNames.map(docName => {
+                          const isReq = requiredSet.has(docName);
+                          const count = Number(raDocs[docName] || 0);
+                          return (
+                            <DocRow key={docName} name={docName} count={count} isRequired={isReq} sources={[ra.type]}
+                              onChange={(delta) => {
+                                const next = Math.max(0, count + delta);
+                                updateRegApp(ra.id, { documents: { ...raDocs, [docName]: next } });
+                              }} />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+          // Legacy fallback: flat document list
+          return (
+            <div className="max-w-4xl mx-auto space-y-4 font-sans font-bold">
+              <h2 className="text-lg font-black text-slate-800 mb-6">2. 作成する書類を選定</h2>
+              {orderedDocs.length === 0 ? <p className="p-12 text-center text-gray-400 bg-white border border-dashed rounded-2xl">登記申請を選択してください。</p>
+              : <div className="space-y-3">{orderedDocs.map(d => (
+                  <DocRow key={d.name} name={d.name} count={siteData?.documents?.[d.name] || 0} isRequired={d.isRequired} sources={d.sources}
+                    onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.max(0, (s.documents?.[d.name]||0) + delta) } } : s))} />
+                ))}</div>}
+            </div>
+          );
+        })()}
 
         {step === 3 && (
           <div className="h-full flex gap-8 animate-in fade-in zoom-in-95 duration-500">
             <div className="w-64 shrink-0 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
               <div><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-2">作成書類一覧</h3>
-                <div className="space-y-1.5">{allInstances.map(inst => {
-                    const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                {(() => {
+                  const regApps = siteData?.registrationApplications || [];
+                  const hasRegApps = regApps.length > 0 && allInstances.some(i => i.raId);
+                  if (hasRegApps) {
+                    // Grouped by registration application
+                    const raMap = new Map(regApps.map(ra => [ra.id, ra]));
+                    const groups = [];
+                    const ungrouped = [];
+                    allInstances.forEach(inst => {
+                      if (inst.raId && raMap.has(inst.raId)) {
+                        let group = groups.find(g => g.raId === inst.raId);
+                        if (!group) { group = { raId: inst.raId, ra: raMap.get(inst.raId), instances: [] }; groups.push(group); }
+                        group.instances.push(inst);
+                      } else {
+                        ungrouped.push(inst);
+                      }
+                    });
                     return (
-                      <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
-                        <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
-                      </button>
+                      <div className="space-y-3">
+                        {groups.map(group => (
+                          <div key={group.raId}>
+                            <div className="px-2 py-1 text-[9px] font-black text-blue-600 bg-blue-50 rounded mb-1 truncate" title={getRegAppLabel(group.ra)}>{getRegAppLabel(group.ra)}</div>
+                            <div className="space-y-1 ml-1">
+                              {group.instances.map(inst => {
+                                const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                                return (
+                                  <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                                    <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                        {ungrouped.length > 0 && (
+                          <div>
+                            <div className="px-2 py-1 text-[9px] font-black text-slate-400 bg-slate-50 rounded mb-1">その他</div>
+                            <div className="space-y-1 ml-1">
+                              {ungrouped.map(inst => {
+                                const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                                return (
+                                  <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                                    <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
-                  })}</div></div>
+                  }
+                  // Legacy flat list
+                  return (
+                    <div className="space-y-1.5">{allInstances.map(inst => {
+                      const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                      return (
+                        <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                          <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
+                        </button>
+                      );
+                    })}</div>
+                  );
+                })()}</div>
 
               {activeInstance && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">

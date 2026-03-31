@@ -159,6 +159,15 @@ export const sanitizeSiteData = (raw = {}) => {
         }))
       : [],
     applications: stableSortKeys({ ...baseApplications, ...(raw.applications || {}) }),
+    registrationApplications: Array.isArray(raw.registrationApplications)
+      ? raw.registrationApplications.map(ra => ({
+          id: ra.id || generateId(),
+          type: ra.type || "",
+          targetBuildingIds: Array.isArray(ra.targetBuildingIds) ? ra.targetBuildingIds : [],
+          applicantPersonIds: Array.isArray(ra.applicantPersonIds) ? ra.applicantPersonIds : [],
+          documents: stableSortKeys(typeof ra.documents === "object" && ra.documents ? ra.documents : {}),
+        }))
+      : [],
     documents: stableSortKeys(typeof raw.documents === "object" && raw.documents ? raw.documents : {}),
     docPick: stableSortKeys(typeof raw.docPick === "object" && raw.docPick ? raw.docPick : {}),
     contractorId: raw.contractorId || "",
