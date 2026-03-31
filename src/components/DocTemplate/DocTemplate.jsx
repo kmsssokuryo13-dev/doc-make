@@ -1685,12 +1685,12 @@ export const DocTemplate = ({
   // 申述書系（共有 / 単独）
   // ==========================
 
-  const renderStatementCommon = ({ titleText, defaultBody }) => {
+  const renderStatementCommon = ({ titleText, defaultBody, showShare = true }) => {
     const hasMultipleStatementPeople = (statementPeople || []).length >= 2;
     const formatStatementLine = (p) => {
       const parts = [];
       parts.push(p?.address || "　");
-      if (hasMultipleStatementPeople) parts.push(formatShare(p?.share));
+      if (showShare && hasMultipleStatementPeople) parts.push(formatShare(p?.share));
       parts.push(p?.name || "　");
       return parts.join("　");
     };
@@ -1917,6 +1917,7 @@ export const DocTemplate = ({
     return renderStatementCommon({
       titleText: "申述書",
       defaultBody: body,
+      showShare: false,
     });
   }
 
