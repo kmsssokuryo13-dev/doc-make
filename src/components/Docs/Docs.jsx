@@ -597,7 +597,7 @@ ${styles}
   );
 })()}
 
-                  {activeInstance.name === "委任状（表題）" && (
+                  {(activeInstance.name === "委任状（表題）" || activeInstance.name === "委任状（保存）") && (
                     <div className="border-t pt-4">
                       <label className="block text-[10px] font-bold text-gray-500 mb-1">予定家屋番号選択</label>
                       <select
