@@ -119,6 +119,13 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
             base.targetPropBuildingId = idAt(i - 1);
           }
 
+          const assignedBldg = buildings.find(b => b.id === base.targetPropBuildingId);
+          if (assignedBldg && Array.isArray(assignedBldg.ownerPersonIds) && assignedBldg.ownerPersonIds.length > 0) {
+            if (!base.applicantPersonIds || base.applicantPersonIds.length === 0) {
+              base.applicantPersonIds = assignedBldg.ownerPersonIds;
+            }
+          }
+
           const beforeStr = before ? JSON.stringify(before) : "";
           const afterStr = JSON.stringify(base);
           if (beforeStr !== afterStr) {
@@ -607,7 +614,15 @@ ${styles}
                       <select
                         className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                         value={activePick.targetPropBuildingId || ""}
-                        onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                        onChange={e => {
+                          const bid = e.target.value;
+                          const patch = { targetPropBuildingId: bid };
+                          const bldg = (siteData.proposedBuildings || []).find(b => b.id === bid);
+                          if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                            patch.applicantPersonIds = bldg.ownerPersonIds;
+                          }
+                          handlePickChange(activeInstanceKey, patch);
+                        }}
                       >
                         <option value="">(未選択)</option>
                         {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
@@ -625,7 +640,15 @@ ${styles}
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                             value={activePick.targetBeforeBuildingId || ""}
-                            onChange={e => handlePickChange(activeInstanceKey, { targetBeforeBuildingId: e.target.value })}
+                            onChange={e => {
+                              const bid = e.target.value;
+                              const patch = { targetBeforeBuildingId: bid };
+                              const bldg = (siteData.buildings || []).find(b => b.id === bid);
+                              if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                                patch.applicantPersonIds = bldg.ownerPersonIds;
+                              }
+                              handlePickChange(activeInstanceKey, patch);
+                            }}
                           >
                             <option value="">(全て表示)</option>
                             {(naturalSortList(siteData.buildings || [], 'houseNum')).map(b => (
@@ -638,7 +661,15 @@ ${styles}
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                             value={activePick.targetPropBuildingId || ""}
-                            onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                            onChange={e => {
+                              const bid = e.target.value;
+                              const patch = { targetPropBuildingId: bid };
+                              const bldg = (siteData.proposedBuildings || []).find(b => b.id === bid);
+                              if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                                patch.applicantPersonIds = bldg.ownerPersonIds;
+                              }
+                              handlePickChange(activeInstanceKey, patch);
+                            }}
                           >
                             <option value="">(全て表示)</option>
                             {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
@@ -685,7 +716,15 @@ ${styles}
                             <select
                               className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                               value={activePick.targetPropBuildingId || ""}
-                              onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                              onChange={e => {
+                                const bid = e.target.value;
+                                const patch = { targetPropBuildingId: bid };
+                                const bldg = (siteData.proposedBuildings || []).find(b => b.id === bid);
+                                if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                                  patch.applicantPersonIds = bldg.ownerPersonIds;
+                                }
+                                handlePickChange(activeInstanceKey, patch);
+                              }}
                             >
                               <option value="">(全て表示)</option>
                               {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (
@@ -714,7 +753,15 @@ ${styles}
                             <select
                               className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                               value={activePick.targetBeforeBuildingId || ""}
-                              onChange={e => handlePickChange(activeInstanceKey, { targetBeforeBuildingId: e.target.value })}
+                              onChange={e => {
+                                const bid = e.target.value;
+                                const patch = { targetBeforeBuildingId: bid };
+                                const bldg = (siteData.buildings || []).find(b => b.id === bid);
+                                if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                                  patch.applicantPersonIds = bldg.ownerPersonIds;
+                                }
+                                handlePickChange(activeInstanceKey, patch);
+                              }}
                             >
                               <option value="">(全て表示)</option>
                               {(naturalSortList(siteData.buildings || [], 'houseNum')).map(b => (
@@ -792,7 +839,15 @@ ${styles}
                             <select
                               className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                               value={activePick.targetPropBuildingId || ""}
-                              onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                              onChange={e => {
+                                const bid = e.target.value;
+                                const patch = { targetPropBuildingId: bid };
+                                const bldg = (siteData.proposedBuildings || []).find(b => b.id === bid);
+                                if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                                  patch.applicantPersonIds = bldg.ownerPersonIds;
+                                }
+                                handlePickChange(activeInstanceKey, patch);
+                              }}
                             >
                               <option value="">(全て表示)</option>
                               {(naturalSortList(siteData.proposedBuildings || [], 'houseNum')).map(pb => (

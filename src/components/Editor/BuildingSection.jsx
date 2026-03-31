@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building, Plus, Trash2, Copy, X } from 'lucide-react';
+import { Building, Plus, Trash2, Copy, X, Users } from 'lucide-react';
 import {
   generateId, naturalSortList, toHalfWidth, toFullWidthDigits,
   createNewBuilding, createNewAnnex, parseStructureToFloors,
@@ -290,6 +290,42 @@ export const BuildingSection = ({ type, site, update }) => {
               </div>
             )}
           </div>
+          {(() => {
+            const people = Array.isArray(site?.people) ? site.people : [];
+            const ownerCandidates = people.filter(p => {
+              const roles = p?.roles || [];
+              return roles.includes("建物所有者") || roles.includes("申請人");
+            });
+            const curIds = new Set(Array.isArray(b.ownerPersonIds) ? b.ownerPersonIds : []);
+            const toggleOwner = (pid) => {
+              const next = new Set(curIds);
+              if (next.has(pid)) next.delete(pid); else next.add(pid);
+              updateBuild(b.id, 'ownerPersonIds', Array.from(next));
+            };
+            if (ownerCandidates.length === 0) return null;
+            return (
+              <div className="px-4 py-3 bg-purple-50/50 border-b border-gray-200">
+                <label className="block text-[10px] font-bold text-purple-600 uppercase mb-2 flex items-center gap-1">
+                  <Users size={12} /> この建物の所有者
+                </label>
+                <div className="grid grid-cols-2 gap-1">
+                  {ownerCandidates.map(p => (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                        curIds.has(p.id)
+                          ? "bg-purple-100 border-purple-300 text-purple-700"
+                          : "bg-white border-slate-200 text-slate-500"
+                      }`}
+                    >
+                      <input type="checkbox" className="w-3 h-3 rounded accent-purple-600" checked={curIds.has(p.id)} onChange={() => toggleOwner(p.id)} />
+                      <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div className="p-4 bg-white">
             <div className="flex justify-between items-center mb-3 text-black font-sans font-bold">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Plus size={10} /> 附属建物</h4>
