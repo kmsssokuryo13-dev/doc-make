@@ -235,10 +235,11 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
         }
       } else if (current.length > desired) {
         let toRemove = current.length - desired;
-        next = next.filter(ra => {
+        const reversed = [...next].reverse();
+        next = reversed.filter(ra => {
           if (ra.type === type && toRemove > 0) { toRemove--; return false; }
           return true;
-        });
+        }).reverse();
         changed = true;
       }
     }
@@ -362,7 +363,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     if (sameType.length > 1) parts[0] += ` #${idx}`;
     if (targetLabel) parts.push(targetLabel);
     if (applicantNames) parts.push(applicantNames);
-    return parts.join("（") + (parts.length > 1 ? "）" : "");
+    return parts[0] + (parts.length > 1 ? "（" + parts.slice(1).join("・") + "）" : "");
   };
 
   const updateRegApp = (raId, patch) => {
