@@ -13,7 +13,7 @@ import { Modal } from '../ui/Modal.jsx';
 const lotNumberToChiban = (lotNumber) => {
   const s = (lotNumber || '').trim();
   if (!s) return '';
-  return s.replace(/番/, '番地');
+  return s.replace(/番(?!地)/, '番地');
 };
 
 const buildAddressFromSelections = (selections, landMap) => {
