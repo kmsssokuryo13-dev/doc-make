@@ -930,7 +930,7 @@ export const DocTemplate = ({
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>住　　所　{p?.address || '\u3000'}</div>
         {showShare && <div>持　　分　{formatShare(p?.share)}</div>}
-        <div>ふりがな　{p?.nameKana || '\u3000'}</div>
+        {p?.nameKana && <div>ふりがな　{p.nameKana}</div>}
         <div>氏　　名　{p?.name || '\u3000'}</div>
       </div>
     );
