@@ -924,6 +924,20 @@ export const DocTemplate = ({
     return (siteData?.name || "").includes("登記") ? siteData.name : "建物表題登記";
   };
 
+  const LABEL_STYLE = { display: 'inline-block', width: '5em', letterSpacing: '0.5em' };
+
+  const renderSignerMultiLine = (p) => {
+    const showShare = hasMultipleApplicants;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div><span style={LABEL_STYLE}>住所</span>{p?.address || '\u3000'}</div>
+        {showShare && <div><span style={LABEL_STYLE}>持分</span>{formatShare(p?.share)}</div>}
+        <div><span style={{ ...LABEL_STYLE, letterSpacing: '0' }}>ふりがな</span>{p?.nameKana || '\u3000'}</div>
+        <div><span style={LABEL_STYLE}>氏名</span>{p?.name || '\u3000'}</div>
+      </div>
+    );
+  };
+
   const renderDelegationCommon = ({
     docNoBold = false,
     workText,
@@ -933,6 +947,7 @@ export const DocTemplate = ({
     dateBlock,
     topRightBlock,
     signerList,
+    signerRenderer,
   }) => {
     const signers = signerList || applicants || [];
     return (
@@ -1008,7 +1023,7 @@ export const DocTemplate = ({
               <div style={{ fontSize: '11pt' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
                   {signers.map((p, i) => (
-                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{renderOwnerWithDecedent(p, formatApplicantLine)}</div>
+                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{signerRenderer ? renderOwnerWithDecedent(p, () => signerRenderer(p)) : renderOwnerWithDecedent(p, formatApplicantLine)}</div>
                   ))}
                 </div>
               </div>
@@ -1091,7 +1106,7 @@ export const DocTemplate = ({
       <div>　</div>
     );
 
-    return renderDelegationCommon({ docNoBold: false, workText, buildingBlock });
+    return renderDelegationCommon({ docNoBold: false, workText, buildingBlock, signerRenderer: renderSignerMultiLine });
   };
 
   const DelegationLandCategoryChangeTemplate = () => {
@@ -1379,6 +1394,7 @@ export const DocTemplate = ({
       docNoBold: false, workText,
       buildingTitle: "物件の表示", buildingBlock: landBlock,
       dateBlock: buildCommonDateBlock(),
+      signerRenderer: renderSignerMultiLine,
     });
   };
 
