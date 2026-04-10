@@ -924,16 +924,14 @@ export const DocTemplate = ({
     return (siteData?.name || "").includes("登記") ? siteData.name : "建物表題登記";
   };
 
-  const LABEL_STYLE = { display: 'inline-block', width: '4em', textAlignLast: 'justify' };
-
   const renderSignerMultiLine = (p) => {
     const showShare = hasMultipleApplicants;
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <div><span style={LABEL_STYLE}>住所</span>{p?.address || '\u3000'}</div>
-        {showShare && <div><span style={LABEL_STYLE}>持分</span>{formatShare(p?.share)}</div>}
-        <div><span style={LABEL_STYLE}>ふりがな</span>{p?.nameKana || '\u3000'}</div>
-        <div><span style={LABEL_STYLE}>氏名</span>{p?.name || '\u3000'}</div>
+        <div>住　　所　{p?.address || '\u3000'}</div>
+        {showShare && <div>持　　分　{formatShare(p?.share)}</div>}
+        <div>ふりがな　{p?.nameKana || '\u3000'}</div>
+        <div>氏　　名　{p?.name || '\u3000'}</div>
       </div>
     );
   };
