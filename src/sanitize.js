@@ -154,6 +154,7 @@ export const sanitizeSiteData = (raw = {}) => {
           ...p,
           id: p.id || generateId(),
           roles: Array.isArray(p.roles) ? p.roles : (p.role ? p.role.split(/[、,]/).map(x => x.trim()).filter(Boolean) : []),
+          nameKana: p.nameKana || "",
           contractorMasterId: p.contractorMasterId || "",
           decedentName: p.decedentName || ""
         }))

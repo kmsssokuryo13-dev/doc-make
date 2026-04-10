@@ -194,6 +194,7 @@ export const createNewPerson = (patch = {}) => {
     id: generateId(),
     address: "",
     name: "",
+    nameKana: "",
     representative: "",
     share: "",
     roles: ["申請人"],
