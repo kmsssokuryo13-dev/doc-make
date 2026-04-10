@@ -924,7 +924,7 @@ export const DocTemplate = ({
     return (siteData?.name || "").includes("登記") ? siteData.name : "建物表題登記";
   };
 
-  const LABEL_STYLE = { display: 'inline-block', width: '5em', letterSpacing: '0.5em' };
+  const LABEL_STYLE = { display: 'inline-block', width: '4em', textAlignLast: 'justify' };
 
   const renderSignerMultiLine = (p) => {
     const showShare = hasMultipleApplicants;
@@ -932,7 +932,7 @@ export const DocTemplate = ({
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div><span style={LABEL_STYLE}>住所</span>{p?.address || '\u3000'}</div>
         {showShare && <div><span style={LABEL_STYLE}>持分</span>{formatShare(p?.share)}</div>}
-        <div><span style={{ ...LABEL_STYLE, letterSpacing: '0' }}>ふりがな</span>{p?.nameKana || '\u3000'}</div>
+        <div><span style={LABEL_STYLE}>ふりがな</span>{p?.nameKana || '\u3000'}</div>
         <div><span style={LABEL_STYLE}>氏名</span>{p?.name || '\u3000'}</div>
       </div>
     );
