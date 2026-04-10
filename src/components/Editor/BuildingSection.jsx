@@ -1,5 +1,5 @@
-import React from 'react';
-import { Building, Plus, Trash2, Copy, X, Users } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Building, Plus, Trash2, Copy, X, Users, MapPin } from 'lucide-react';
 import {
   generateId, naturalSortList, toHalfWidth, toFullWidthDigits,
   createNewBuilding, createNewAnnex, parseStructureToFloors,
@@ -8,12 +8,167 @@ import {
 } from '../../utils.js';
 import { FormField } from '../ui/FormField.jsx';
 import { DateInput } from '../ui/DateInput.jsx';
+import { Modal } from '../ui/Modal.jsx';
+
+const lotNumberToChiban = (lotNumber) => {
+  const s = (lotNumber || '').trim();
+  if (!s) return '';
+  return s.replace(/番/, '番地');
+};
+
+const buildAddressFromSelections = (selections, landMap) => {
+  if (!selections.length) return { address: '', houseNum: '' };
+  const parts = [];
+  let prevAddress = null;
+  for (const landId of selections) {
+    const land = landMap.get(landId);
+    if (!land) continue;
+    const addr = (land.address || '').trim();
+    const lot = (land.lotNumber || '').trim();
+    const chibanChi = lotNumberToChiban(lot);
+    if (addr === prevAddress) {
+      parts.push(chibanChi);
+    } else {
+      parts.push(addr + chibanChi);
+      prevAddress = addr;
+    }
+  }
+  const firstLand = landMap.get(selections[0]);
+  const houseNum = firstLand ? (firstLand.lotNumber || '').trim() : '';
+  return { address: parts.join('、'), houseNum };
+};
+
+const LandSelectModal = ({ isOpen, onClose, lands, onConfirm }) => {
+  const [selections, setSelections] = useState([]);
+
+  const grouped = useMemo(() => {
+    const groups = [];
+    const map = new Map();
+    for (const land of lands) {
+      const addr = (land.address || '').trim() || '（所在なし）';
+      if (!map.has(addr)) {
+        const group = { address: addr, items: [] };
+        map.set(addr, group);
+        groups.push(group);
+      }
+      map.get(addr).items.push(land);
+    }
+    return groups;
+  }, [lands]);
+
+  const toggleSelection = useCallback((landId) => {
+    setSelections(prev => {
+      if (prev.includes(landId)) return prev.filter(id => id !== landId);
+      return [...prev, landId];
+    });
+  }, []);
+
+  const handleConfirm = () => {
+    onConfirm(selections);
+    setSelections([]);
+  };
+
+  const handleClose = () => {
+    setSelections([]);
+    onClose();
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="土地情報を選択"
+      maxWidth="max-w-lg"
+      footer={
+        <>
+          <button onClick={handleClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-bold transition-colors">
+            キャンセル
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={selections.length === 0}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            決定（{selections.length}件選択中）
+          </button>
+        </>
+      }
+    >
+      <p className="text-xs text-gray-500 mb-4">転記する土地を選択してください（複数選択可・クリック順に番号が付きます）</p>
+      <div className="space-y-4">
+        {grouped.map(group => (
+          <div key={group.address}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <MapPin size={14} className="text-blue-500" />
+              <span className="text-sm font-bold text-gray-700">{group.address}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 pl-5">
+              {group.items.map(land => {
+                const idx = selections.indexOf(land.id);
+                const selected = idx >= 0;
+                return (
+                  <button
+                    key={land.id}
+                    onClick={() => toggleSelection(land.id)}
+                    className={`flex items-center gap-2 p-2 rounded-lg border text-left text-sm transition-all ${
+                      selected
+                        ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-sm'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/30'
+                    }`}
+                  >
+                    {selected && (
+                      <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0">
+                        {idx + 1}
+                      </span>
+                    )}
+                    <span className="font-bold truncate">{land.lotNumber || '（地番なし）'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+};
 
 export const BuildingSection = ({ type, site, update }) => {
   const isReg = type === 'registered';
   const dataKey = isReg ? 'buildings' : 'proposedBuildings';
   const buildings = site[dataKey] || [];
   const CONFIRM_R2_OPTIONS = Array.from({ length: 99 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const [isLandSelectOpen, setIsLandSelectOpen] = useState(false);
+
+  const landMap = useMemo(() => {
+    const m = new Map();
+    for (const l of (site.land || [])) m.set(l.id, l);
+    return m;
+  }, [site.land]);
+
+  const handleLandCopy = useCallback(() => {
+    const lands = site.land || [];
+    if (lands.length === 0) return;
+    if (lands.length === 1) {
+      const { address, houseNum } = buildAddressFromSelections([lands[0].id], landMap);
+      const newBldg = createNewBuilding();
+      newBldg.address = address;
+      newBldg.houseNum = houseNum;
+      update({ [dataKey]: [...buildings, newBldg] });
+      return;
+    }
+    setIsLandSelectOpen(true);
+  }, [site.land, landMap, buildings, dataKey, update]);
+
+  const handleLandSelectConfirm = useCallback((selections) => {
+    if (selections.length === 0) return;
+    const { address, houseNum } = buildAddressFromSelections(selections, landMap);
+    const newBldg = createNewBuilding();
+    newBldg.address = address;
+    newBldg.houseNum = houseNum;
+    update({ [dataKey]: [...buildings, newBldg] });
+    setIsLandSelectOpen(false);
+  }, [landMap, buildings, dataKey, update]);
 
   const updateBuild = (bid, field, val) => {
     update({ [dataKey]: buildings.map(b => {
@@ -73,9 +228,16 @@ export const BuildingSection = ({ type, site, update }) => {
     <div className="space-y-6 animate-in fade-in duration-300 text-black font-sans">
       <div className="flex justify-between items-center px-1 font-bold">
         <h3 className="text-gray-700 text-sm flex items-center gap-2"><Building size={16} className={isReg ? "text-amber-500" : "text-emerald-500"} /> {isReg ? '既登記建物情報' : '申請建物情報'}</h3>
-        <button onClick={() => update({ [dataKey]: [...buildings, createNewBuilding()] })} className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-700 font-bold transition-all active:scale-95 shadow-sm">
-          <Plus size={12} /> 物件を追加
-        </button>
+        <div className="flex items-center gap-2">
+          {!isReg && (site.land || []).length > 0 && (
+            <button onClick={handleLandCopy} className="text-[10px] bg-emerald-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-emerald-700 font-bold transition-all active:scale-95 shadow-sm">
+              <MapPin size={12} /> 土地から転記
+            </button>
+          )}
+          <button onClick={() => update({ [dataKey]: [...buildings, createNewBuilding()] })} className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-700 font-bold transition-all active:scale-95 shadow-sm">
+            <Plus size={12} /> 物件を追加
+          </button>
+        </div>
       </div>
       {naturalSortList(buildings, 'houseNum').map(b => (
         <div key={b.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white relative group">
@@ -485,6 +647,7 @@ export const BuildingSection = ({ type, site, update }) => {
           </div>
         </div>
       ))}
+      {!isReg && <LandSelectModal isOpen={isLandSelectOpen} onClose={() => setIsLandSelectOpen(false)} lands={site.land || []} onConfirm={handleLandSelectConfirm} />}
     </div>
   );
 };
