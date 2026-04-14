@@ -981,13 +981,13 @@ export const DocTemplate = ({
                 {topRightBlock ?? (
                   useLinkedScrivenerOnTopRight ? (
                     <>
-                      <p style={{ margin: '0' }}>{'\u3000\u3000'}{linkedScrivenerAddrLine}</p>
-                      <p style={{ margin: '0' }}>{'\u3000\u3000'}{linkedScrivenerNameLine}</p>
+                      <p style={{ margin: '0' }}>{'\u3000\u3000\u3000'}{linkedScrivenerAddrLine}</p>
+                      <p style={{ margin: '0' }}>{'\u3000\u3000\u3000'}{linkedScrivenerNameLine}</p>
                     </>
                   ) : (
                     <>
-                                                                                        <p style={{ margin: '0' }}>{'\u3000\u3000'}射水市善光寺２７番１号　塩谷信泰</p>
-                                                                                        <p style={{ margin: '0' }}>{'\u3000\u3000'}射水市善光寺２７番１号　塩谷一真</p>
+                                                                                        <p style={{ margin: '0' }}>{'\u3000\u3000\u3000'}射水市善光寺２７番１号　塩谷信泰</p>
+                                                                                        <p style={{ margin: '0' }}>{'\u3000\u3000\u3000'}射水市善光寺２７番１号　塩谷一真</p>
                     </>
                   )
                 )}
