@@ -327,19 +327,25 @@ export const formatConfirmationCertLine = (cc) => {
   return `${no}　${dt}`;
 };
 
-export const formatShare = (share) => {
+export const formatShare = (share, { omitPrefix = false } = {}) => {
   const raw = (share ?? "").toString().trim();
-  if (!raw) return "持分\u3000\u3000分の\u3000\u3000";
+  if (!raw) return omitPrefix ? "\u3000\u3000\u3000\u3000分の\u3000\u3000" : "持分\u3000\u3000分の\u3000\u3000";
   const hw = toHalfWidth(raw);
   const slashMatch = hw.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (slashMatch) {
     const numer = toFullWidthDigits(slashMatch[1]);
     const denom = toFullWidthDigits(slashMatch[2]);
-    return `持分${denom}分の${numer}`;
+    return omitPrefix ? `${denom}分の${numer}` : `持分${denom}分の${numer}`;
   }
   const bunnoMatch = raw.match(/^(\S+?)分の(\S+)$/);
   if (bunnoMatch) {
+    if (omitPrefix) {
+      return raw.startsWith("持分") ? raw.slice(2) : raw;
+    }
     return raw.startsWith("持分") ? raw : `持分${raw}`;
+  }
+  if (omitPrefix) {
+    return raw.startsWith("持分") ? raw.slice(2) : raw;
   }
   return raw.startsWith("持分") ? raw : `持分${raw}`;
 };

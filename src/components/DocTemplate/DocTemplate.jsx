@@ -929,7 +929,7 @@ export const DocTemplate = ({
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>住　　所　{p?.address || '\u3000'}</div>
-        {showShare && <div>持　　分　{formatShare(p?.share)}</div>}
+        {showShare && <div>持　　分　{formatShare(p?.share, { omitPrefix: true })}</div>}
         {p?.nameKana && <div>ふりがな　{p.nameKana}</div>}
         <div>氏　　名　{p?.name || '\u3000'}</div>
       </div>
@@ -981,13 +981,13 @@ export const DocTemplate = ({
                 {topRightBlock ?? (
                   useLinkedScrivenerOnTopRight ? (
                     <>
-                      <p style={{ margin: '0' }}>{linkedScrivenerAddrLine}</p>
-                      <p style={{ margin: '0' }}>{linkedScrivenerNameLine}</p>
+                      <p style={{ margin: '0' }}>{'\u3000\u3000'}{linkedScrivenerAddrLine}</p>
+                      <p style={{ margin: '0' }}>{'\u3000\u3000'}{linkedScrivenerNameLine}</p>
                     </>
                   ) : (
                     <>
-                                                                                        <p style={{ margin: '0' }}>射水市善光寺２７番１号　塩谷信泰</p>
-                                                                                        <p style={{ margin: '0' }}>射水市善光寺２７番１号　塩谷一真</p>
+                                                                                        <p style={{ margin: '0' }}>{'\u3000\u3000'}射水市善光寺２７番１号　塩谷信泰</p>
+                                                                                        <p style={{ margin: '0' }}>{'\u3000\u3000'}射水市善光寺２７番１号　塩谷一真</p>
                     </>
                   )
                 )}
@@ -1752,8 +1752,9 @@ export const DocTemplate = ({
               <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>{buildingBlock}</div>
 
               <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
-                <div>確認済証の番号{"\u3000\u3000\u3000\u3000\u3000\u3000\u3000"}{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "\u3000"}</div>
-                <div>確認済証記載の建築主名義</div>
+                <div>確認済証の番号</div>
+                <div>{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "\u3000"}</div>
+                <div style={{ marginTop: "4mm" }}>確認済証記載の建築主名義</div>
                 {(() => {
                   const confirmIds = Array.isArray(pick?.confirmApplicantPersonIds) ? pick.confirmApplicantPersonIds : [];
                   const people = siteData.people || [];
@@ -1761,8 +1762,8 @@ export const DocTemplate = ({
                     ? people.filter(p => confirmIds.includes(p.id))
                     : people.filter(p => (p.roles || []).includes("建築申請人"));
                   return selected.length > 0
-                    ? selected.map(p => <div key={p.id} style={{ paddingLeft: "15.2em" }}>{p.name || "\u3000"}</div>)
-                    : <div style={{ paddingLeft: "15.2em" }}>{"\u3000"}</div>;
+                    ? selected.map(p => <div key={p.id} style={{ textAlign: "left" }}>{p.name || "\u3000"}</div>)
+                    : <div style={{ textAlign: "left" }}>{"\u3000"}</div>;
                 })()}
               </div>
 
