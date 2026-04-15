@@ -329,7 +329,7 @@ export const formatConfirmationCertLine = (cc) => {
 
 export const formatShare = (share, { omitPrefix = false } = {}) => {
   const raw = (share ?? "").toString().trim();
-  if (!raw) return omitPrefix ? "\u3000\u3000\u3000\u3000分の\u3000\u3000" : "持分\u3000\u3000分の\u3000\u3000";
+  if (!raw) return omitPrefix ? "\u3000\u3000\u3000\u3000\u3000分の\u3000\u3000" : "持分\u3000\u3000\u3000分の\u3000\u3000";
   const hw = toHalfWidth(raw);
   const slashMatch = hw.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (slashMatch) {
