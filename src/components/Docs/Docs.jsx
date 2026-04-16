@@ -1983,7 +1983,7 @@ ${styles}
               {activeInstance ? (
                 <div className="p-10">
                   <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden">
-                    <DocTemplate name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
+                    <DocTemplate key={activeInstanceKey} name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                        instanceKey={activeInstanceKey}
                       pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} />
                   </div>
