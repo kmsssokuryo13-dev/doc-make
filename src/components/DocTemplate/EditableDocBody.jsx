@@ -17,11 +17,14 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
 
   const hasCustom = !isBlankHtml(customHtml);
 
+  const onChangeRef = useRef(onCustomHtmlChange);
+  onChangeRef.current = onCustomHtmlChange;
+
   const flush = useCallback(() => {
-    if (!onCustomHtmlChange || draftRef.current == null) return;
-    onCustomHtmlChange(draftRef.current);
+    if (!onChangeRef.current || draftRef.current == null) return;
+    onChangeRef.current(draftRef.current);
     draftRef.current = null;
-  }, [onCustomHtmlChange]);
+  }, []);
 
   const handleInput = () => {
     if (!containerRef.current) return;
@@ -51,6 +54,10 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
   }
 
   useLayoutEffect(() => {
+    if (focusedRef.current && containerRef.current &&
+        document.activeElement !== containerRef.current) {
+      focusedRef.current = false;
+    }
     if (editable && !hasCustom && containerRef.current && captureRef.current && !focusedRef.current) {
       containerRef.current.innerHTML = captureRef.current.innerHTML;
     }
