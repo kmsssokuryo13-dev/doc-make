@@ -8,7 +8,7 @@ import {
 export const sanitizeSiteData = (raw = {}) => {
   const sanitizeLand = (l = {}) => ({
     id: l.id || generateId(),
-    address: l.address || "",
+    address: toFullWidthDigits(l.address || ""),
     lotNumber: l.lotNumber || "",
     category: l.category || "",
     area: l.area || "",
@@ -112,7 +112,7 @@ export const sanitizeSiteData = (raw = {}) => {
     const struct = structMaterial + structFloor;
     return {
       id: b.id || generateId(),
-      address: b.address || "",
+      address: toFullWidthDigits(b.address || ""),
       symbol: b.symbol || "",
       houseNum: b.houseNum || "",
       kind: b.kind || "",
@@ -145,7 +145,7 @@ export const sanitizeSiteData = (raw = {}) => {
   return {
     id: raw.id || generateId(),
     name: raw.name || "新規現場",
-    address: raw.address || "",
+    address: toFullWidthDigits(raw.address || ""),
     land: Array.isArray(raw.land) ? raw.land.map(sanitizeLand) : [],
     buildings: Array.isArray(raw.buildings) ? raw.buildings.map(sanitizeBuilding) : [],
     proposedBuildings: Array.isArray(raw.proposedBuildings) ? raw.proposedBuildings.map(sanitizeBuilding) : [],
@@ -153,6 +153,7 @@ export const sanitizeSiteData = (raw = {}) => {
       ? raw.people.map(p => ({
           ...p,
           id: p.id || generateId(),
+          address: toFullWidthDigits(p.address || ""),
           roles: Array.isArray(p.roles) ? p.roles : (p.role ? p.role.split(/[、,]/).map(x => x.trim()).filter(Boolean) : []),
           nameKana: p.nameKana || "",
           contractorMasterId: p.contractorMasterId || "",
@@ -180,7 +181,7 @@ export const sanitizeContractors = (list) => {
   if (!Array.isArray(list)) return [];
   return list.map(c => ({
     id: c.id || generateId(),
-    address: c.address || "",
+    address: toFullWidthDigits(c.address || ""),
     tradeName: c.tradeName || c.name || "",
     representative: c.representative || ""
   }));
@@ -190,7 +191,7 @@ export const sanitizeScriveners = (list) => {
   if (!Array.isArray(list)) return [];
   return list.map(s => ({
     id: s.id || generateId(),
-    address: s.address || "",
+    address: toFullWidthDigits(s.address || ""),
     name: s.name || ""
   }));
 };

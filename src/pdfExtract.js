@@ -680,7 +680,7 @@ export const parseBuildingRegistration = (text) => {
 
   return [{
     id: generateId(),
-    address: bld.address,
+    address: toFullWidthDigits(bld.address),
     houseNum: bld.houseNum,
     kind: bld.kind,
     structMaterial: bld.structMaterial,
@@ -712,7 +712,7 @@ export const parseLandRegistration = (text) => {
 
   return [{
     id: generateId(),
-    address: land.address,
+    address: toFullWidthDigits(land.address),
     lotNumber: toFullWidthDigits(land.lotNumber),
     category: land.category,
     area: toFullWidthDigits(land.area),
