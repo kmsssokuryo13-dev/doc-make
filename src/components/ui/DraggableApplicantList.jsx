@@ -32,10 +32,10 @@ export const DraggableApplicantList = ({
   const handleDrop = (e, dropIdx) => {
     e.preventDefault();
     if (dragSrcIdx !== null && dragSrcIdx !== dropIdx) {
-      const next = [...selectedIds];
-      const [moved] = next.splice(dragSrcIdx, 1);
-      next.splice(dropIdx, 0, moved);
-      onReorder(next);
+      const validIds = selectedItems.map(p => p.id);
+      const [moved] = validIds.splice(dragSrcIdx, 1);
+      validIds.splice(dropIdx, 0, moved);
+      onReorder(validIds);
     }
     setDragSrcIdx(null);
     setDragOverIdx(null);
