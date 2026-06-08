@@ -23,8 +23,7 @@ export const DocTemplate = ({
   const applicants = useMemo(() => {
     const ids = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
     if (!ids.length) return allApplicants;
-    const set = new Set(ids);
-    const filtered = allApplicants.filter(p => set.has(p.id));
+    const filtered = ids.map(id => allApplicants.find(p => p.id === id)).filter(Boolean);
     return filtered.length ? filtered : allApplicants;
   }, [allApplicants, pick?.applicantPersonIds]);
 
@@ -38,8 +37,7 @@ export const DocTemplate = ({
   const statementPeople = useMemo(() => {
     const ids = Array.isArray(pick?.statementPersonIds) ? pick.statementPersonIds : [];
     if (!ids.length) return statementCandidates;
-    const set = new Set(ids);
-    const filtered = statementCandidates.filter(p => set.has(p.id));
+    const filtered = ids.map(id => statementCandidates.find(p => p.id === id)).filter(Boolean);
     return filtered.length ? filtered : statementCandidates;
   }, [statementCandidates, pick?.statementPersonIds]);
 
@@ -1165,8 +1163,7 @@ export const DocTemplate = ({
       if (!ids.length) {
         return allCandidates.filter(p => (p.roles || []).includes("土地所有者"));
       }
-      const set = new Set(ids);
-      const filtered = allCandidates.filter(p => set.has(p.id));
+      const filtered = ids.map(id => allCandidates.find(p => p.id === id)).filter(Boolean);
       return filtered.length ? filtered : allCandidates.filter(p => (p.roles || []).includes("土地所有者"));
     })();
 
@@ -1217,8 +1214,7 @@ export const DocTemplate = ({
       if (!ids.length) {
         return allCandidates.filter(p => (p.roles || []).includes("建物所有者"));
       }
-      const set = new Set(ids);
-      const filtered = allCandidates.filter(p => set.has(p.id));
+      const filtered = ids.map(id => allCandidates.find(p => p.id === id)).filter(Boolean);
       return filtered.length ? filtered : allCandidates.filter(p => (p.roles || []).includes("建物所有者"));
     })();
 
@@ -1759,7 +1755,7 @@ export const DocTemplate = ({
                   const confirmIds = Array.isArray(pick?.confirmApplicantPersonIds) ? pick.confirmApplicantPersonIds : [];
                   const people = siteData.people || [];
                   const selected = confirmIds.length > 0
-                    ? people.filter(p => confirmIds.includes(p.id))
+                    ? confirmIds.map(id => people.find(p => p.id === id)).filter(Boolean)
                     : people.filter(p => (p.roles || []).includes("建築申請人"));
                   return selected.length > 0
                     ? selected.map(p => <div key={p.id} style={{ textAlign: "left" }}>{p.name || "\u3000"}</div>)
@@ -1818,14 +1814,14 @@ export const DocTemplate = ({
 
     const saleBuyerIds = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
     const saleBuyers = saleBuyerIds.length > 0
-      ? allApplicants.filter(p => new Set(saleBuyerIds).has(p.id))
+      ? saleBuyerIds.map(id => allApplicants.find(p => p.id === id)).filter(Boolean)
       : allApplicants;
     const displayBuyers = saleBuyers.length > 0 ? saleBuyers : allApplicants;
 
     const sellerCandidates = (siteData?.people || []).filter(p => (p.roles || []).includes("その他"));
     const sellerIds = Array.isArray(pick?.saleSellerPersonIds) ? pick.saleSellerPersonIds : [];
     const displaySellers = sellerIds.length > 0
-      ? sellerCandidates.filter(p => new Set(sellerIds).has(p.id))
+      ? sellerIds.map(id => sellerCandidates.find(p => p.id === id)).filter(Boolean)
       : sellerCandidates;
 
     const currentYearReiwa = String(new Date().getFullYear() - 2018);
