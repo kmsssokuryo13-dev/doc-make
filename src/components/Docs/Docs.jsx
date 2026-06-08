@@ -7,6 +7,7 @@ import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
 import { DocTemplate } from '../DocTemplate/DocTemplate.jsx';
+import { DraggableApplicantList } from '../ui/DraggableApplicantList.jsx';
 
 export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const [params] = useSearchParams();
@@ -602,36 +603,31 @@ ${styles}
                               </select>
                             </div>
                           )}
-                          <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">申請人</label>
-                            {(siteData?.people || []).filter(p => {
+                          {(() => {
+                            const raApplCandidates = (siteData?.people || []).filter(p => {
                               const roles = p?.roles || [];
                               return roles.includes("建物所有者") || roles.includes("申請人") || roles.includes("土地所有者");
-                            }).length === 0 ? (
-                              <p className="text-[9px] text-slate-400">関係人が登録されていません。</p>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-1">
-                                {(siteData?.people || []).filter(p => {
-                                  const roles = p?.roles || [];
-                                  return roles.includes("建物所有者") || roles.includes("申請人") || roles.includes("土地所有者");
-                                }).map(p => {
-                                  const checked = (ra.applicantPersonIds || []).includes(p.id);
-                                  return (
-                                    <label key={p.id} className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${checked ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-slate-200 text-slate-500"}`}>
-                                      <input type="checkbox" className="w-3 h-3 accent-blue-600" checked={checked}
-                                        onChange={() => {
-                                          const cur = new Set(ra.applicantPersonIds || []);
-                                          if (cur.has(p.id)) cur.delete(p.id); else cur.add(p.id);
-                                          updateRegApp(ra.id, { applicantPersonIds: Array.from(cur) });
-                                        }}
-                                      />
-                                      <span className="truncate">{p.name || "(氏名未入力)"}</span>
-                                    </label>
-                                  );
-                                })}
+                            });
+                            return (
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-500 mb-1">申請人</label>
+                                {raApplCandidates.length === 0 ? (
+                                  <p className="text-[9px] text-slate-400">関係人が登録されていません。</p>
+                                ) : (
+                                  <DraggableApplicantList
+                                    candidates={raApplCandidates}
+                                    selectedIds={ra.applicantPersonIds || []}
+                                    onToggle={(id) => {
+                                      const cur = new Set(ra.applicantPersonIds || []);
+                                      if (cur.has(id)) cur.delete(id); else cur.add(id);
+                                      updateRegApp(ra.id, { applicantPersonIds: Array.from(cur) });
+                                    }}
+                                    onReorder={(newIds) => updateRegApp(ra.id, { applicantPersonIds: newIds })}
+                                  />
+                                )}
                               </div>
-                            )}
-                          </div>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -838,22 +834,14 @@ ${styles}
           {candidates.length === 0 ? (
             <p className="text-[10px] text-slate-400">「建物所有者」または「申請人」が登録されていません。</p>
           ) : (
-            <div className="grid grid-cols-1 gap-1">
-              {candidates.map((p) => (
-                <label
-                  key={p.id}
-                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                    effectiveApplSet.has(p.id)
-                      ? "bg-blue-50 border-blue-200 text-blue-700"
-                      : "bg-white border-slate-200 text-slate-500"
-                  }`}
-                >
-                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveApplSet.has(p.id)} onChange={() => toggleAppl(p.id)} />
-                  <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
-                </label>
-              ))}
-              <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
-            </div>
+            <DraggableApplicantList
+              candidates={candidates}
+              selectedIds={curAppl.length > 0 ? curAppl : candidates.filter(p => (p.roles || []).includes("建物所有者")).map(p => p.id)}
+              onToggle={toggleAppl}
+              onReorder={(newIds) => handlePickChange(activeInstanceKey, { applicantPersonIds: newIds })}
+              showRoles
+              minOne
+            />
           )}
         </div>
       </>
@@ -885,27 +873,14 @@ ${styles}
         {candidates.length === 0 ? (
           <p className="text-[10px] text-slate-400">「土地所有者」または「申請人」が登録されていません。</p>
         ) : (
-          <div className="grid grid-cols-1 gap-1">
-            {candidates.map((p) => (
-              <label
-                key={p.id}
-                className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                  effectiveSet.has(p.id)
-                    ? "bg-blue-50 border-blue-200 text-blue-700"
-                    : "bg-white border-slate-200 text-slate-500"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="w-3 h-3 rounded"
-                  checked={effectiveSet.has(p.id)}
-                  onChange={() => toggleOne(p.id)}
-                />
-                <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
-              </label>
-            ))}
-            <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
-          </div>
+          <DraggableApplicantList
+            candidates={candidates}
+            selectedIds={cur.length > 0 ? cur : candidates.filter(p => (p.roles || []).includes("土地所有者")).map(p => p.id)}
+            onToggle={toggleOne}
+            onReorder={(newIds) => handlePickChange(activeInstanceKey, { applicantPersonIds: newIds })}
+            showRoles
+            minOne
+          />
         )}
       </div>
     );
@@ -956,26 +931,14 @@ ${styles}
           </label>
 
           {selecting && (
-            <div className="mt-2 grid grid-cols-1 gap-1">
-              {all.map((p) => (
-                <label
-                  key={p.id}
-                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                    curSet.has(p.id)
-                      ? "bg-blue-50 border-blue-200 text-blue-700"
-                      : "bg-white border-slate-200 text-slate-500"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="w-3 h-3 rounded"
-                    checked={curSet.has(p.id)}
-                    onChange={() => toggleOne(p.id)}
-                  />
-                  <span className="truncate">{p.name || "(氏名未入力)"}</span>
-                </label>
-              ))}
-              <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
+            <div className="mt-2">
+              <DraggableApplicantList
+                candidates={all}
+                selectedIds={cur}
+                onToggle={toggleOne}
+                onReorder={(newIds) => handlePickChange(activeInstanceKey, { applicantPersonIds: newIds })}
+                minOne
+              />
             </div>
           )}
         </>
@@ -1264,26 +1227,12 @@ ${styles}
                               {confirmCandidates.length === 0 ? (
                                 <p className="text-[10px] text-slate-400">「申請人」または「建築申請人」が登録されていません。</p>
                               ) : (
-                                <div className="grid grid-cols-1 gap-1">
-                                  {confirmCandidates.map((p) => (
-                                    <label
-                                      key={p.id}
-                                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                                        effectiveConfirmSet.has(p.id)
-                                          ? "bg-blue-50 border-blue-200 text-blue-700"
-                                          : "bg-white border-slate-200 text-slate-500"
-                                      }`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        className="w-3 h-3 rounded"
-                                        checked={effectiveConfirmSet.has(p.id)}
-                                        onChange={() => toggleConfirm(p.id)}
-                                      />
-                                      <span className="truncate">{p.name || "(氏名未入力)"}</span>
-                                    </label>
-                                  ))}
-                                </div>
+                                <DraggableApplicantList
+                                  candidates={confirmCandidates}
+                                  selectedIds={curConfirm.length > 0 ? curConfirm : confirmCandidates.filter(p => (p.roles || []).includes("建築申請人")).map(p => p.id)}
+                                  onToggle={toggleConfirm}
+                                  onReorder={(newIds) => handlePickChange(activeInstanceKey, { confirmApplicantPersonIds: newIds })}
+                                />
                               )}
                             </div>
                           );
@@ -1356,27 +1305,14 @@ ${styles}
                               <label className="block text-[10px] font-bold text-gray-500 mb-2">
                                 申述人（署名・押印する人）
                               </label>
-
-                              <div className="mt-2 grid grid-cols-1 gap-1">
-                                {candidates.map((p) => (
-                                  <label
-                                    key={p.id}
-                                    className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                                      effectiveSet.has(p.id)
-                                        ? "bg-blue-50 border-blue-200 text-blue-700"
-                                        : "bg-white border-slate-200 text-slate-500"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      className="w-3 h-3 rounded"
-                                      checked={effectiveSet.has(p.id)}
-                                      onChange={() => toggleOne(p.id)}
-                                    />
-                                    <span className="truncate">{p.name || "(氏名未入力)"}</span>
-                                  </label>
-                                ))}
-                                <p className="text-[9px] text-slate-400 mt-1">※0人にはできません（最低1人）</p>
+                              <div className="mt-2">
+                                <DraggableApplicantList
+                                  candidates={candidates}
+                                  selectedIds={selecting ? cur : candidates.map(p => p.id)}
+                                  onToggle={toggleOne}
+                                  onReorder={(newIds) => handlePickChange(activeInstanceKey, { statementPersonIds: newIds })}
+                                  minOne
+                                />
                               </div>
                             </div>
                           );
@@ -1741,21 +1677,12 @@ ${styles}
                           {applicantCandidates.length === 0 ? (
                             <p className="text-[10px] text-slate-400">「申請人」が登録されていません。</p>
                           ) : (
-                            <div className="grid grid-cols-1 gap-1">
-                              {applicantCandidates.map((p) => (
-                                <label
-                                  key={p.id}
-                                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                                    effectiveApplSet.has(p.id)
-                                      ? "bg-blue-50 border-blue-200 text-blue-700"
-                                      : "bg-white border-slate-200 text-slate-500"
-                                  }`}
-                                >
-                                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveApplSet.has(p.id)} onChange={() => toggleApplicant(p.id)} />
-                                  <span className="truncate">{p.name || "(氏名未入力)"}</span>
-                                </label>
-                              ))}
-                            </div>
+                            <DraggableApplicantList
+                              candidates={applicantCandidates}
+                              selectedIds={curApplIds.length > 0 ? curApplIds : applicantCandidates.map(p => p.id)}
+                              onToggle={toggleApplicant}
+                              onReorder={(newIds) => handlePickChange(activeInstanceKey, { applicantPersonIds: newIds })}
+                            />
                           )}
                         </div>
                         <div>
@@ -1763,21 +1690,12 @@ ${styles}
                           {sellerCandidates.length === 0 ? (
                             <p className="text-[10px] text-slate-400">「その他」の役割の人が登録されていません。</p>
                           ) : (
-                            <div className="grid grid-cols-1 gap-1">
-                              {sellerCandidates.map((p) => (
-                                <label
-                                  key={p.id}
-                                  className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                                    effectiveSellerSet.has(p.id)
-                                      ? "bg-blue-50 border-blue-200 text-blue-700"
-                                      : "bg-white border-slate-200 text-slate-500"
-                                  }`}
-                                >
-                                  <input type="checkbox" className="w-3 h-3 rounded" checked={effectiveSellerSet.has(p.id)} onChange={() => toggleSeller(p.id)} />
-                                  <span className="truncate">{p.name || "(氏名未入力)"}</span>
-                                </label>
-                              ))}
-                            </div>
+                            <DraggableApplicantList
+                              candidates={sellerCandidates}
+                              selectedIds={curSellerIds.length > 0 ? curSellerIds : sellerCandidates.map(p => p.id)}
+                              onToggle={toggleSeller}
+                              onReorder={(newIds) => handlePickChange(activeInstanceKey, { saleSellerPersonIds: newIds })}
+                            />
                           )}
                         </div>
                       </div>
