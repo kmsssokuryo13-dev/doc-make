@@ -29,17 +29,33 @@ export const DocTemplate = ({
 
   const statementCandidates = useMemo(() => {
     const people = siteData.people || [];
-    const buildingApplicants = people.filter(p => (p.roles || []).includes("建築申請人"));
-    if (buildingApplicants.length) return buildingApplicants;
+    const applicants = people.filter(p => (p.roles || []).includes("申請人"));
+    const others = people.filter(p => (p.roles || []).includes("その他"));
+    const sortedPropBuildings = siteData.proposedBuildings || [];
+    const confirmPersonIds = new Set();
+    for (const bldg of sortedPropBuildings) {
+      for (const pid of (bldg.confirmApplicantPersonIds || [])) confirmPersonIds.add(pid);
+    }
+    const confirmPeople = [...confirmPersonIds].map(id => people.find(p => p.id === id)).filter(Boolean);
+    const seen = new Set();
+    const result = [];
+    for (const p of [...applicants, ...others, ...confirmPeople]) {
+      if (!seen.has(p.id)) { seen.add(p.id); result.push(p); }
+    }
+    return result;
+  }, [siteData.people, siteData.proposedBuildings]);
+
+  const statementDefaultPeople = useMemo(() => {
+    const people = siteData.people || [];
     return people.filter(p => (p.roles || []).includes("申請人"));
   }, [siteData.people]);
 
   const statementPeople = useMemo(() => {
     const ids = Array.isArray(pick?.statementPersonIds) ? pick.statementPersonIds : [];
-    if (!ids.length) return statementCandidates;
+    if (!ids.length) return statementDefaultPeople;
     const filtered = ids.map(id => statementCandidates.find(p => p.id === id)).filter(Boolean);
-    return filtered.length ? filtered : statementCandidates;
-  }, [statementCandidates, pick?.statementPersonIds]);
+    return filtered.length ? filtered : statementDefaultPeople;
+  }, [statementCandidates, statementDefaultPeople, pick?.statementPersonIds]);
 
   const linkedScrivener = useMemo(
     () => getSelectedScrivener(siteData, scriveners),
@@ -1749,17 +1765,17 @@ export const DocTemplate = ({
 
               <div style={{ fontSize: "11pt", marginBottom: "8mm" }}>
                 <div>確認済証の番号</div>
-                <div>{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "\u3000"}</div>
+                <div>{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "　"}</div>
                 <div style={{ marginTop: "4mm" }}>確認済証記載の建築主名義</div>
                 {(() => {
-                  const confirmIds = Array.isArray(pick?.confirmApplicantPersonIds) ? pick.confirmApplicantPersonIds : [];
                   const people = siteData.people || [];
-                  const selected = confirmIds.length > 0
-                    ? confirmIds.map(id => people.find(p => p.id === id)).filter(Boolean)
-                    : people.filter(p => (p.roles || []).includes("建築申請人"));
-                  return selected.length > 0
-                    ? selected.map(p => <div key={p.id} style={{ textAlign: "left" }}>{p.name || "\u3000"}</div>)
-                    : <div style={{ textAlign: "left" }}>{"\u3000"}</div>;
+                  const bldgPersonIds = Array.isArray(targetProp?.confirmApplicantPersonIds) ? targetProp.confirmApplicantPersonIds : [];
+                  const bldgNames = Array.isArray(targetProp?.confirmApplicantNames) ? targetProp.confirmApplicantNames.filter(n => n.trim()) : [];
+                  const personNames = bldgPersonIds.map(id => people.find(p => p.id === id)).filter(Boolean);
+                  const allNames = [...personNames.map(p => ({ key: p.id, name: p.name || "　" })), ...bldgNames.map((n, i) => ({ key: `manual-${i}`, name: n }))];
+                  return allNames.length > 0
+                    ? allNames.map(item => <div key={item.key} style={{ textAlign: "left" }}>{item.name}</div>)
+                    : <div style={{ textAlign: "left" }}>{"　"}</div>;
                 })()}
               </div>
 

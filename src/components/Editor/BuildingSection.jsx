@@ -362,6 +362,43 @@ export const BuildingSection = ({ type, site, update }) => {
                   </div>
                 ))}
 
+                {(() => {
+                  const people = Array.isArray(site?.people) ? site.people : [];
+                  const ownerCandidates = people.filter(p => {
+                    const roles = p?.roles || [];
+                    return roles.includes("建物所有者") || roles.includes("申請人");
+                  });
+                  const curIds = new Set(Array.isArray(b.ownerPersonIds) ? b.ownerPersonIds : []);
+                  const toggleOwner = (pid) => {
+                    const next = new Set(curIds);
+                    if (next.has(pid)) next.delete(pid); else next.add(pid);
+                    updateBuild(b.id, 'ownerPersonIds', Array.from(next));
+                  };
+                  if (ownerCandidates.length === 0) return null;
+                  return (
+                    <div className="pt-3 mt-3 border-t border-slate-200">
+                      <label className="block text-[10px] font-bold text-purple-600 uppercase mb-2 flex items-center gap-1">
+                        <Users size={12} /> この建物の所有者
+                      </label>
+                      <div className="grid grid-cols-2 gap-1">
+                        {ownerCandidates.map(p => (
+                          <label
+                            key={p.id}
+                            className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                              curIds.has(p.id)
+                                ? "bg-purple-100 border-purple-300 text-purple-700"
+                                : "bg-white border-slate-200 text-slate-500"
+                            }`}
+                          >
+                            <input type="checkbox" className="w-3 h-3 rounded accent-purple-600" checked={curIds.has(p.id)} onChange={() => toggleOwner(p.id)} />
+                            <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="pt-3 mt-3 border-t border-slate-200">
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">
                     確認済証情報（申述書用）
@@ -446,48 +483,86 @@ export const BuildingSection = ({ type, site, update }) => {
                           <X size={12} /> 削除
                         </button>
                       </div>
+
+                      {/* 建築申請人 hybrid input */}
+                      {(() => {
+                        const people = Array.isArray(site?.people) ? site.people : [];
+                        const selectCandidates = people.filter(p => {
+                          const roles = p?.roles || [];
+                          return roles.includes("申請人") || roles.includes("その他");
+                        });
+                        const curPersonIds = Array.isArray(b.confirmApplicantPersonIds) ? b.confirmApplicantPersonIds : [];
+                        const curNames = Array.isArray(b.confirmApplicantNames) ? b.confirmApplicantNames : [];
+                        const togglePerson = (pid) => {
+                          const next = curPersonIds.includes(pid) ? curPersonIds.filter(id => id !== pid) : [...curPersonIds, pid];
+                          updateBuild(b.id, 'confirmApplicantPersonIds', next);
+                        };
+                        const addManualName = () => {
+                          updateBuild(b.id, 'confirmApplicantNames', [...curNames, '']);
+                        };
+                        const updateManualName = (idx, val) => {
+                          const next = [...curNames];
+                          next[idx] = val;
+                          updateBuild(b.id, 'confirmApplicantNames', next);
+                        };
+                        const removeManualName = (idx) => {
+                          updateBuild(b.id, 'confirmApplicantNames', curNames.filter((_, i) => i !== idx));
+                        };
+                        return (
+                          <div className="mt-3 pt-3 border-t border-dashed border-amber-200 bg-amber-50/40 rounded p-2">
+                            <label className="block text-[10px] font-bold text-amber-700 uppercase mb-2">
+                              建築申請人（確認済証記載の建築主）
+                            </label>
+                            {selectCandidates.length > 0 && (
+                              <div className="mb-2">
+                                <span className="text-[9px] text-slate-500 font-bold">人物から選択：</span>
+                                <div className="grid grid-cols-2 gap-1 mt-1">
+                                  {selectCandidates.map(p => (
+                                    <label
+                                      key={p.id}
+                                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
+                                        curPersonIds.includes(p.id)
+                                          ? "bg-amber-100 border-amber-300 text-amber-800"
+                                          : "bg-white border-slate-200 text-slate-500"
+                                      }`}
+                                    >
+                                      <input type="checkbox" className="w-3 h-3 rounded accent-amber-600" checked={curPersonIds.includes(p.id)} onChange={() => togglePerson(p.id)} />
+                                      <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="space-y-1">
+                              {curNames.map((nm, idx) => (
+                                <div key={idx} className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    className="flex-1 text-sm p-1 border rounded text-black bg-white"
+                                    value={nm}
+                                    placeholder="氏名を直接入力"
+                                    onChange={e => updateManualName(idx, e.target.value)}
+                                  />
+                                  <button onClick={() => removeManualName(idx)} className="text-gray-400 hover:text-red-500 p-0.5"><X size={12} /></button>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              onClick={addManualName}
+                              className="mt-1 text-[9px] text-amber-700 font-bold hover:underline flex items-center gap-1"
+                            >
+                              <Plus size={10} /> 手入力で追加
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
               </div>
             )}
           </div>
-          {(() => {
-            const people = Array.isArray(site?.people) ? site.people : [];
-            const ownerCandidates = people.filter(p => {
-              const roles = p?.roles || [];
-              return roles.includes("建物所有者") || roles.includes("申請人");
-            });
-            const curIds = new Set(Array.isArray(b.ownerPersonIds) ? b.ownerPersonIds : []);
-            const toggleOwner = (pid) => {
-              const next = new Set(curIds);
-              if (next.has(pid)) next.delete(pid); else next.add(pid);
-              updateBuild(b.id, 'ownerPersonIds', Array.from(next));
-            };
-            if (ownerCandidates.length === 0) return null;
-            return (
-              <div className="px-4 py-3 bg-purple-50/50 border-b border-gray-200">
-                <label className="block text-[10px] font-bold text-purple-600 uppercase mb-2 flex items-center gap-1">
-                  <Users size={12} /> この建物の所有者
-                </label>
-                <div className="grid grid-cols-2 gap-1">
-                  {ownerCandidates.map(p => (
-                    <label
-                      key={p.id}
-                      className={`flex items-center gap-2 p-1 rounded border text-[9px] cursor-pointer ${
-                        curIds.has(p.id)
-                          ? "bg-purple-100 border-purple-300 text-purple-700"
-                          : "bg-white border-slate-200 text-slate-500"
-                      }`}
-                    >
-                      <input type="checkbox" className="w-3 h-3 rounded accent-purple-600" checked={curIds.has(p.id)} onChange={() => toggleOwner(p.id)} />
-                      <span className="truncate">{p.name || "(氏名未入力)"}{` [${(p.roles || []).join("、")}]`}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+
           <div className="p-4 bg-white">
             <div className="flex justify-between items-center mb-3 text-black font-sans font-bold">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Plus size={10} /> 附属建物</h4>
