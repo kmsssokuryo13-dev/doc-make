@@ -484,13 +484,22 @@ ${styles}
     [siteData?.people]
   );
 
-  const statementEligiblePeople = useMemo(
-    () => (siteData?.people || []).filter(p => {
-      const roles = p?.roles || [];
-      return roles.includes("申請人") || roles.includes("建築申請人");
-    }),
-    [siteData?.people]
-  );
+  const statementEligiblePeople = useMemo(() => {
+    const people = siteData?.people || [];
+    const applicants = people.filter(p => (p.roles || []).includes("申請人"));
+    const others = people.filter(p => (p.roles || []).includes("その他"));
+    const confirmPersonIds = new Set();
+    for (const bldg of (siteData?.proposedBuildings || [])) {
+      for (const pid of (bldg.confirmApplicantPersonIds || [])) confirmPersonIds.add(pid);
+    }
+    const confirmPeople = [...confirmPersonIds].map(id => people.find(p => p.id === id)).filter(Boolean);
+    const seen = new Set();
+    const result = [];
+    for (const p of [...applicants, ...others, ...confirmPeople]) {
+      if (!seen.has(p.id)) { seen.add(p.id); result.push(p); }
+    }
+    return result;
+  }, [siteData?.people, siteData?.proposedBuildings]);
 
   const contractorsInPeople = useMemo(() => (siteData?.people || []).filter(p => (p.roles || []).includes("工事人")), [siteData?.people]);
 
@@ -1203,40 +1212,12 @@ ${styles}
                     <div className="border-t pt-4 text-black">
                       <div className="space-y-3">
 
-                        {(() => {
-                          const confirmCandidates = (siteData?.people || []).filter(p => {
-                            const roles = p?.roles || [];
-                            return roles.includes("申請人") || roles.includes("建築申請人");
-                          });
-                          const curConfirm = Array.isArray(activePick.confirmApplicantPersonIds) ? activePick.confirmApplicantPersonIds : [];
-                          const defaultIds = new Set(confirmCandidates.filter(p => (p.roles || []).includes("建築申請人")).map(p => p.id));
-                          const effectiveConfirmSet = curConfirm.length > 0 ? new Set(curConfirm) : defaultIds;
-
-                          const toggleConfirm = (id) => {
-                            const base = new Set(curConfirm.length > 0 ? curConfirm : Array.from(defaultIds));
-                            if (base.has(id)) base.delete(id);
-                            else base.add(id);
-                            handlePickChange(activeInstanceKey, { confirmApplicantPersonIds: Array.from(base) });
-                          };
-
-                          return (
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-500 mb-2">
-                                建築確認の申請人
-                              </label>
-                              {confirmCandidates.length === 0 ? (
-                                <p className="text-[10px] text-slate-400">「申請人」または「建築申請人」が登録されていません。</p>
-                              ) : (
-                                <DraggableApplicantList
-                                  candidates={confirmCandidates}
-                                  selectedIds={curConfirm.length > 0 ? curConfirm : confirmCandidates.filter(p => (p.roles || []).includes("建築申請人")).map(p => p.id)}
-                                  onToggle={toggleConfirm}
-                                  onReorder={(newIds) => handlePickChange(activeInstanceKey, { confirmApplicantPersonIds: newIds })}
-                                />
-                              )}
-                            </div>
-                          );
-                        })()}
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 mb-2">
+                            建築確認の申請人
+                          </label>
+                          <p className="text-[9px] text-slate-400">※申請建物タブの確認済証情報内「建築申請人」から自動参照されます。</p>
+                        </div>
 
                         <div>
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
@@ -1272,43 +1253,46 @@ ${styles}
                         )}
 
                         {(() => {
-                          let candidates = (siteData?.people || []).filter(p =>
-                            (p.roles || []).includes("建築申請人")
-                          );
-
-                          if (candidates.length === 0) {
-                            candidates = (siteData?.people || []).filter(p =>
-                              (p.roles || []).includes("申請人")
-                            );
+                          const people = siteData?.people || [];
+                          const applicants = people.filter(p => (p.roles || []).includes("申請人"));
+                          const others = people.filter(p => (p.roles || []).includes("その他"));
+                          const confirmPersonIds = new Set();
+                          for (const bldg of (siteData?.proposedBuildings || [])) {
+                            for (const pid of (bldg.confirmApplicantPersonIds || [])) confirmPersonIds.add(pid);
+                          }
+                          const confirmPeople = [...confirmPersonIds].map(id => people.find(p => p.id === id)).filter(Boolean);
+                          const seen = new Set();
+                          const candidates = [];
+                          for (const p of [...applicants, ...others, ...confirmPeople]) {
+                            if (!seen.has(p.id)) { seen.add(p.id); candidates.push(p); }
                           }
 
                           if (candidates.length === 0) {
-                            return <p className="text-[10px] text-slate-400">「建築申請人」かつ「申請人」の人が登録されていません。</p>;
+                            return <p className="text-[10px] text-slate-400">「申請人」「その他」または確認済証建築申請人が登録されていません。</p>;
                           }
 
+                          const defaultIds = applicants.map(p => p.id);
                           const cur = Array.isArray(activePick.statementPersonIds) ? activePick.statementPersonIds : [];
                           const selecting = cur.length > 0;
-                          const curSet = new Set(cur);
 
-                          const toggleOne= (id) => {
-                            const base = new Set(selecting ? cur : candidates.map(p => p.id));
+                          const toggleOne = (id) => {
+                            const base = new Set(selecting ? cur : defaultIds);
                             if (base.has(id)) base.delete(id);
                             else base.add(id);
                             if (base.size === 0) return;
                             handlePickChange(activeInstanceKey, { statementPersonIds: Array.from(base) });
                           };
 
-                          const effectiveSet= new Set(selecting ? cur : candidates.map(p => p.id));
-
                           return (
                             <div className="mt-1">
                               <label className="block text-[10px] font-bold text-gray-500 mb-2">
                                 申述人（署名・押印する人）
                               </label>
+                              <p className="text-[9px] text-slate-400 mb-1">※デフォルトは申請人のみ。その他・確認済証建築申請人も選択可能です。</p>
                               <div className="mt-2">
                                 <DraggableApplicantList
                                   candidates={candidates}
-                                  selectedIds={selecting ? cur : candidates.map(p => p.id)}
+                                  selectedIds={selecting ? cur : defaultIds}
                                   onToggle={toggleOne}
                                   onReorder={(newIds) => handlePickChange(activeInstanceKey, { statementPersonIds: newIds })}
                                   minOne
