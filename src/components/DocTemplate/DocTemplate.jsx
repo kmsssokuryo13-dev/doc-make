@@ -333,7 +333,34 @@ export const DocTemplate = ({
 
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-                <p style={{ margin: '0' }}>{formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}　{targetProp.registrationCause || "　"}</p>
+                {(() => {
+                  const hasAnyAnnexes = (targetProp.annexes || []).length > 0;
+                  const causeEntries = [];
+                  const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
+                  if (targetProp.registrationCause) {
+                    causeEntries.push({ date: formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate), cause: targetProp.registrationCause, prefix: mainPrefix });
+                  }
+                  (targetProp.additionalCauses || []).forEach(ac => {
+                    if (ac.cause) {
+                      causeEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
+                    }
+                  });
+                  (targetProp.annexes || []).forEach(a => {
+                    const sym = stripAllWS(a.symbol);
+                    const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
+                    if (a.registrationCause) {
+                      causeEntries.push({ date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause, prefix: annexPrefix });
+                    }
+                    (a.additionalCauses || []).forEach(ac => {
+                      if (ac.cause) {
+                        causeEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: annexPrefix });
+                      }
+                    });
+                  });
+                  return causeEntries.length > 0
+                    ? causeEntries.map((c, i) => <p key={i} style={{ margin: '0' }}>{c.prefix}{c.date}　{c.cause}</p>)
+                    : <p style={{ margin: '0' }}>　</p>;
+                })()}
               </div>
 
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
@@ -1061,10 +1088,45 @@ export const DocTemplate = ({
   // ---- 各テンプレ（独立した形のまま） ----
 
   const DelegationTitleTemplate = () => {
-    const workText =
-      (targetProp)
-        ? `${formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}${targetProp.registrationCause || ""}したので建物表題登記`
-        : getLegacyWorkText();
+    const workText = (() => {
+      if (!targetProp) return getLegacyWorkText();
+      const hasAnyAnnexes = (targetProp.annexes || []).length > 0;
+      const causeEntries = [];
+      const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
+      if (targetProp.registrationCause) {
+        causeEntries.push({ date: formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate), cause: targetProp.registrationCause, prefix: mainPrefix });
+      }
+      (targetProp.additionalCauses || []).forEach(ac => {
+        if (ac.cause) {
+          causeEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
+        }
+      });
+      (targetProp.annexes || []).forEach(a => {
+        const sym = stripAllWS(a.symbol);
+        const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
+        if (a.registrationCause) {
+          causeEntries.push({ date: formatWareki(a.registrationDate, a.additionalUnknownDate), cause: a.registrationCause, prefix: annexPrefix });
+        }
+        (a.additionalCauses || []).forEach(ac => {
+          if (ac.cause) {
+            causeEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: annexPrefix });
+          }
+        });
+      });
+      if (causeEntries.length === 0) {
+        return `${formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate)}${targetProp.registrationCause || ""}したので建物表題登記`;
+      }
+      return (
+        <>
+          {causeEntries.map((cl, i) => (
+            <div key={i}>
+              {cl.prefix}{cl.date}{cl.cause}
+              {i === causeEntries.length - 1 ? "したので建物表題登記" : "、"}
+            </div>
+          ))}
+        </>
+      );
+    })();
 
     const buildingBlock = targetProp ? (
       <div style={{ marginBottom: '6mm' }}>
