@@ -967,12 +967,32 @@ export const DocTemplate = ({
 
   const renderSignerMultiLine = (p) => {
     const showShare = hasMultipleApplicants;
+    const rep = (p?.representative || "").trim();
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>住　　所　{p?.address || '\u3000'}</div>
         {showShare && <div>持　　分　{formatShare(p?.share, { omitPrefix: true })}</div>}
         {p?.nameKana && <div>ふりがな　{p.nameKana}</div>}
         <div>氏　　名　{p?.name || '\u3000'}</div>
+        {rep && <div>{"\u3000\u3000\u3000\u3000\u3000"}{"代表者\u3000"}{rep}</div>}
+      </div>
+    );
+  };
+
+  const formatDelegationApplicantLine = (p) => {
+    const rep = (p?.representative || "").trim();
+    if (!rep) return formatApplicantLine(p);
+    const prefixParts = [];
+    prefixParts.push(p?.address || "\u3000");
+    if (hasMultipleApplicants) prefixParts.push(formatShare(p?.share));
+    const prefix = prefixParts.join("\u3000") + "\u3000";
+    return (
+      <div>
+        <div>{prefix}{p?.name || "\u3000"}</div>
+        <div>
+          <span style={{ visibility: 'hidden' }}>{prefix}</span>
+          {"代表者\u3000"}{rep}
+        </div>
       </div>
     );
   };
@@ -1062,7 +1082,7 @@ export const DocTemplate = ({
               <div style={{ fontSize: '11pt' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
                   {signers.map((p, i) => (
-                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{signerRenderer ? renderOwnerWithDecedent(p, () => signerRenderer(p)) : renderOwnerWithDecedent(p, formatApplicantLine)}</div>
+                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{signerRenderer ? renderOwnerWithDecedent(p, () => signerRenderer(p)) : renderOwnerWithDecedent(p, formatDelegationApplicantLine)}</div>
                   ))}
                 </div>
               </div>
