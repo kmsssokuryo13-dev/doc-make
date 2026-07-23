@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   toFullWidthDigits, naturalSortList, formatWareki, getSelectedScrivener,
-  formatConfirmationCertLine, formatShare
+  formatConfirmationCertLine, formatShare, resolvePersonShare
 } from '../../utils.js';
 import {
   DOC_PAGE_PADDING, DEFAULT_DELEGATION_TEXT, DEFAULT_DELEGATION_TEXT_SAVE,
@@ -263,6 +263,13 @@ export const DocTemplate = ({
     return sortedProp.find(b => b.id === pick.targetPropBuildingId) || sortedProp[0] || null;
   }, [sortedProp, pick.targetPropBuildingId]);
 
+  // 書類が対象とする物件（土地 or 建物）のIDを1つ決定し、申請人の物件別持分を解決するのに使う
+  const LAND_BASED_DOCS = ["委任状（地目変更）", "委任状（住所変更）"];
+  const docTargetPropId = LAND_BASED_DOCS.includes(name)
+    ? ((selectedLand || [])[0]?.id || null)
+    : (targetProp?.id || null);
+  const shareStr = (p) => resolvePersonShare(p, docTargetPropId);
+
   const hasMultipleApplicants = (applicants || []).length >= 2;
 
   const AFFECTED_BY_DECEDENT = [
@@ -276,7 +283,7 @@ export const DocTemplate = ({
   const formatApplicantLine = (p) => {
     const parts = [];
     parts.push(p?.address || "　");
-    if (hasMultipleApplicants) parts.push(formatShare(p?.share));
+    if (hasMultipleApplicants) parts.push(formatShare(shareStr(p)));
     parts.push(p?.name || "　");
     return parts.join("　");
   };
@@ -970,7 +977,7 @@ export const DocTemplate = ({
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>住　　所　{p?.address || '\u3000'}</div>
-        {showShare && <div>持　　分　{formatShare(p?.share, { omitPrefix: true })}</div>}
+        {showShare && <div>持　　分　{formatShare(shareStr(p), { omitPrefix: true })}</div>}
         {p?.nameKana && <div>ふりがな　{p.nameKana}</div>}
         <div>氏　　名　{p?.name || '\u3000'}</div>
       </div>
@@ -1778,7 +1785,7 @@ export const DocTemplate = ({
     const formatStatementLine = (p) => {
       const parts = [];
       parts.push(p?.address || "　");
-      if (hasMultipleStatementPeople) parts.push(formatShare(p?.share));
+      if (hasMultipleStatementPeople) parts.push(formatShare(shareStr(p)));
       parts.push(p?.name || "　");
       return parts.join("　");
     };
