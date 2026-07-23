@@ -197,6 +197,7 @@ export const createNewPerson = (patch = {}) => {
     nameKana: "",
     representative: "",
     share: "",
+    shareOverrides: {},
     roles: ["申請人"],
     role: "申請人",
     contractorMasterId: "",
@@ -348,6 +349,16 @@ export const formatShare = (share, { omitPrefix = false } = {}) => {
     return raw.startsWith("持分") ? raw.slice(2) : raw;
   }
   return raw.startsWith("持分") ? raw : `持分${raw}`;
+};
+
+export const resolvePersonShare = (person, targetId) => {
+  if (!person) return "";
+  const overrides = person.shareOverrides;
+  if (targetId && overrides && typeof overrides === "object") {
+    const ov = overrides[targetId];
+    if (ov != null && String(ov).trim() !== "") return ov;
+  }
+  return person.share ?? "";
 };
 
 export const getSelectedContractor = (siteData, contractors) => (contractors || []).find(c => c.id === siteData.contractorId) || null;

@@ -157,6 +157,8 @@ export const sanitizeSiteData = (raw = {}) => {
           id: p.id || generateId(),
           address: toFullWidthDigits(p.address || ""),
           roles: Array.isArray(p.roles) ? p.roles : (p.role ? p.role.split(/[、,]/).map(x => x.trim()).filter(Boolean) : []),
+          share: p.share || "",
+          shareOverrides: (p.shareOverrides && typeof p.shareOverrides === "object" && !Array.isArray(p.shareOverrides)) ? { ...p.shareOverrides } : {},
           nameKana: p.nameKana || "",
           contractorMasterId: p.contractorMasterId || "",
           decedentName: p.decedentName || ""
