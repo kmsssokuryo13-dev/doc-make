@@ -487,7 +487,7 @@ const parseKoukuOwner = (lines) => {
     const rightsClean = clean(rightsText);
 
     if (seqCol && /^[０-９\d]+$/.test(hw(seqCol))) {
-      const isOwnership = purposeCol.includes("所有権") && !purposeCol.includes("仮登記") && !purposeCol.includes("抹消");
+      const isOwnership = (purposeCol.includes("所有権") || purposeCol.includes("移転") || purposeCol.includes("保存")) && !purposeCol.includes("仮登記") && !purposeCol.includes("抹消");
       currentEntry = { seq: seqCol, rightsCol: [], isOwnershipTransfer: isOwnership };
     }
 
