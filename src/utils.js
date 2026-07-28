@@ -219,6 +219,52 @@ export const createNewPerson = (patch = {}) => {
   };
 };
 
+const personKeyPart = (v) => toHalfWidth(String(v ?? "")).replace(/\s|　/g, "");
+
+export const personIdentityKey = (p = {}) => `${personKeyPart(p.name)}|${personKeyPart(p.address)}`;
+
+export const mergePeople = (existing = [], incoming = [], propertyIds = []) => {
+  const result = existing.map(p => ({ ...p }));
+  const indexByKey = new Map();
+  result.forEach((p, i) => {
+    const key = personIdentityKey(p);
+    if (!indexByKey.has(key)) indexByKey.set(key, i);
+  });
+
+  incoming.forEach(inc => {
+    const key = personIdentityKey(inc);
+    const hasIdentity = key !== "|";
+    const at = hasIdentity ? indexByKey.get(key) : undefined;
+    if (at === undefined) {
+      if (hasIdentity) indexByKey.set(key, result.length);
+      result.push({ ...inc });
+      return;
+    }
+
+    const cur = result[at];
+    const roles = Array.from(new Set([...(cur.roles || []), ...(inc.roles || [])]));
+    const merged = { ...cur, roles, role: roles.join("、") };
+
+    const curShare = String(cur.share || "").trim();
+    const incShare = String(inc.share || "").trim();
+    if (incShare && !curShare) {
+      merged.share = inc.share;
+    } else if (incShare && incShare !== curShare && propertyIds.length > 0) {
+      const overrides = { ...(cur.shareOverrides || {}) };
+      propertyIds.filter(Boolean).forEach(id => { overrides[id] = inc.share; });
+      merged.shareOverrides = overrides;
+    }
+
+    ["nameKana", "representative", "decedentName", "contractorMasterId"].forEach(f => {
+      if (!String(cur[f] || "").trim() && String(inc[f] || "").trim()) merged[f] = inc[f];
+    });
+
+    result[at] = merged;
+  });
+
+  return result;
+};
+
 const compareYMD = (y, m, d, sy, sm, sd) => {
   if (y !== sy) return y - sy;
   if (m !== sm) return m - sm;

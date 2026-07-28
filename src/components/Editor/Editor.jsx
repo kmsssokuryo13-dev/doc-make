@@ -4,7 +4,7 @@ import {
   FileText, Map as MapIcon, Users, Plus, Trash2, Save, Building,
   Info, Upload, Download, Settings2, ExternalLink
 } from 'lucide-react';
-import { createNewSite } from '../../utils.js';
+import { createNewSite, mergePeople } from '../../utils.js';
 import { sanitizeSiteData } from '../../sanitize.js';
 import { extractTextFromPdf, parseRegistrationPdf } from '../../pdfExtract.js';
 import { Modal } from '../ui/Modal.jsx';
@@ -55,7 +55,11 @@ export const Editor = ({ sites, setSites, activeSiteId, setActiveSiteId, contrac
         updated.land = [...(s.land || []), ...data.land];
       }
       if (data.people && data.people.length > 0) {
-        updated.people = [...(s.people || []), ...data.people];
+        const propertyIds = [
+          ...(data.land || []).map(l => l.id),
+          ...(data.buildings || []).map(b => b.id),
+        ];
+        updated.people = mergePeople(s.people || [], data.people, propertyIds);
       }
       return sanitizeSiteData(updated);
     }));
