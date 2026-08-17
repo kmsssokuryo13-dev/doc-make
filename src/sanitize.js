@@ -4,6 +4,9 @@ import {
   parseStructureToFloors, parseAnnexStructureToFloors, parseStructParts,
   sanitizeConfirmationCert
 } from './utils.js';
+import {
+  normalizeRegistrationApplication, migrateLegacyLandTargets
+} from './registrationApplications.js';
 
 export const sanitizeSiteData = (raw = {}) => {
   const sanitizeLand = (l = {}) => ({
@@ -121,6 +124,8 @@ export const sanitizeSiteData = (raw = {}) => {
       struct,
       owner: b.owner || "",
       ownerPersonIds: Array.isArray(b.ownerPersonIds) ? b.ownerPersonIds : [],
+      // この建物が所在する敷地土地（land[].id）。登記対象土地とは別概念。
+      siteLandIds: Array.isArray(b.siteLandIds) ? b.siteLandIds.filter(v => typeof v === "string") : [],
       floorAreas,
       hasBasement,
       annexes: Array.isArray(b.annexes) ? b.annexes.map(sanitizeAnnex) : [],
@@ -144,11 +149,14 @@ export const sanitizeSiteData = (raw = {}) => {
     return acc;
   }, {});
 
+  const land = Array.isArray(raw.land) ? raw.land.map(sanitizeLand) : [];
+  const landIds = new Set(land.map(l => l.id));
+
   return {
     id: raw.id || generateId(),
     name: raw.name || "新規現場",
     address: toFullWidthDigits(raw.address || ""),
-    land: Array.isArray(raw.land) ? raw.land.map(sanitizeLand) : [],
+    land,
     buildings: Array.isArray(raw.buildings) ? raw.buildings.map(sanitizeBuilding) : [],
     proposedBuildings: Array.isArray(raw.proposedBuildings) ? raw.proposedBuildings.map(sanitizeBuilding) : [],
     people: Array.isArray(raw.people)
@@ -166,13 +174,10 @@ export const sanitizeSiteData = (raw = {}) => {
       : [],
     applications: stableSortKeys({ ...baseApplications, ...(raw.applications || {}) }),
     registrationApplications: Array.isArray(raw.registrationApplications)
-      ? raw.registrationApplications.map(ra => ({
-          id: ra.id || generateId(),
-          type: ra.type || "",
-          targetBuildingIds: Array.isArray(ra.targetBuildingIds) ? ra.targetBuildingIds : [],
-          applicantPersonIds: Array.isArray(ra.applicantPersonIds) ? ra.applicantPersonIds : [],
-          documents: stableSortKeys(typeof ra.documents === "object" && ra.documents ? ra.documents : {}),
-        }))
+      ? migrateLegacyLandTargets(
+          raw.registrationApplications.map(normalizeRegistrationApplication),
+          landIds
+        )
       : [],
     documents: stableSortKeys(typeof raw.documents === "object" && raw.documents ? raw.documents : {}),
     docPick: stableSortKeys(typeof raw.docPick === "object" && raw.docPick ? raw.docPick : {}),
