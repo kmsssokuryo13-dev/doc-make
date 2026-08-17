@@ -154,6 +154,8 @@ export const BuildingSection = ({ type, site, update }) => {
       const newBldg = createNewBuilding();
       newBldg.address = address;
       newBldg.houseNum = houseNum;
+      // 所在文字列だけでなく、選んだ土地とのID関連も保持する。
+      newBldg.siteLandIds = [lands[0].id];
       update({ [dataKey]: [...buildings, newBldg] });
       return;
     }
@@ -166,9 +168,22 @@ export const BuildingSection = ({ type, site, update }) => {
     const newBldg = createNewBuilding();
     newBldg.address = address;
     newBldg.houseNum = houseNum;
+    newBldg.siteLandIds = [...selections];
     update({ [dataKey]: [...buildings, newBldg] });
     setIsLandSelectOpen(false);
   }, [landMap, buildings, dataKey, update]);
+
+  // 敷地土地の選択だけを変更する。所在文字列は「土地から転記」操作時のみ生成する方針なので書き換えない。
+  const toggleSiteLand = useCallback((bid, landId) => {
+    update({ [dataKey]: buildings.map(b => {
+      if (b.id !== bid) return b;
+      const cur = Array.isArray(b.siteLandIds) ? b.siteLandIds : [];
+      return {
+        ...b,
+        siteLandIds: cur.includes(landId) ? cur.filter(id => id !== landId) : [...cur, landId]
+      };
+    })});
+  }, [buildings, dataKey, update]);
 
   const updateBuild = (bid, field, val) => {
     update({ [dataKey]: buildings.map(b => {
@@ -273,6 +288,31 @@ export const BuildingSection = ({ type, site, update }) => {
                 </>
               )}
             </div>
+
+            {(site.land || []).length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-200 text-black">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">敷地土地</label>
+                <p className="text-[9px] text-slate-400 mb-2">この建物が所在する土地を選びます（登記対象の土地とは別です）。選択を変えても上の「所在」は自動で書き換わりません。</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(site.land || []).map(l => {
+                    const selected = (b.siteLandIds || []).includes(l.id);
+                    return (
+                      <button
+                        key={l.id}
+                        onClick={() => toggleSiteLand(b.id, l.id)}
+                        className={`text-[10px] px-2.5 py-1 rounded-full border font-bold transition-all active:scale-95 ${
+                          selected
+                            ? 'bg-blue-50 border-blue-400 text-blue-700'
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300'
+                        }`}
+                      >
+                        {[(l.address || '').trim(), (l.lotNumber || '').trim()].filter(Boolean).join(' ') || '（地番なし）'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {!isReg && (
               <div className="mt-4 pt-4 border-t border-slate-200 flex flex-col gap-3 text-black">

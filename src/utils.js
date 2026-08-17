@@ -159,6 +159,7 @@ export const createNewSite = (name) => ({
   name: name || '新規現場',
   address: '', land: [], buildings: [], proposedBuildings: [], people: [],
   applications: APPLICATION_TYPES.reduce((acc, type) => ({ ...acc, [type]: 0 }), {}),
+  registrationApplications: [],
   documents: {}, docPick: {},
   contractorId: "", scrivenerId: ""
 });
@@ -170,6 +171,7 @@ export const createNewBuilding = () => ({
   address: '', symbol: '', houseNum: '', kind: '',
   structMaterial: '', structFloor: '', struct: '',
   owner: '',
+  siteLandIds: [],
   floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
   hasBasement: false,
   annexes: [],

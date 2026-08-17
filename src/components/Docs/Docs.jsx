@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
-import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki, generateId } from '../../utils.js';
+import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES, APPLICATION_TO_DOCS } from '../../constants.js';
+import { syncRegistrationApplications, isLandApplicationType } from '../../registrationApplications.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
@@ -221,33 +222,11 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   // Sync registrationApplications when application counts change
   useEffect(() => {
     if (!siteId || !siteData) return;
-    const apps = siteData.applications || {};
-    const regApps = siteData.registrationApplications || [];
-    let changed = false;
-    let next = [...regApps];
-
-    for (const type of APPLICATION_TYPES) {
-      const desired = Number(apps[type] || 0);
-      const current = next.filter(ra => ra.type === type);
-      if (current.length < desired) {
-        for (let i = current.length; i < desired; i++) {
-          next.push({ id: generateId(), type, targetBuildingIds: [], applicantPersonIds: [], documents: {} });
-          changed = true;
-        }
-      } else if (current.length > desired) {
-        let toRemove = current.length - desired;
-        const reversed = [...next].reverse();
-        next = reversed.filter(ra => {
-          if (ra.type === type && toRemove > 0) { toRemove--; return false; }
-          return true;
-        }).reverse();
-        changed = true;
-      }
-    }
-    // Remove entries for types not in APPLICATION_TYPES
-    const validTypes = new Set(APPLICATION_TYPES);
-    const filtered = next.filter(ra => validTypes.has(ra.type));
-    if (filtered.length !== next.length) { next = filtered; changed = true; }
+    const { next, changed } = syncRegistrationApplications(
+      siteData.applications || {},
+      siteData.registrationApplications || [],
+      APPLICATION_TYPES
+    );
 
     if (changed) {
       setSites(prev => prev.map(s => s.id === siteId ? { ...s, registrationApplications: next } : s));
@@ -352,8 +331,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     const buildingSource = ["建物表題登記", "建物滅失登記"].includes(ra.type) ? (siteData?.proposedBuildings || [])
       : ["建物表題部変更登記", "建物表題部更正登記", "建物合併登記", "建物分割登記", "建物合体登記"].includes(ra.type) ? (siteData?.buildings || [])
       : [];
-    const isLandType = ra.type === "土地地目変更登記";
-    const targetId = ra.targetBuildingIds?.[0];
+    const isLandType = isLandApplicationType(ra.type);
+    const targetId = isLandType ? ra.targetLandIds?.[0] : ra.targetBuildingIds?.[0];
     let targetLabel = "";
     if (isLandType) {
       const land = (siteData?.land || []).find(l => l.id === targetId);
@@ -556,7 +535,7 @@ ${styles}
               const needsProposed = ["建物表題登記", "建物滅失登記"].includes(type);
               const needsBefore = ["建物表題部変更登記", "建物表題部更正登記", "建物合併登記", "建物分割登記", "建物合体登記"].includes(type);
               const buildingSource = needsProposed ? (siteData?.proposedBuildings || []) : needsBefore ? (siteData?.buildings || []) : [];
-              const isLandType = type === "土地地目変更登記";
+              const isLandType = isLandApplicationType(type);
               return (
                 <div key={type}>
                   <CountRow label={type} count={count}
@@ -594,10 +573,11 @@ ${styles}
                               <label className="block text-[10px] font-bold text-gray-500 mb-1">対象土地</label>
                               <select
                                 className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                                value={ra.targetBuildingIds?.[0] || ""}
+                                value={ra.targetLandIds?.[0] || ""}
                                 onChange={e => {
                                   const lid = e.target.value;
-                                  const patch = { targetBuildingIds: lid ? [lid] : [] };
+                                  // 土地系申請の対象土地は targetLandIds を正式な source とする。
+                                  const patch = { targetLandIds: lid ? [lid] : [], targetBuildingIds: [] };
                                   const land = (siteData?.land || []).find(l => l.id === lid);
                                   if (land && Array.isArray(land.ownerPersonIds) && land.ownerPersonIds.length > 0) {
                                     patch.applicantPersonIds = land.ownerPersonIds;
