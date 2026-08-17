@@ -1025,7 +1025,7 @@ export const DocTemplate = ({
               customHtml={pick.customText}
               onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
             >
-              <div style={{ textAlign: 'right', fontSize: '11pt', marginTop: '36mm', marginBottom: '5mm' }}>
+              <div style={{ fontSize: '11pt', marginTop: '36mm', marginBottom: '5mm', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                 {topRightBlock ?? (
                   useLinkedScrivenerOnTopRight ? (
                     <>
