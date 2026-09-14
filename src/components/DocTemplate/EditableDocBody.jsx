@@ -1,21 +1,12 @@
 import React, { useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { isBlankDocumentHtml } from '../../v8Compatibility.js';
 
 export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, children }) => {
   const containerRef = useRef(null);
   const captureRef = useRef(null);
   const draftRef = useRef(null);
   const focusedRef = useRef(false);
-  const isBlankHtml = (html) => {
-    if (html === null || html === undefined) return true;
-    const s = String(html)
-      .replace(/<br\s*\/?>/gi, "")
-      .replace(/&nbsp;/gi, "")
-      .replace(/<[^>]*>/g, "")
-      .replace(/[\s\u3000\u00A0\u2000-\u200B\u202F\u205F\uFEFF]/g, "");
-    return s.length === 0;
-  };
-
-  const hasCustom = !isBlankHtml(customHtml);
+  const hasCustom = !isBlankDocumentHtml(customHtml);
 
   const onChangeRef = useRef(onCustomHtmlChange);
   onChangeRef.current = onCustomHtmlChange;

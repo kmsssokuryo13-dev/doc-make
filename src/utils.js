@@ -31,10 +31,9 @@ export const naturalSortList = (list, key) => {
 
 export const stableSortKeys = (obj) => {
   if (!obj || typeof obj !== 'object') return obj;
-  return Object.keys(obj).sort().reduce((acc, key) => {
-    acc[key] = obj[key];
-    return acc;
-  }, {});
+  return Object.fromEntries(
+    Object.keys(obj).sort().map(key => [key, obj[key]])
+  );
 };
 
 export const getOrderedDocs = (applications = {}) => {
@@ -171,6 +170,8 @@ export const createNewBuilding = () => ({
   address: '', symbol: '', houseNum: '', kind: '',
   structMaterial: '', structFloor: '', struct: '',
   owner: '',
+  ownerPersonIds: [],
+  contractorPersonIds: [],
   siteLandIds: [],
   floorAreas: [{ id: generateId(), floor: '１階', area: '' }],
   hasBasement: false,
@@ -178,7 +179,9 @@ export const createNewBuilding = () => ({
   registrationCause: "",
   registrationDate: { era: "令和", year: "", month: "", day: "", unknown: false },
   additionalCauses: [],
-  confirmationCert: null
+  confirmationCert: null,
+  confirmApplicantPersonIds: [],
+  confirmApplicantNames: []
 });
 
 export const createNewAnnex = () => ({
