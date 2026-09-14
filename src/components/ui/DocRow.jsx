@@ -1,7 +1,7 @@
 import React from 'react';
 import { Minus, Plus } from 'lucide-react';
 
-export const DocRow = ({ name, count, isRequired, sources, onChange, max = Infinity }) => (
+export const DocRow = ({ name, count, isRequired, sources, onChange, min = 0, max = Infinity }) => (
   <div className={`p-4 rounded-xl border-2 bg-white transition-all flex items-center justify-between ${count > 0 ? 'border-blue-400 shadow-sm' : 'border-slate-100 opacity-60'}`}>
     <div className="flex-1 font-bold">
       <div className="flex items-center gap-2 mb-1">
@@ -14,7 +14,7 @@ export const DocRow = ({ name, count, isRequired, sources, onChange, max = Infin
       <button
         type="button"
         onClick={() => onChange(-1)}
-        disabled={count <= 0}
+        disabled={count <= min}
         className="p-1.5 rounded hover:bg-slate-100 text-slate-400 disabled:cursor-not-allowed disabled:opacity-30"
         aria-label={`${name}を1通減らす`}
       ><Minus size={16}/></button>

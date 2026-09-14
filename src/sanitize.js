@@ -147,8 +147,12 @@ export const sanitizeSiteData = (raw = {}) => {
       additionalCauses: Array.isArray(b.additionalCauses) ? b.additionalCauses.map(sanitizeCauseEntry) : [],
       additionalUnknownDate: !!b.additionalUnknownDate,
       confirmationCert: sanitizeConfirmationCert(b.confirmationCert),
-      confirmApplicantPersonIds: Array.isArray(b.confirmApplicantPersonIds) ? b.confirmApplicantPersonIds : [],
-      confirmApplicantNames: Array.isArray(b.confirmApplicantNames) ? b.confirmApplicantNames : []
+      confirmApplicantPersonIds: Array.isArray(b.confirmApplicantPersonIds)
+        ? b.confirmApplicantPersonIds.filter(value => typeof value === "string")
+        : [],
+      confirmApplicantNames: Array.isArray(b.confirmApplicantNames)
+        ? b.confirmApplicantNames.filter(value => typeof value === "string")
+        : []
     };
   };
 

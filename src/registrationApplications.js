@@ -1,4 +1,4 @@
-import { APPLICATION_TYPES } from './constants.js';
+import { APPLICATION_TYPES, APPLICATION_TO_DOCS } from './constants.js';
 import { generateId, stableSortKeys } from './utils.js';
 import {
   countDocumentsFromInstances,
@@ -8,6 +8,7 @@ import {
   getDocumentTemplateKey,
   normalizeApplicationSubject,
   normalizeCompatibilityRecord,
+  normalizeDocumentCount,
   normalizeDocumentInstance,
   normalizeLegacyDocumentCounts,
   synchronizeSubjectFromLegacyPatch,
@@ -196,5 +197,31 @@ export const syncRegistrationApplications = (
   const filtered = next.filter(ra => validTypes.has(ra.type));
   if (filtered.length !== next.length) { next = filtered; changed = true; }
 
+  return { next, changed };
+};
+
+export const ensureRequiredRegistrationDocuments = (
+  registrationApplications = [],
+  definitions = APPLICATION_TO_DOCS
+) => {
+  let changed = false;
+  const next = (Array.isArray(registrationApplications) ? registrationApplications : [])
+    .map(application => {
+      const definition = application && Object.prototype.hasOwnProperty.call(definitions, application.type)
+        ? definitions[application.type]
+        : null;
+      if (!definition?.required?.length) return application;
+      const documents = { ...(application.documents || {}) };
+      let applicationChanged = false;
+      definition.required.forEach(documentName => {
+        if (normalizeDocumentCount(documents[documentName]) < 1) {
+          documents[documentName] = 1;
+          applicationChanged = true;
+        }
+      });
+      if (!applicationChanged) return application;
+      changed = true;
+      return { ...application, documents };
+    });
   return { next, changed };
 };

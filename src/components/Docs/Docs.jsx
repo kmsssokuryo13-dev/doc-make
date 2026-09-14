@@ -5,10 +5,13 @@ import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '.
 import { APPLICATION_TYPES, APPLICATION_TO_DOCS } from '../../constants.js';
 import {
   applyRegistrationApplicationPatch,
+  ensureRequiredRegistrationDocuments,
   syncRegistrationApplications,
   isLandApplicationType,
 } from '../../registrationApplications.js';
 import {
+  acknowledgeDetachedDocumentSource,
+  acknowledgeSelectionOverrideSources,
   createStableDocumentInstanceId,
   getDocumentTemplateKey,
   LEGACY_DOCUMENT_PICK_DEFAULTS,
@@ -17,11 +20,88 @@ import {
   reconcileSiteDocumentCompatibility,
   selectLegacyPickForApplication,
 } from '../../v8Compatibility.js';
+import {
+  buildDocumentContextsForInstances,
+  getDocumentContextPrintBlockers,
+} from '../../documentContext.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
 import { DocTemplate } from '../DocTemplate/DocTemplate.jsx';
 import { DraggableApplicantList } from '../ui/DraggableApplicantList.jsx';
+
+const DOCUMENT_CONTEXT_STATUS = {
+  current: { label: '最新', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50/60' },
+  modified: { label: '個別設定', badge: 'bg-blue-100 text-blue-700', panel: 'border-blue-200 bg-blue-50/60' },
+  detached: { label: '全文固定', badge: 'bg-amber-100 text-amber-700', panel: 'border-amber-200 bg-amber-50/60' },
+  warning: { label: '確認推奨', badge: 'bg-amber-100 text-amber-700', panel: 'border-amber-200 bg-amber-50/60' },
+  'review-required': { label: '要確認', badge: 'bg-rose-100 text-rose-700', panel: 'border-rose-200 bg-rose-50/60' },
+};
+
+const getDocumentContextStatusStyle = (context) => {
+  if (context?.status === 'review-required' &&
+      !context.issues?.some(issue => issue.severity === 'blocking')) {
+    return DOCUMENT_CONTEXT_STATUS.warning;
+  }
+  return DOCUMENT_CONTEXT_STATUS[context?.status] || DOCUMENT_CONTEXT_STATUS.current;
+};
+
+const DocumentContextSummary = ({ context }) => {
+  if (!context?.supported) return null;
+  const status = getDocumentContextStatusStyle(context);
+  const building = context.data?.building;
+  const applicantNames = (context.data?.applicants || [])
+    .map(person => person?.name || '(氏名未入力)')
+    .join('・');
+  const ownerNames = (context.data?.owners || [])
+    .map(person => person?.name || '(氏名未入力)')
+    .join('・');
+  const contractorName = context.data?.contractor?.name || '';
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-2 ${status.panel}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black text-slate-600">
+          {context.editMode === 'linked' ? '自動設定' : '最新データ（全文固定には未反映）'}
+        </span>
+        <span className={`text-[9px] px-2 py-0.5 rounded-full font-black ${status.badge}`}>{status.label}</span>
+      </div>
+      <dl className="grid grid-cols-[4.5em_1fr] gap-x-2 gap-y-1 text-[9px] leading-relaxed">
+        <dt className="text-slate-400">対象建物</dt>
+        <dd className="text-slate-700 break-words">{building ? (building.houseNum || building.address || '(建物情報未入力)') : '未解決'}</dd>
+        <dt className="text-slate-400">申請人</dt>
+        <dd className="text-slate-700 break-words">{applicantNames || '未解決'}</dd>
+        {context.meta?.documentName === '工事完了引渡証明書（表題）' && (
+          <>
+            <dt className="text-slate-400">所有者</dt>
+            <dd className="text-slate-700 break-words">{ownerNames || '未解決'}</dd>
+            <dt className="text-slate-400">工事人</dt>
+            <dd className="text-slate-700 break-words">{contractorName || '未解決'}</dd>
+          </>
+        )}
+      </dl>
+      {context.issues?.length > 0 && (
+        <ul className="border-t border-current/10 pt-2 space-y-1 text-[9px] leading-relaxed text-rose-700">
+          {context.issues.map((issue, index) => (
+            <li key={`${issue.code}-${index}`} className={issue.severity === 'warning' ? 'text-amber-700' : ''}>
+              {issue.severity === 'blocking' ? '⚠ ' : '● '}{issue.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+const DocumentContextStatusBadge = ({ context }) => {
+  if (!context?.supported) return null;
+  const status = getDocumentContextStatusStyle(context);
+  return (
+    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black whitespace-nowrap ${status.badge}`}>
+      {status.label}
+    </span>
+  );
+};
 
 export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const [params] = useSearchParams();
@@ -76,6 +156,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
               copyIndex,
               key: `${docName}__${idx}`,
               identity: `${siteData.id}:v8:${stableId}`,
+              documentInstanceId: stableId,
               raId: ra.id,
               sources: [ra.type],
             });
@@ -118,6 +199,18 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     ...DEFAULT_PICK,
     ...(siteData?.docPick?.[activeInstanceKey] || {})
   };
+
+  // Previewと印刷が同じ日付・同じ解決結果を使うよう、画面を開いた時刻を固定する。
+  const documentContextNow = useMemo(() => new Date(), [siteId]);
+  const documentContextsByIdentity = useMemo(() => buildDocumentContextsForInstances({
+    site: siteData,
+    instances: allInstances,
+    scriveners,
+    now: documentContextNow,
+  }), [allInstances, documentContextNow, scriveners, siteData]);
+  const activeDocumentContext = activeInstance
+    ? documentContextsByIdentity[activeInstance.identity] || null
+    : null;
 
   useEffect(() => {
     if (!siteId || !siteData) return;
@@ -240,6 +333,20 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     if (!changed) return;
     setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: stableSortKeys(nextDocs) } : s));
   }, [step, siteId, siteData, orderedDocs, setSites]);
+
+  // 登記申請ごとの必須書類はStep2到達時に最低1通を保証する。
+  useEffect(() => {
+    if (!siteId || step < 2) return;
+    setSites(prev => prev.map(site => {
+      if (site.id !== siteId) return site;
+      const { next: applications, changed } = ensureRequiredRegistrationDocuments(
+        site.registrationApplications || []
+      );
+      return changed
+        ? reconcileSiteDocumentCompatibility({ ...site, registrationApplications: applications })
+        : site;
+    }));
+  }, [setSites, siteId, step]);
 
   // Sync registrationApplications when application counts change
   useEffect(() => {
@@ -414,21 +521,98 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   }, [step, allInstances, activeInstanceId]);
 
   const handlePickChange = (instanceKey, patch) => {
-    const current = {
-      ...DEFAULT_PICK,
-      ...(siteData?.docPick?.[instanceKey] || {})
-    };
+    const editedInstance = allInstances.find(instance => instance.key === instanceKey);
+    const editedContext = editedInstance
+      ? documentContextsByIdentity[editedInstance.identity] || null
+      : null;
+    const sourceSnapshotAtEdit = Object.prototype.hasOwnProperty.call(patch, 'customText') &&
+      typeof patch.customText === 'string' && patch.customText.trim()
+      ? editedContext?.sourceSnapshot || null
+      : null;
+    const selectionOverrideSourcesAtEdit = editedContext?.selectionOverrideSources || null;
     setSites(prev => prev.map(s => {
       if (s.id !== siteId) return s;
+      const current = {
+        ...DEFAULT_PICK,
+        ...(s.docPick?.[instanceKey] || {}),
+      };
       const docPick = {
         ...s.docPick,
         [instanceKey]: { ...current, ...patch },
       };
       return reconcileSiteDocumentCompatibility(
         { ...s, docPick },
-        { legacyPickIntentFields: { [instanceKey]: Object.keys(patch) } }
+        {
+          legacyPickIntentFields: { [instanceKey]: Object.keys(patch) },
+          detachedSourceSnapshots: sourceSnapshotAtEdit
+            ? { [instanceKey]: sourceSnapshotAtEdit }
+            : {},
+          selectionOverrideSourceValuesByPick: selectionOverrideSourcesAtEdit
+            ? { [instanceKey]: selectionOverrideSourcesAtEdit }
+            : {},
+        }
       );
     }));
+  };
+
+  const handleAcknowledgeDetachedSource = () => {
+    if (!activeInstance?.raId || !activeInstance.documentInstanceId ||
+        !activeDocumentContext?.sourceSnapshot) return;
+    const confirmed = window.confirm(
+      '現在の全文固定内容を維持し、最新の案件情報を確認済みとして扱います。\n' +
+      '固定本文の氏名・住所などは自動更新されません。表示内容を確認しましたか？'
+    );
+    if (!confirmed) return;
+    setSites(prev => prev.map(site => {
+      if (site.id !== siteId) return site;
+      let changed = false;
+      const registrationApplications = (site.registrationApplications || []).map(application => {
+        if (application.id !== activeInstance.raId) return application;
+        const result = acknowledgeDetachedDocumentSource(application, {
+          documentInstanceId: activeInstance.documentInstanceId,
+          sourceSnapshot: activeDocumentContext.sourceSnapshot,
+        });
+        changed = changed || result.changed;
+        return result.next;
+      });
+      return changed
+        ? reconcileSiteDocumentCompatibility({ ...site, registrationApplications })
+        : site;
+    }));
+  };
+
+  const handleAcknowledgeSelectionOverrides = () => {
+    if (!activeInstance?.raId || !activeInstance.documentInstanceId ||
+        !activeDocumentContext?.selectionOverrideSources) return;
+    const confirmed = window.confirm(
+      '現在の書類固有設定を維持し、最新のStep1情報を確認済みとして扱います。\n' +
+      '対象建物・申請人などの設定内容を確認しましたか？'
+    );
+    if (!confirmed) return;
+    setSites(prev => prev.map(site => {
+      if (site.id !== siteId) return site;
+      let changed = false;
+      const registrationApplications = (site.registrationApplications || []).map(application => {
+        if (application.id !== activeInstance.raId) return application;
+        const result = acknowledgeSelectionOverrideSources(application, {
+          documentInstanceId: activeInstance.documentInstanceId,
+          selectionOverrideSources: activeDocumentContext.selectionOverrideSources,
+        });
+        changed = changed || result.changed;
+        return result.next;
+      });
+      return changed
+        ? reconcileSiteDocumentCompatibility({ ...site, registrationApplications })
+        : site;
+    }));
+  };
+
+  const handleResetDocumentText = () => {
+    const hasDetachedText = typeof activePick.customText === 'string' && activePick.customText.trim();
+    if (hasDetachedText && !window.confirm(
+      '全文編集した内容を破棄し、最新データ連動方式へ戻します。よろしいですか？'
+    )) return;
+    handlePickChange(activeInstanceKey, { customText: null });
   };
 
   const handleStampPosChange = (index, nextDx, nextDy) => {
@@ -448,6 +632,11 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   };
 
   const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
+  const blockingPrintInstances = useMemo(() => getDocumentContextPrintBlockers({
+    instances: allInstances,
+    contextsByIdentity: documentContextsByIdentity,
+    docPick: siteData?.docPick || {},
+  }), [allInstances, documentContextsByIdentity, siteData?.docPick]);
 
   const openPrintWindowForDoc = (pages, title, styles) => {
     const printWindow = window.open('', '_blank');
@@ -502,6 +691,13 @@ ${styles}
   }, [printInstances]);
 
   const printSingleDoc = (docKey, title) => {
+    const blocked = blockingPrintInstances.find(instance => instance.key === docKey);
+    if (blocked) {
+      setActiveInstanceId(blocked.identity);
+      setShowPrintPanel(false);
+      alert(`「${blocked.name}」に未解決の確認項目があります。書類設定を確認してください。`);
+      return;
+    }
     const el = document.getElementById("print-area");
     if (!el) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -559,7 +755,7 @@ ${styles}
           const instPick = siteData?.docPick?.[inst.key] || DEFAULT_PICK;
           return (
             <div key={inst.key} data-doc-name={inst.name} data-doc-key={inst.key} className={`w-[210mm] h-[297mm] bg-white font-serif leading-relaxed ${i > 0 ? "break-before-page" : ""} relative overflow-hidden`}>
-                <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={instPick} isPrint={true} scriveners={scriveners} />
+                <DocTemplate name={inst.name} siteData={siteData} instanceIndex={inst.index} instanceKey={inst.key} pick={instPick} isPrint={true} scriveners={scriveners} documentContext={documentContextsByIdentity[inst.identity] || null} />
             </div>
           );
         })}
@@ -578,7 +774,16 @@ ${styles}
         <div className="flex gap-2">
           {step > 1 && <button onClick={() => setStep(step - 1)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg">戻る</button>}
           {step < 3 ? <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition-all">次へ進む</button>
-          : <button onClick={() => { if (!printInstances.length) { alert("印刷対象がありません。"); return; } setShowPrintPanel(true); }} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Printer size={18} /> 印刷実行</button>}
+          : <button onClick={() => {
+              if (!printInstances.length) { alert("印刷対象がありません。"); return; }
+              if (blockingPrintInstances.length > 0) {
+                const firstBlocked = blockingPrintInstances[0];
+                setActiveInstanceId(firstBlocked.identity);
+                alert(`「${firstBlocked.name}」に未解決の確認項目があります。書類設定を確認してください。`);
+                return;
+              }
+              setShowPrintPanel(true);
+            }} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Printer size={18} /> 印刷実行</button>}
         </div>
       </header>
 
@@ -710,11 +915,12 @@ ${styles}
                           const count = Number(raDocs[docName] || 0);
                           return (
                             <DocRow key={docName} name={docName} count={count} isRequired={isReq} sources={[ra.type]}
+                              min={isReq ? 1 : 0}
                               max={MAX_DOCUMENT_COPIES_PER_APPLICATION}
                               onChange={(delta) => {
                                 const next = Math.min(
                                   MAX_DOCUMENT_COPIES_PER_APPLICATION,
-                                  Math.max(0, count + delta)
+                                  Math.max(isReq ? 1 : 0, count + delta)
                                 );
                                 updateRegApp(ra.id, { documents: { ...raDocs, [docName]: next } });
                               }} />
@@ -770,9 +976,10 @@ ${styles}
                             <div className="space-y-1 ml-1">
                               {group.instances.map(inst => {
                                 const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                                const context = documentContextsByIdentity[inst.identity] || null;
                                 return (
                                   <button key={inst.identity} onClick={() => setActiveInstanceId(inst.identity)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceId === inst.identity ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
-                                    <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
+                                    <div className="flex items-center justify-between gap-1"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><div className="flex items-center gap-1"><DocumentContextStatusBadge context={context} /><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div></div>
                                   </button>
                                 );
                               })}
@@ -785,9 +992,10 @@ ${styles}
                             <div className="space-y-1 ml-1">
                               {ungrouped.map(inst => {
                                 const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                                const context = documentContextsByIdentity[inst.identity] || null;
                                 return (
                                   <button key={inst.identity} onClick={() => setActiveInstanceId(inst.identity)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceId === inst.identity ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
-                                    <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
+                                    <div className="flex items-center justify-between gap-1"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><div className="flex items-center gap-1"><DocumentContextStatusBadge context={context} /><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div></div>
                                   </button>
                                 );
                               })}
@@ -801,9 +1009,10 @@ ${styles}
                   return (
                     <div className="space-y-1.5">{allInstances.map(inst => {
                       const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
+                      const context = documentContextsByIdentity[inst.identity] || null;
                       return (
                         <button key={inst.identity} onClick={() => setActiveInstanceId(inst.identity)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceId === inst.identity ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
-                          <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
+                          <div className="flex items-center justify-between gap-1"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><div className="flex items-center gap-1"><DocumentContextStatusBadge context={context} /><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div></div>
                         </button>
                       );
                     })}</div>
@@ -813,6 +1022,7 @@ ${styles}
               {activeInstance && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
+                  <DocumentContextSummary context={activeDocumentContext} />
                   {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && activeInstance.name !== "滅失証明書（滅失）" && activeInstance.name !== "滅失証明書（表題部変更）" && activeInstance.name !== "非登載証明書" && activeInstance.name !== "委任状（表題）" && activeInstance.name !== "委任状（保存）" && activeInstance.name !== "工事完了引渡証明書（表題）" && activeInstance.name !== "申述書（共有）" && activeInstance.name !== "申述書（単独）" && (
                     <div className="space-y-2 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
                   )}
@@ -939,10 +1149,19 @@ ${styles}
     );
   }
 
-  const all = applicantsInPeople || [];
-  const cur = Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : [];
+  const usesDocumentContext = activeDocumentContext?.supported === true;
+  const all = usesDocumentContext ? (siteData?.people || []) : (applicantsInPeople || []);
+  const cur = usesDocumentContext
+    ? (activeDocumentContext.selection?.applicantPersonIds || [])
+    : (Array.isArray(activePick.applicantPersonIds) ? activePick.applicantPersonIds : []);
+  const canonicalIds = usesDocumentContext
+    ? (activeDocumentContext.canonicalSelection?.applicantPersonIds || [])
+    : [];
   const selecting = cur.length > 0;
   const curSet = new Set(cur);
+  const hasContextOverride = usesDocumentContext && (
+    cur.length !== canonicalIds.length || cur.some((id, index) => id !== canonicalIds[index])
+  );
 
   const setSelecting = (on) => {
     if (!on) {
@@ -971,6 +1190,26 @@ ${styles}
 
       {all.length === 0 ? (
         <p className="text-[10px] text-slate-400">申請人が登録されていません。</p>
+      ) : usesDocumentContext ? (
+        <>
+          <p className="text-[9px] text-slate-400 mb-2">Step1の申請人を自動使用します。ここで変更すると、この書類だけの個別設定になります。</p>
+          <DraggableApplicantList
+            candidates={all}
+            selectedIds={cur}
+            onToggle={toggleOne}
+            onReorder={(newIds) => handlePickChange(activeInstanceKey, { applicantPersonIds: newIds })}
+            minOne
+          />
+          {hasContextOverride && (
+            <button
+              type="button"
+              onClick={() => handlePickChange(activeInstanceKey, { applicantPersonIds: canonicalIds })}
+              className="mt-2 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+            >
+              Step1の申請人に戻す
+            </button>
+          )}
+        </>
       ) : (
         <>
           <label className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
@@ -1005,12 +1244,12 @@ ${styles}
                       <label className="block text-[10px] font-bold text-gray-500 mb-1">予定家屋番号選択</label>
                       <select
                         className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                        value={activePick.targetPropBuildingId || ""}
+                        value={activeDocumentContext?.selection?.targetBuildingId || activePick.targetPropBuildingId || ""}
                         onChange={e => {
                           const bid = e.target.value;
                           const patch = { targetPropBuildingId: bid };
                           const bldg = (siteData.proposedBuildings || []).find(b => b.id === bid);
-                          if (bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
+                          if (!activeDocumentContext?.supported && bldg && Array.isArray(bldg.ownerPersonIds) && bldg.ownerPersonIds.length > 0) {
                             patch.applicantPersonIds = bldg.ownerPersonIds;
                           }
                           handlePickChange(activeInstanceKey, patch);
@@ -1052,7 +1291,7 @@ ${styles}
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">{activeInstance.name === "委任状（表題部更正）" ? "更正後" : "変更後"}の建物を選択</label>
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                            value={activePick.targetPropBuildingId || ""}
+                            value={activeDocumentContext?.selection?.targetBuildingId || activePick.targetPropBuildingId || ""}
                             onChange={e => {
                               const bid = e.target.value;
                               const patch = { targetPropBuildingId: bid };
@@ -1267,7 +1506,7 @@ ${styles}
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                            value={activePick.targetPropBuildingId || ""}
+                            value={activeDocumentContext?.selection?.targetBuildingId || activePick.targetPropBuildingId || ""}
                             onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
                           >
                             <option value="">(未選択)</option>
@@ -1284,11 +1523,11 @@ ${styles}
                             </label>
                             <select
                               className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                              value={activePick.statementApplicantPersonId || ""}
+                              value={activeDocumentContext?.selection?.soleApplicantPersonId || activePick.statementApplicantPersonId || ""}
                               onChange={e => handlePickChange(activeInstanceKey, { statementApplicantPersonId: e.target.value })}
                             >
                               <option value="">(未選択)</option>
-                              {(applicantsInPeople || []).map(p => (
+                              {(activeDocumentContext?.data?.applicants || applicantsInPeople || []).map(p => (
                                 <option key={p.id} value={p.id}>{p.name || "(氏名未入力)"}</option>
                               ))}
                             </select>
@@ -1298,16 +1537,26 @@ ${styles}
 
                         {(() => {
                           const people = siteData?.people || [];
-                          const applicants = people.filter(p => (p.roles || []).includes("申請人"));
+                          const usesContext = activeDocumentContext?.supported === true;
+                          const applicants = usesContext
+                            ? (activeDocumentContext.data?.applicants || [])
+                            : people.filter(p => (p.roles || []).includes("申請人"));
                           const others = people.filter(p => (p.roles || []).includes("その他"));
-                          const confirmPersonIds = new Set();
-                          for (const bldg of (siteData?.proposedBuildings || [])) {
-                            for (const pid of (bldg.confirmApplicantPersonIds || [])) confirmPersonIds.add(pid);
-                          }
-                          const confirmPeople = [...confirmPersonIds].map(id => people.find(p => p.id === id)).filter(Boolean);
+                          const confirmPeople = usesContext
+                            ? (activeDocumentContext.data?.confirmation?.applicants || []).map(item => item.person).filter(Boolean)
+                            : (() => {
+                                const confirmPersonIds = new Set();
+                                for (const bldg of (siteData?.proposedBuildings || [])) {
+                                  for (const pid of (bldg.confirmApplicantPersonIds || [])) confirmPersonIds.add(pid);
+                                }
+                                return [...confirmPersonIds].map(id => people.find(p => p.id === id)).filter(Boolean);
+                              })();
+                          const currentContextPeople = usesContext
+                            ? (activeDocumentContext.data?.statementPeople || [])
+                            : [];
                           const seen = new Set();
                           const candidates = [];
-                          for (const p of [...applicants, ...others, ...confirmPeople]) {
+                          for (const p of [...applicants, ...others, ...confirmPeople, ...currentContextPeople]) {
                             if (!seen.has(p.id)) { seen.add(p.id); candidates.push(p); }
                           }
 
@@ -1315,12 +1564,19 @@ ${styles}
                             return <p className="text-[10px] text-slate-400">「申請人」「その他」または確認済証建築申請人が登録されていません。</p>;
                           }
 
-                          const defaultIds = applicants.map(p => p.id);
-                          const cur = Array.isArray(activePick.statementPersonIds) ? activePick.statementPersonIds : [];
-                          const selecting = cur.length > 0;
+                          const defaultIds = usesContext
+                            ? (activeDocumentContext.selection?.applicantPersonIds || [])
+                            : applicants.map(p => p.id);
+                          const cur = usesContext
+                            ? (activeDocumentContext.selection?.statementPersonIds || [])
+                            : (Array.isArray(activePick.statementPersonIds) ? activePick.statementPersonIds : []);
+                          const selecting = usesContext
+                            ? (cur.length !== defaultIds.length || cur.some((id, index) => id !== defaultIds[index]))
+                            : cur.length > 0;
+                          const selectedIds = usesContext ? cur : (selecting ? cur : defaultIds);
 
                           const toggleOne = (id) => {
-                            const base = new Set(selecting ? cur : defaultIds);
+                            const base = new Set(selectedIds);
                             if (base.has(id)) base.delete(id);
                             else base.add(id);
                             if (base.size === 0) return;
@@ -1336,12 +1592,21 @@ ${styles}
                               <div className="mt-2">
                                 <DraggableApplicantList
                                   candidates={candidates}
-                                  selectedIds={selecting ? cur : defaultIds}
+                                  selectedIds={selectedIds}
                                   onToggle={toggleOne}
                                   onReorder={(newIds) => handlePickChange(activeInstanceKey, { statementPersonIds: newIds })}
                                   minOne
                                 />
                               </div>
+                              {usesContext && selecting && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePickChange(activeInstanceKey, { statementPersonIds: [] })}
+                                  className="mt-2 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+                                >
+                                  Step1の申請人に戻す
+                                </button>
+                              )}
                             </div>
                           );
                         })()}
@@ -1602,24 +1867,40 @@ ${styles}
                   {activeInstance.name === "工事完了引渡証明書（表題）"&& (
                     <div className="border-t pt-4">
                       <div className="space-y-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-1">工事人を選択</label>
-                          <select
-                            className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                            value={activePick.targetContractorPersonId || ""}
-                            onChange={e => handlePickChange(activeInstanceKey, { targetContractorPersonId: e.target.value })}
-                          >
-                            <option value="">(未選択・最初の工事人)</option>
-                            {(contractorsInPeople || []).map(p => (
-                              <option key={p.id} value={p.id}>{p.name || "(名前未入力)"}</option>
-                            ))}
-                          </select>
-                        </div>
+                        {(() => {
+                          const usesContext = activeDocumentContext?.supported === true;
+                          const people = siteData?.people || [];
+                          const linkedIds = activeDocumentContext?.data?.building?.contractorPersonIds || [];
+                          const linkedPeople = linkedIds.map(id => people.find(person => person.id === id)).filter(Boolean);
+                          const currentContractor = activeDocumentContext?.data?.contractor;
+                          const seen = new Set();
+                          const candidates = [];
+                          for (const person of usesContext
+                            ? [...linkedPeople, ...(contractorsInPeople || []), ...(currentContractor ? [currentContractor] : [])]
+                            : (contractorsInPeople || [])) {
+                            if (!seen.has(person.id)) { seen.add(person.id); candidates.push(person); }
+                          }
+                          return (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 mb-1">工事人を選択</label>
+                              <select
+                                className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                                value={activeDocumentContext?.selection?.contractorPersonId || activePick.targetContractorPersonId || ""}
+                                onChange={e => handlePickChange(activeInstanceKey, { targetContractorPersonId: e.target.value })}
+                              >
+                                <option value="">(未選択)</option>
+                                {candidates.map(person => (
+                                  <option key={person.id} value={person.id}>{person.name || "(名前未入力)"}</option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })()}
                         <div>
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
                           <select
                             className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
-                            value={activePick.targetPropBuildingId || ""}
+                            value={activeDocumentContext?.selection?.targetBuildingId || activePick.targetPropBuildingId || ""}
                             onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
                           >
                             <option value="">(未選択)</option>
@@ -1920,7 +2201,32 @@ ${styles}
                     <p className="text-[9px] text-gray-400 mt-1">テキストを選択してからサイズを変更</p>
                   </div>
 
-                  <div className="border-t pt-2 space-y-2 font-sans font-bold"><button onClick={() => handlePickChange(activeInstanceKey, { customText: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 文言をリセット</button><button onClick={() => handlePickChange(activeInstanceKey, { stampPositions: null, signerStampPositions: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 位置をリセット</button></div>
+                  <div className="border-t pt-2 space-y-2 font-sans font-bold">
+                    {activeDocumentContext?.issues?.some(issue =>
+                      issue.scope === 'detached' && issue.severity === 'blocking'
+                    ) && (
+                      <button
+                        type="button"
+                        onClick={handleAcknowledgeDetachedSource}
+                        className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 text-[9px] font-bold rounded"
+                      >
+                        現在の全文を確認済みにする
+                      </button>
+                    )}
+                    {activeDocumentContext?.issues?.some(issue =>
+                      issue.scope === 'selection-override' && issue.severity === 'blocking'
+                    ) && (
+                      <button
+                        type="button"
+                        onClick={handleAcknowledgeSelectionOverrides}
+                        className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 text-[9px] font-bold rounded"
+                      >
+                        現在の個別設定を確認済みにする
+                      </button>
+                    )}
+                    <button onClick={handleResetDocumentText} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> {activeDocumentContext?.editMode && activeDocumentContext.editMode !== 'linked' ? '最新データ連動へ切替' : '文言をリセット'}</button>
+                    <button onClick={() => handlePickChange(activeInstanceKey, { stampPositions: null, signerStampPositions: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 位置をリセット</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1931,7 +2237,7 @@ ${styles}
                   <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden">
                     <DocTemplate key={activeInstance.identity} name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                        instanceKey={activeInstanceKey}
-                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} />
+                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} documentContext={activeDocumentContext} />
                   </div>
                 </div>
               ) : <div className="flex items-center text-slate-400 italic h-full font-bold">書類を選択してください</div>}

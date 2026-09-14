@@ -974,6 +974,52 @@ test('RA由来値は元データ更新へ同期し、明示overrideだけを維�
   assert.equal(site.docPick[key].targetPropBuildingId, 'special-building');
 });
 
+test('表題の帳票対象overrideはsubjectのprimaryBuildingIdを正本として保持する', () => {
+  const key = `${DOC_TITLE}__1`;
+  let site = sanitizeSiteData({
+    id: 'site-primary-target',
+    registrationApplications: [{
+      id: 'ra-primary-target',
+      type: '建物表題登記',
+      targetBuildingIds: ['building-a', 'building-b'],
+      subject: {
+        beforeBuildingIds: [],
+        afterBuildingIds: ['building-a', 'building-b'],
+        landIds: [],
+        primaryBuildingId: 'building-b',
+      },
+      documents: { [DOC_TITLE]: 1 },
+    }],
+  });
+  assert.equal(site.docPick[key].targetPropBuildingId, 'building-b');
+
+  site = reconcileSiteDocumentCompatibility({
+    ...site,
+    docPick: {
+      ...site.docPick,
+      [key]: { ...site.docPick[key], targetPropBuildingId: 'building-a' },
+    },
+  }, { legacyPickIntentFields: { [key]: ['targetPropBuildingId'] } });
+  assert.equal(site.docPick[key].targetPropBuildingId, 'building-a');
+  assert.equal(
+    site.registrationApplications[0].documentInstances[0]
+      .selectionOverrides.targetPropBuildingId,
+    'building-a'
+  );
+
+  site = reconcileSiteDocumentCompatibility({
+    ...site,
+    docPick: {
+      ...site.docPick,
+      [key]: { ...site.docPick[key], targetPropBuildingId: 'building-b' },
+    },
+  }, { legacyPickIntentFields: { [key]: ['targetPropBuildingId'] } });
+  assert.deepEqual(
+    site.registrationApplications[0].documentInstances[0].selectionOverrides,
+    {}
+  );
+});
+
 test('明示overrideは元データと一時的に同値になっても明示解除まで維持する', () => {
   const key = `${DOC_TITLE}__1`;
   let site = sanitizeSiteData({
