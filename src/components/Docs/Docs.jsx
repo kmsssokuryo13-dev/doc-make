@@ -12,6 +12,7 @@ import {
   createStableDocumentInstanceId,
   getDocumentTemplateKey,
   LEGACY_DOCUMENT_PICK_DEFAULTS,
+  MAX_DOCUMENT_COPIES_PER_APPLICATION,
   normalizeDocumentCount,
   reconcileSiteDocumentCompatibility,
   selectLegacyPickForApplication,
@@ -709,8 +710,12 @@ ${styles}
                           const count = Number(raDocs[docName] || 0);
                           return (
                             <DocRow key={docName} name={docName} count={count} isRequired={isReq} sources={[ra.type]}
+                              max={MAX_DOCUMENT_COPIES_PER_APPLICATION}
                               onChange={(delta) => {
-                                const next = Math.max(0, count + delta);
+                                const next = Math.min(
+                                  MAX_DOCUMENT_COPIES_PER_APPLICATION,
+                                  Math.max(0, count + delta)
+                                );
                                 updateRegApp(ra.id, { documents: { ...raDocs, [docName]: next } });
                               }} />
                           );
@@ -729,7 +734,8 @@ ${styles}
               {orderedDocs.length === 0 ? <p className="p-12 text-center text-gray-400 bg-white border border-dashed rounded-2xl">登記申請を選択してください。</p>
               : <div className="space-y-3">{orderedDocs.map(d => (
                   <DocRow key={d.name} name={d.name} count={siteData?.documents?.[d.name] || 0} isRequired={d.isRequired} sources={d.sources}
-                    onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.max(0, (s.documents?.[d.name]||0) + delta) } } : s))} />
+                    max={MAX_DOCUMENT_COPIES_PER_APPLICATION}
+                    onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.min(MAX_DOCUMENT_COPIES_PER_APPLICATION, Math.max(0, (s.documents?.[d.name]||0) + delta)) } } : s))} />
                 ))}</div>}
             </div>
           );
