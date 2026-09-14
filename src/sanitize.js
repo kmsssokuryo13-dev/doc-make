@@ -7,6 +7,11 @@ import {
 import {
   normalizeRegistrationApplication, migrateLegacyLandTargets
 } from './registrationApplications.js';
+import {
+  normalizeLegacyDocumentCounts,
+  rebindLegacyPickApplicationIds,
+  reconcileSiteDocumentCompatibility,
+} from './v8Compatibility.js';
 
 export const sanitizeSiteData = (raw = {}) => {
   const sanitizeLand = (l = {}) => ({
@@ -124,6 +129,9 @@ export const sanitizeSiteData = (raw = {}) => {
       struct,
       owner: b.owner || "",
       ownerPersonIds: Array.isArray(b.ownerPersonIds) ? b.ownerPersonIds : [],
+      contractorPersonIds: Array.isArray(b.contractorPersonIds)
+        ? b.contractorPersonIds.filter(v => typeof v === "string")
+        : [],
       // この建物が所在する敷地土地（land[].id）。登記対象土地とは別概念。
       siteLandIds: Array.isArray(b.siteLandIds) ? b.siteLandIds.filter(v => typeof v === "string") : [],
       floorAreas,
@@ -151,6 +159,54 @@ export const sanitizeSiteData = (raw = {}) => {
 
   const land = Array.isArray(raw.land) ? raw.land.map(sanitizeLand) : [];
   const landIds = new Set(land.map(l => l.id));
+  const rawDocPick = stableSortKeys(
+    raw.docPick && typeof raw.docPick === "object" && !Array.isArray(raw.docPick)
+      ? raw.docPick
+      : {}
+  );
+  // v6の土地対象補正を先に行うことで、明示済みsubjectは保持しつつ、
+  // subject未導入データだけを補正後のlegacy値から正しく生成する。
+  const migratedRawApplications = Array.isArray(raw.registrationApplications)
+    ? migrateLegacyLandTargets(raw.registrationApplications, landIds)
+    : [];
+  const reservedApplicationIds = new Set(
+    migratedRawApplications
+      .map(application => application?.id)
+      .filter(id => typeof id === "string" && id)
+  );
+  const usedApplicationIds = new Set();
+  const originalApplicationIds = [];
+  const migratedApplications = migratedRawApplications.map((application, applicationIndex) => {
+    if (!application || typeof application !== "object" || Array.isArray(application)) {
+      originalApplicationIds[applicationIndex] = "";
+      return normalizeRegistrationApplication(application);
+    }
+    const originalId = typeof application.id === "string" ? application.id : "";
+    originalApplicationIds[applicationIndex] = originalId;
+    if (!originalId || !usedApplicationIds.has(originalId)) {
+      if (originalId) usedApplicationIds.add(originalId);
+      return normalizeRegistrationApplication(application);
+    }
+    let suffix = 2;
+    let uniqueId = `${originalId}~${suffix}`;
+    while (reservedApplicationIds.has(uniqueId) || usedApplicationIds.has(uniqueId)) {
+      uniqueId = `${originalId}~${++suffix}`;
+    }
+    reservedApplicationIds.add(uniqueId);
+    usedApplicationIds.add(uniqueId);
+    return normalizeRegistrationApplication({ ...application, id: uniqueId });
+  });
+  const reboundDocPick = rebindLegacyPickApplicationIds({
+    applications: migratedApplications,
+    originalApplicationIds,
+    docPick: rawDocPick,
+  });
+  const compatibility = reconcileSiteDocumentCompatibility({
+    registrationApplications: migratedApplications,
+    docPick: reboundDocPick,
+  });
+  const registrationApplications = compatibility.registrationApplications;
+  const docPick = stableSortKeys(compatibility.docPick);
 
   return {
     id: raw.id || generateId(),
@@ -173,14 +229,9 @@ export const sanitizeSiteData = (raw = {}) => {
         }))
       : [],
     applications: stableSortKeys({ ...baseApplications, ...(raw.applications || {}) }),
-    registrationApplications: Array.isArray(raw.registrationApplications)
-      ? migrateLegacyLandTargets(
-          raw.registrationApplications.map(normalizeRegistrationApplication),
-          landIds
-        )
-      : [],
-    documents: stableSortKeys(typeof raw.documents === "object" && raw.documents ? raw.documents : {}),
-    docPick: stableSortKeys(typeof raw.docPick === "object" && raw.docPick ? raw.docPick : {}),
+    registrationApplications,
+    documents: stableSortKeys(normalizeLegacyDocumentCounts(raw.documents)),
+    docPick,
     contractorId: raw.contractorId || "",
     scrivenerId: raw.scrivenerId || ""
   };

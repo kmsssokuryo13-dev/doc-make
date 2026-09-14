@@ -1,4 +1,5 @@
 import { sanitizeSiteData } from './sanitize.js';
+import { stripV8CompatibilityForV7 } from './v8Compatibility.js';
 
 // 共通Core schemaVersion。7 で siteLandIds / targetLandIds / variant を正式化した。
 export const EXPORT_SCHEMA_VERSION = 7;
@@ -17,7 +18,9 @@ export const buildExportPayload = (
   app: EXPORT_APP,
   variant: VARIANT,
   activeSiteId: activeSiteId ?? null,
-  sites: Array.isArray(sites) ? sites : [],
+  // 全関連アプリがv8を保持できるまでは外部契約をv7のまま維持し、
+  // local state上のv8 shadowを「v7 JSON」として誤表示しない。
+  sites: Array.isArray(sites) ? sites.map(stripV8CompatibilityForV7) : [],
   contractors: Array.isArray(contractors) ? contractors : [],
   scriveners: Array.isArray(scriveners) ? scriveners : [],
 });

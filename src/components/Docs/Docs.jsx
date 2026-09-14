@@ -3,7 +3,20 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
 import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
 import { APPLICATION_TYPES, APPLICATION_TO_DOCS } from '../../constants.js';
-import { syncRegistrationApplications, isLandApplicationType } from '../../registrationApplications.js';
+import {
+  applyRegistrationApplicationPatch,
+  syncRegistrationApplications,
+  isLandApplicationType,
+} from '../../registrationApplications.js';
+import {
+  createStableDocumentInstanceId,
+  getDocumentTemplateKey,
+  LEGACY_DOCUMENT_PICK_DEFAULTS,
+  MAX_DOCUMENT_COPIES_PER_APPLICATION,
+  normalizeDocumentCount,
+  reconcileSiteDocumentCompatibility,
+  selectLegacyPickForApplication,
+} from '../../v8Compatibility.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
@@ -16,40 +29,14 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const navigate = useNavigate();
   const siteData = sites.find(s => s.id === siteId);
   const [step, setStep] = useState(1);
-  const [activeInstanceKey, setActiveInstanceKey] = useState("");
+  const [activeInstanceId, setActiveInstanceId] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [showPrintPanel, setShowPrintPanel] = useState(false);
 
   const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
 
   const DOC_TITLE = "委任状（表題）";
-  const DEFAULT_PICK = {
-    applicantPersonIds: [],
-    showMain: true,
-    showAnnex: true,
-    reg: { ids: [] },
-    prop: { ids: [] },
-    customText: null,
-    stampPositions: null,
-    signerStampPositions: null,
-    printOn: true,
-    targetPropBuildingId: "",
-    targetBeforeBuildingId: "",
-    targetContractorPersonId: "",
-    targetLandIds: [],
-    statementPersonIds: [],
-    statementApplicantPersonId: "",
-    statementConfirmApplicantPersonId: "",
-    confirmApplicantPersonIds: [],
-    selectedCauseIds: null,
-    mergeBeforeBuildingIds: [],
-    splitAfterBuildingIds: [],
-    combineBeforeBuildingIds: [],
-    combinePurpose: "combineOnly",
-    saleBuildingSource: "proposed",
-    saleSellerPersonIds: [],
-    fontScale: 100
-  };
+  const DEFAULT_PICK = LEGACY_DOCUMENT_PICK_DEFAULTS;
 
   const allInstances = useMemo(() => {
     if (!siteData) return [];
@@ -60,18 +47,38 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
       // Phase 2: generate instances per registration application
       const globalIndex = {}; // track global index per doc name
       regApps.forEach((ra) => {
-        const def = APPLICATION_TO_DOCS[ra.type];
+        const def = Object.prototype.hasOwnProperty.call(APPLICATION_TO_DOCS, ra.type)
+          ? APPLICATION_TO_DOCS[ra.type]
+          : null;
         if (!def) return;
         const allDocNames = [...(def.required || []), ...(def.optional || [])];
         const raDocs = ra.documents || {};
         allDocNames.forEach(docName => {
-          const c = Number(raDocs[docName] || 0);
+          const c = normalizeDocumentCount(raDocs[docName]);
           if (c <= 0) return;
           if (!globalIndex[docName]) globalIndex[docName] = 0;
           for (let j = 0; j < c; j++) {
             globalIndex[docName]++;
             const idx = globalIndex[docName];
-            instances.push({ name: docName, index: idx, key: `${docName}__${idx}`, raId: ra.id, sources: [ra.type] });
+            const copyIndex = j + 1;
+            const templateKey = getDocumentTemplateKey(docName);
+            const shadowInstance = (ra.documentInstances || []).find(instance =>
+              instance.active !== false &&
+              instance.templateKey === templateKey &&
+              instance.documentName === docName &&
+              instance.copyIndex === copyIndex
+            );
+            const stableId = shadowInstance?.id ||
+              createStableDocumentInstanceId(ra.id, templateKey, copyIndex);
+            instances.push({
+              name: docName,
+              index: idx,
+              copyIndex,
+              key: `${docName}__${idx}`,
+              identity: `${siteData.id}:v8:${stableId}`,
+              raId: ra.id,
+              sources: [ra.type],
+            });
           }
         });
       });
@@ -82,22 +89,30 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
       const orderedSet = new Set(orderedNames);
       (orderedDocs || []).forEach((d) => {
         const name = d.name;
-        const c = Number(docs?.[name] || 0);
+        const c = normalizeDocumentCount(docs?.[name]);
         if (!name || c <= 0) return;
-        for (let i = 1; i <= c; i++) instances.push({ name, index: i, key: `${name}__${i}`, raId: null, sources: d.sources || [] });
+        for (let i = 1; i <= c; i++) {
+          const key = `${name}__${i}`;
+          instances.push({ name, index: i, copyIndex: i, key, identity: `${siteData.id}:legacy:${key}`, raId: null, sources: d.sources || [] });
+        }
       });
       Object.entries(docs).forEach(([name, count]) => {
         if (!name || orderedSet.has(name)) return;
-        for (let i = 1; i <= (Number(count) || 0); i++) instances.push({ name, index: i, key: `${name}__${i}`, raId: null, sources: [] });
+        const safeCount = normalizeDocumentCount(count);
+        for (let i = 1; i <= safeCount; i++) {
+          const key = `${name}__${i}`;
+          instances.push({ name, index: i, copyIndex: i, key, identity: `${siteData.id}:legacy:${key}`, raId: null, sources: [] });
+        }
       });
     }
     return instances;
   }, [siteData, orderedDocs]);
 
   const activeInstance = useMemo(
-    () => (allInstances || []).find(i => i.key === activeInstanceKey) || null,
-    [allInstances, activeInstanceKey]
+    () => (allInstances || []).find(instance => instance.identity === activeInstanceId) || null,
+    [allInstances, activeInstanceId]
   );
+  const activeInstanceKey = activeInstance?.key || "";
 
   const activePick = {
     ...DEFAULT_PICK,
@@ -114,6 +129,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
 
         const buildings = naturalSortList(s.proposedBuildings || [], "houseNum");
         const buildingLimit = buildings.length;
+        const hasRegistrationApplications = Array.isArray(s.registrationApplications) &&
+          s.registrationApplications.length > 0;
 
         const apps = { ...(s.applications || {}) };
         const rawTitleCount = Number(apps["建物表題登記"] || 0);
@@ -127,7 +144,7 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
         const desiredCount = clampedTitleCount;
         const docs = { ...(s.documents || {}) };
         const curCount = Number(docs[DOC_TITLE] || 0);
-        if (curCount !== desiredCount) {
+        if (!hasRegistrationApplications && curCount !== desiredCount) {
           docs[DOC_TITLE] = desiredCount;
           changedAny = true;
         }
@@ -136,46 +153,23 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
         const idAt = (i) => (buildings[i] ? buildings[i].id : "");
         const isValidId = (id) => !!id && buildings.some(b => b.id === id);
 
-        for (let i = 1; i <= desiredCount; i++) {
-          const key = `${DOC_TITLE}__${i}`;
-          const before = pickMap[key];
-          const base = { ...DEFAULT_PICK, ...(before || {}) };
-
-          if (!isValidId(base.targetPropBuildingId)) {
-            base.targetPropBuildingId = idAt(i - 1);
-          }
-
-          const assignedBldg = buildings.find(b => b.id === base.targetPropBuildingId);
-          if (!before && assignedBldg && Array.isArray(assignedBldg.ownerPersonIds) && assignedBldg.ownerPersonIds.length > 0) {
-            if (!base.applicantPersonIds || base.applicantPersonIds.length === 0) {
-              base.applicantPersonIds = assignedBldg.ownerPersonIds;
-            }
-          }
-
-          const beforeStr = before ? JSON.stringify(before) : "";
-          const afterStr = JSON.stringify(base);
-          if (beforeStr !== afterStr) {
-            pickMap[key] = base;
-            changedAny = true;
-          } else {
-            pickMap[key] = before;
-          }
-        }
-
-        const STATEMENT_DOCS = ["申述書（共有）", "申述書（単独）"];
-        const fallbackPropId = idAt(0);
-
-        for (const docName of STATEMENT_DOCS) {
-          const c = Number(docs?.[docName] || 0);
-          if (c <= 0) continue;
-
-          for (let i = 1; i <= c; i++) {
-            const key = `${docName}__${i}`;
+        // RA導入後はStep1の対象・申請人を正本とし、並び順からdocPickを補正しない。
+        // ここで旧flat pickを更新すると、不正対象をRAへ戻す投影との更新ループになる。
+        if (!hasRegistrationApplications) {
+          for (let i = 1; i <= desiredCount; i++) {
+            const key = `${DOC_TITLE}__${i}`;
             const before = pickMap[key];
             const base = { ...DEFAULT_PICK, ...(before || {}) };
 
             if (!isValidId(base.targetPropBuildingId)) {
-              base.targetPropBuildingId = fallbackPropId || "";
+              base.targetPropBuildingId = idAt(i - 1);
+            }
+
+            const assignedBldg = buildings.find(b => b.id === base.targetPropBuildingId);
+            if (!before && assignedBldg && Array.isArray(assignedBldg.ownerPersonIds) && assignedBldg.ownerPersonIds.length > 0) {
+              if (!base.applicantPersonIds || base.applicantPersonIds.length === 0) {
+                base.applicantPersonIds = assignedBldg.ownerPersonIds;
+              }
             }
 
             const beforeStr = before ? JSON.stringify(before) : "";
@@ -187,16 +181,44 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
               pickMap[key] = before;
             }
           }
+
+          const STATEMENT_DOCS = ["申述書（共有）", "申述書（単独）"];
+          const fallbackPropId = idAt(0);
+
+          for (const docName of STATEMENT_DOCS) {
+            const c = normalizeDocumentCount(docs?.[docName]);
+            if (c <= 0) continue;
+
+            for (let i = 1; i <= c; i++) {
+              const key = `${docName}__${i}`;
+              const before = pickMap[key];
+              const base = { ...DEFAULT_PICK, ...(before || {}) };
+
+              if (!isValidId(base.targetPropBuildingId)) {
+                base.targetPropBuildingId = fallbackPropId || "";
+              }
+
+              const beforeStr = before ? JSON.stringify(before) : "";
+              const afterStr = JSON.stringify(base);
+              if (beforeStr !== afterStr) {
+                pickMap[key] = base;
+                changedAny = true;
+              } else {
+                pickMap[key] = before;
+              }
+            }
+          }
         }
 
         if (!changedAny) return s;
 
-        return {
+        const nextSite = {
           ...s,
           applications: stableSortKeys(apps),
           documents: stableSortKeys(docs),
           docPick: stableSortKeys(pickMap),
         };
+        return reconcileSiteDocumentCompatibility(nextSite);
       });
       return changedAny ? next : prev;
     });
@@ -229,7 +251,12 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     );
 
     if (changed) {
-      setSites(prev => prev.map(s => s.id === siteId ? { ...s, registrationApplications: next } : s));
+      setSites(prev => prev.map(s => s.id === siteId
+        ? reconcileSiteDocumentCompatibility(
+            { ...s, registrationApplications: next },
+            { preferApplicationValues: true }
+          )
+        : s));
     }
   }, [siteId, siteData?.applications]);
 
@@ -261,7 +288,9 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
           // Check if this doc comes from an application type - only clear those
           const allRaDocNames = new Set();
           regApps.forEach(ra => {
-            const def = APPLICATION_TO_DOCS[ra.type];
+            const def = Object.prototype.hasOwnProperty.call(APPLICATION_TO_DOCS, ra.type)
+              ? APPLICATION_TO_DOCS[ra.type]
+              : null;
             if (def) { (def.required || []).forEach(d => allRaDocNames.add(d)); (def.optional || []).forEach(d => allRaDocNames.add(d)); }
           });
           if (allRaDocNames.has(name)) { merged[name] = 0; changed = true; }
@@ -279,7 +308,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     const regApps = siteData.registrationApplications || [];
     if (regApps.length === 0) return;
 
-    const pick = { ...(siteData.docPick || {}) };
+    const sourcePick = { ...(siteData.docPick || {}) };
+    const pick = { ...sourcePick };
     let changed = false;
 
     allInstances.forEach(inst => {
@@ -290,7 +320,18 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
       const existing = pick[inst.key];
       if (existing && existing._raApplied === ra.id) return; // already applied for this RA
 
-      const patch = { ...(existing || {}), _raApplied: ra.id };
+      const shadowInstance = (ra.documentInstances || []).find(instance =>
+        instance.templateKey === getDocumentTemplateKey(inst.name) &&
+        instance.documentName === inst.name &&
+        instance.copyIndex === inst.copyIndex
+      );
+      const compatiblePick = selectLegacyPickForApplication({
+        docPick: sourcePick,
+        currentInstanceKey: inst.key,
+        previousInstanceKey: shadowInstance?.legacyInstanceKey || "",
+        applicationId: ra.id,
+      });
+      const patch = { ...compatiblePick, _raApplied: ra.id };
       const bid = ra.targetBuildingIds?.[0] || "";
 
       // Auto-fill building selection based on application type
@@ -318,7 +359,9 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     });
 
     if (changed) {
-      setSites(prev => prev.map(s => s.id === siteId ? { ...s, docPick: pick } : s));
+      setSites(prev => prev.map(s => s.id === siteId
+        ? reconcileSiteDocumentCompatibility({ ...s, docPick: pick })
+        : s));
     }
   }, [step, siteId, allInstances, siteData?.registrationApplications]);
 
@@ -351,27 +394,41 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   };
 
   const updateRegApp = (raId, patch) => {
-    setSites(prev => prev.map(s => s.id === siteId ? {
-      ...s,
-      registrationApplications: (s.registrationApplications || []).map(ra =>
-        ra.id === raId ? { ...ra, ...patch } : ra
-      )
-    } : s));
+    setSites(prev => prev.map(s => {
+      if (s.id !== siteId) return s;
+      const applications = (s.registrationApplications || []).map(ra =>
+        ra.id === raId ? applyRegistrationApplicationPatch(ra, patch) : ra
+      );
+      return reconcileSiteDocumentCompatibility({
+        ...s,
+        registrationApplications: applications,
+      }, { preferApplicationValues: true });
+    }));
   };
 
   useEffect(() => {
     if (step !== 3 || !allInstances.length) return;
-    if (!allInstances.some(i => i.key === activeInstanceKey)) {
-      setActiveInstanceKey(allInstances[0].key);
+    if (!allInstances.some(instance => instance.identity === activeInstanceId)) {
+      setActiveInstanceId(allInstances[0].identity);
     }
-  }, [step, allInstances, activeInstanceKey]);
+  }, [step, allInstances, activeInstanceId]);
 
   const handlePickChange = (instanceKey, patch) => {
     const current = {
       ...DEFAULT_PICK,
       ...(siteData?.docPick?.[instanceKey] || {})
     };
-    setSites(prev => prev.map(s => s.id === siteId ? { ...s, docPick: { ...s.docPick, [instanceKey]: { ...current, ...patch } } } : s));
+    setSites(prev => prev.map(s => {
+      if (s.id !== siteId) return s;
+      const docPick = {
+        ...s.docPick,
+        [instanceKey]: { ...current, ...patch },
+      };
+      return reconcileSiteDocumentCompatibility(
+        { ...s, docPick },
+        { legacyPickIntentFields: { [instanceKey]: Object.keys(patch) } }
+      );
+    }));
   };
 
   const handleStampPosChange = (index, nextDx, nextDy) => {
@@ -634,7 +691,9 @@ ${styles}
               <div className="max-w-4xl mx-auto space-y-6 font-sans font-bold">
                 <h2 className="text-lg font-black text-slate-800 mb-6">2. 作成する書類を選定</h2>
                 {regApps.map(ra => {
-                  const def = APPLICATION_TO_DOCS[ra.type];
+                  const def = Object.prototype.hasOwnProperty.call(APPLICATION_TO_DOCS, ra.type)
+                    ? APPLICATION_TO_DOCS[ra.type]
+                    : null;
                   if (!def) return null;
                   const allDocNames = [...(def.required || []), ...(def.optional || [])];
                   const requiredSet = new Set(def.required || []);
@@ -651,8 +710,12 @@ ${styles}
                           const count = Number(raDocs[docName] || 0);
                           return (
                             <DocRow key={docName} name={docName} count={count} isRequired={isReq} sources={[ra.type]}
+                              max={MAX_DOCUMENT_COPIES_PER_APPLICATION}
                               onChange={(delta) => {
-                                const next = Math.max(0, count + delta);
+                                const next = Math.min(
+                                  MAX_DOCUMENT_COPIES_PER_APPLICATION,
+                                  Math.max(0, count + delta)
+                                );
                                 updateRegApp(ra.id, { documents: { ...raDocs, [docName]: next } });
                               }} />
                           );
@@ -671,7 +734,8 @@ ${styles}
               {orderedDocs.length === 0 ? <p className="p-12 text-center text-gray-400 bg-white border border-dashed rounded-2xl">登記申請を選択してください。</p>
               : <div className="space-y-3">{orderedDocs.map(d => (
                   <DocRow key={d.name} name={d.name} count={siteData?.documents?.[d.name] || 0} isRequired={d.isRequired} sources={d.sources}
-                    onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.max(0, (s.documents?.[d.name]||0) + delta) } } : s))} />
+                    max={MAX_DOCUMENT_COPIES_PER_APPLICATION}
+                    onChange={(delta) => setSites(prev => prev.map(s => s.id === siteId ? { ...s, documents: { ...s.documents, [d.name]: Math.min(MAX_DOCUMENT_COPIES_PER_APPLICATION, Math.max(0, (s.documents?.[d.name]||0) + delta)) } } : s))} />
                 ))}</div>}
             </div>
           );
@@ -707,7 +771,7 @@ ${styles}
                               {group.instances.map(inst => {
                                 const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
                                 return (
-                                  <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                                  <button key={inst.identity} onClick={() => setActiveInstanceId(inst.identity)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceId === inst.identity ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
                                     <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
                                   </button>
                                 );
@@ -722,7 +786,7 @@ ${styles}
                               {ungrouped.map(inst => {
                                 const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
                                 return (
-                                  <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                                  <button key={inst.identity} onClick={() => setActiveInstanceId(inst.identity)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceId === inst.identity ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
                                     <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
                                   </button>
                                 );
@@ -738,7 +802,7 @@ ${styles}
                     <div className="space-y-1.5">{allInstances.map(inst => {
                       const printOn = siteData?.docPick?.[inst.key]?.printOn ?? true;
                       return (
-                        <button key={inst.key} onClick={() => setActiveInstanceKey(inst.key)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceKey === inst.key ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                        <button key={inst.identity} onClick={() => setActiveInstanceId(inst.identity)} className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${activeInstanceId === inst.identity ? "bg-blue-600/10 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
                           <div className="flex items-center justify-between"><div className="flex items-center gap-2 min-w-0 font-bold"><input type="checkbox" checked={printOn} onClick={e => e.stopPropagation()} onChange={e => handlePickChange(inst.key, { printOn: e.target.checked })} /><span className="truncate text-[11px]">{inst.name}</span></div><span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">#{inst.index}</span></div>
                         </button>
                       );
@@ -1865,7 +1929,7 @@ ${styles}
               {activeInstance ? (
                 <div className="p-10">
                   <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden">
-                    <DocTemplate key={activeInstanceKey} name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
+                    <DocTemplate key={activeInstance.identity} name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                        instanceKey={activeInstanceKey}
                       pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} />
                   </div>
