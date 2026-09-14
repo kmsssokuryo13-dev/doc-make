@@ -13,19 +13,23 @@ import { DraggableSignerStamp } from './DraggableSignerStamp.jsx';
 
 export const DocTemplate = ({
   name, siteData, instanceKey, pick, onPickChange,
-  onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners
+  onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners,
+  documentContext
 }) => {
+  const linkedDocumentContext = documentContext?.supported ? documentContext : null;
+
   const allApplicants = useMemo(
     () => (siteData.people || []).filter(p => (p.roles || []).includes("申請人")),
     [siteData.people]
   );
 
   const applicants = useMemo(() => {
+    if (linkedDocumentContext) return linkedDocumentContext.data?.applicants || [];
     const ids = Array.isArray(pick?.applicantPersonIds) ? pick.applicantPersonIds : [];
     if (!ids.length) return allApplicants;
     const filtered = ids.map(id => allApplicants.find(p => p.id === id)).filter(Boolean);
     return filtered.length ? filtered : allApplicants;
-  }, [allApplicants, pick?.applicantPersonIds]);
+  }, [allApplicants, linkedDocumentContext, pick?.applicantPersonIds]);
 
   const statementCandidates = useMemo(() => {
     const people = siteData.people || [];
@@ -51,11 +55,12 @@ export const DocTemplate = ({
   }, [siteData.people]);
 
   const statementPeople = useMemo(() => {
+    if (linkedDocumentContext) return linkedDocumentContext.data?.statementPeople || [];
     const ids = Array.isArray(pick?.statementPersonIds) ? pick.statementPersonIds : [];
     if (!ids.length) return statementDefaultPeople;
     const filtered = ids.map(id => statementCandidates.find(p => p.id === id)).filter(Boolean);
     return filtered.length ? filtered : statementDefaultPeople;
-  }, [statementCandidates, statementDefaultPeople, pick?.statementPersonIds]);
+  }, [linkedDocumentContext, statementCandidates, statementDefaultPeople, pick?.statementPersonIds]);
 
   const linkedScrivener = useMemo(
     () => getSelectedScrivener(siteData, scriveners),
@@ -96,8 +101,15 @@ export const DocTemplate = ({
     return filtered.length ? filtered : all;
   }, [sortedLand, pick?.targetLandIds]);
 
+  const contextNow = linkedDocumentContext?.meta?.resolvedAt
+    ? new Date(linkedDocumentContext.meta.resolvedAt)
+    : null;
+  const documentNow = contextNow && !Number.isNaN(contextNow.getTime())
+    ? contextNow
+    : new Date();
+
   const getWarekiNow = () => {
-    const y = new Date().getFullYear();
+    const y = documentNow.getFullYear();
     if (y >= 2019) return { era: "令和", year: String(y - 2018) };
     if (y >= 1989) return { era: "平成", year: String(y - 1988) };
     if (y >= 1926) return { era: "昭和", year: String(y - 1925) };
@@ -251,17 +263,19 @@ export const DocTemplate = ({
   };
 
   const targetContractor = useMemo(() => {
+    if (linkedDocumentContext) return linkedDocumentContext.data?.contractor || null;
     const list = (siteData?.people || []).filter(p => (p.roles || []).includes("工事人"));
     if (pick.targetContractorPersonId) {
       return list.find(p => p.id === pick.targetContractorPersonId) || list[0] || null;
     }
     return list[0] || null;
-  }, [siteData.people, pick.targetContractorPersonId]);
+  }, [linkedDocumentContext, siteData.people, pick.targetContractorPersonId]);
 
   const targetProp = useMemo(() => {
+    if (linkedDocumentContext) return linkedDocumentContext.data?.building || null;
     if (!pick.targetPropBuildingId) return sortedProp[0] || null;
     return sortedProp.find(b => b.id === pick.targetPropBuildingId) || sortedProp[0] || null;
-  }, [sortedProp, pick.targetPropBuildingId]);
+  }, [linkedDocumentContext, sortedProp, pick.targetPropBuildingId]);
 
   // 書類が対象とする物件（土地 or 建物）のIDを1つ決定し、申請人の物件別持分を解決するのに使う
   const LAND_BASED_DOCS = ["委任状（地目変更）", "委任状（住所変更）"];
@@ -269,6 +283,7 @@ export const DocTemplate = ({
     ? ((selectedLand || [])[0]?.id || null)
     : (targetProp?.id || null);
   const shareStr = (p) => resolvePersonShare(p, docTargetPropId);
+  const hasExplicitShare = (p) => String(shareStr(p) ?? '').trim().length > 0;
 
   const hasMultipleApplicants = (applicants || []).length >= 2;
 
@@ -283,7 +298,7 @@ export const DocTemplate = ({
   const formatApplicantLine = (p) => {
     const parts = [];
     parts.push(p?.address || "　");
-    if (hasMultipleApplicants) parts.push(formatShare(shareStr(p)));
+    if (hasMultipleApplicants || hasExplicitShare(p)) parts.push(formatShare(shareStr(p)));
     parts.push(p?.name || "　");
     return parts.join("　");
   };
@@ -302,8 +317,20 @@ export const DocTemplate = ({
 
   // ---- 工事完了引渡証明書（表題） ----
   if (name === "工事完了引渡証明書（表題）") {
-    if (!targetProp) return <div className="p-10 text-center font-bold text-black">申請建物データがありません</div>;
-    const currentYearReiwa = String(new Date().getFullYear() - 2018);
+    const hasDetachedHtml = typeof pick?.customText === 'string' && pick.customText.length > 0;
+    if (!targetProp && !hasDetachedHtml) return <div className="p-10 text-center font-bold text-black">申請建物データがありません</div>;
+    // 旧全文固定は元建物が削除されても保持する。childrenはEditableDocBody側で固定HTMLに置換される。
+    const completionTarget = targetProp || { annexes: [], additionalCauses: [], floorAreas: [] };
+    const completionOwners = linkedDocumentContext?.data?.owners || applicants || [];
+    const hasMultipleCompletionOwners = completionOwners.length >= 2;
+    const formatCompletionOwnerLine = (person) => {
+      const parts = [person?.address || "　"];
+      const ownerShare = resolvePersonShare(person, completionTarget.id);
+      if (hasMultipleCompletionOwners || String(ownerShare ?? '').trim()) parts.push(formatShare(ownerShare));
+      parts.push(person?.name || "　");
+      return parts.join("　");
+    };
+    const currentYearReiwa = String(documentNow.getFullYear() - 2018);
 
     return (
       <div className="doc-content flex flex-col h-full text-black font-serif relative doc-no-bold" style={{ fontFamily: '"MS Mincho","ＭＳ 明朝",serif' }}>
@@ -332,8 +359,8 @@ export const DocTemplate = ({
             >
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal', marginTop: '36mm' }}>建物の表示</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-                {(pick.showMain ?? true) && renderMainValuesInline(targetProp, { showHouseNum: false })}
-                {(pick.showAnnex ?? true) && (targetProp.annexes || []).map(a => (
+                {(pick.showMain ?? true) && renderMainValuesInline(completionTarget, { showHouseNum: false })}
+                {(pick.showAnnex ?? true) && (completionTarget.annexes || []).map(a => (
                   <div key={a.id}>{renderAnnexValuesPlain(a)}</div>
                 ))}
               </div>
@@ -341,18 +368,18 @@ export const DocTemplate = ({
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>工事種別及び完了年月日</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
                 {(() => {
-                  const hasAnyAnnexes = (targetProp.annexes || []).length > 0;
+                  const hasAnyAnnexes = (completionTarget.annexes || []).some(a => !isAnnexEmpty(a));
                   const causeEntries = [];
                   const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
-                  if (targetProp.registrationCause) {
-                    causeEntries.push({ date: formatWareki(targetProp.registrationDate, targetProp.additionalUnknownDate), cause: targetProp.registrationCause, prefix: mainPrefix });
+                  if (completionTarget.registrationCause) {
+                    causeEntries.push({ date: formatWareki(completionTarget.registrationDate, completionTarget.additionalUnknownDate), cause: completionTarget.registrationCause, prefix: mainPrefix });
                   }
-                  (targetProp.additionalCauses || []).forEach(ac => {
+                  (completionTarget.additionalCauses || []).forEach(ac => {
                     if (ac.cause) {
                       causeEntries.push({ date: formatWareki(ac.date), cause: ac.cause, prefix: mainPrefix });
                     }
                   });
-                  (targetProp.annexes || []).forEach(a => {
+                  (completionTarget.annexes || []).forEach(a => {
                     const sym = stripAllWS(a.symbol);
                     const annexPrefix = sym ? `符号${sym}の附属建物` : "附属建物";
                     if (a.registrationCause) {
@@ -372,15 +399,15 @@ export const DocTemplate = ({
 
               <h2 style={{ fontSize: '12pt', margin: '0', fontWeight: 'normal' }}>所有者の住所氏名</h2>
               <div style={{ fontSize: '11pt', marginBottom: '8mm' }}>
-                {(applicants || []).map(p => (
+                {completionOwners.map(p => (
                   <p key={p.id} style={{ margin: '0 0 2mm 0' }}>
-                    {formatApplicantLine(p)}
+                    {formatCompletionOwnerLine(p)}
                   </p>
                 ))}
               </div>
 
               <p style={{ fontSize: '11pt', marginBottom: '10mm' }}>
-                上記のとおり工事を完了して引渡したものであることを証明します。
+                {linkedDocumentContext?.blocks?.['certificate.body'] || '上記のとおり工事を完了して引渡したものであることを証明します。'}
               </p>
 
               <div style={{ textAlign: 'left', fontSize: '12pt', marginBottom: '10mm' }}>
@@ -428,7 +455,7 @@ export const DocTemplate = ({
       return sortedBuildings;
     })();
     const propsToUse = targetProp ? [targetProp] : sortedProp;
-    const currentYearReiwa = String(new Date().getFullYear() - 2018);
+    const currentYearReiwa = String(documentNow.getFullYear() - 2018);
 
     const hasAnyAnnexes = beforeBuildings.some(b => (b.annexes || []).length > 0)
       || propsToUse.some(b => (b.annexes || []).length > 0);
@@ -973,7 +1000,7 @@ export const DocTemplate = ({
   };
 
   const renderSignerMultiLine = (p) => {
-    const showShare = hasMultipleApplicants;
+    const showShare = hasMultipleApplicants || hasExplicitShare(p);
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div>住　　所　{p?.address || '\u3000'}</div>
@@ -1042,11 +1069,13 @@ export const DocTemplate = ({
               </div>
 
               <p style={{ fontSize: '11pt', marginBottom: '10mm', textIndent: '1em' }}>
-                {name === "委任状（保存）"
-                  ? DEFAULT_DELEGATION_TEXT_SAVE
-                  : name === "委任状（住所変更）"
-                    ? DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE
-                    : DEFAULT_DELEGATION_TEXT}
+                {linkedDocumentContext?.blocks?.['delegation.body'] || (
+                  name === "委任状（保存）"
+                    ? DEFAULT_DELEGATION_TEXT_SAVE
+                    : name === "委任状（住所変更）"
+                      ? DEFAULT_DELEGATION_TEXT_ADDRESS_CHANGE
+                      : DEFAULT_DELEGATION_TEXT
+                )}
               </p>
 
               <div style={{ fontSize: '11pt', marginBottom: '10mm', fontWeight: 'bold' }}>
@@ -1097,7 +1126,7 @@ export const DocTemplate = ({
   const DelegationTitleTemplate = () => {
     const workText = (() => {
       if (!targetProp) return getLegacyWorkText();
-      const hasAnyAnnexes = (targetProp.annexes || []).length > 0;
+      const hasAnyAnnexes = (targetProp.annexes || []).some(a => !isAnnexEmpty(a));
       const causeEntries = [];
       const mainPrefix = hasAnyAnnexes ? "主である建物" : "";
       if (targetProp.registrationCause) {
@@ -1785,7 +1814,7 @@ export const DocTemplate = ({
     const formatStatementLine = (p) => {
       const parts = [];
       parts.push(p?.address || "　");
-      if (hasMultipleStatementPeople) parts.push(formatShare(shareStr(p)));
+      if (hasMultipleStatementPeople || hasExplicitShare(p)) parts.push(formatShare(shareStr(p)));
       parts.push(p?.name || "　");
       return parts.join("　");
     };
@@ -1837,6 +1866,12 @@ export const DocTemplate = ({
                 <div>{targetProp?.confirmationCert ? formatConfirmationCertLine(targetProp.confirmationCert) : "　"}</div>
                 <div style={{ marginTop: "4mm" }}>確認済証記載の建築主名義</div>
                 {(() => {
+                  if (linkedDocumentContext) {
+                    const contextApplicants = linkedDocumentContext.data?.confirmation?.applicants || [];
+                    return contextApplicants.length > 0
+                      ? contextApplicants.map(item => <div key={item.key} style={{ textAlign: "left" }}>{item.name || "　"}</div>)
+                      : <div style={{ textAlign: "left" }}>{"　"}</div>;
+                  }
                   const people = siteData.people || [];
                   const bldgPersonIds = Array.isArray(targetProp?.confirmApplicantPersonIds) ? targetProp.confirmApplicantPersonIds : [];
                   const bldgNames = Array.isArray(targetProp?.confirmApplicantNames) ? targetProp.confirmApplicantNames.filter(n => n.trim()) : [];
@@ -1909,7 +1944,7 @@ export const DocTemplate = ({
       ? sellerIds.map(id => sellerCandidates.find(p => p.id === id)).filter(Boolean)
       : sellerCandidates;
 
-    const currentYearReiwa = String(new Date().getFullYear() - 2018);
+    const currentYearReiwa = String(documentNow.getFullYear() - 2018);
     const w = getWarekiNow();
 
     const buyerText = displayBuyers.map(p => `${p.address || "　"}　${p.name || "　"}様`).join("、");
@@ -1999,20 +2034,22 @@ export const DocTemplate = ({
   if (name === "申述書（共有）") {
     return renderStatementCommon({
       titleText: "申述書",
-      defaultBody: "上記の建物は下記の通りの持分であることを証明します。",
+      defaultBody: linkedDocumentContext?.blocks?.['statement.body'] ||
+        "上記の建物は下記の通りの持分であることを証明します。",
     });
   }
 
   if (name === "申述書（単独）") {
-    const selected = (allApplicants || []).find(p => p.id === (pick?.statementApplicantPersonId || "")) || null;
+    const selected = linkedDocumentContext?.data?.soleApplicant ||
+      (allApplicants || []).find(p => p.id === (pick?.statementApplicantPersonId || "")) || null;
     const who = selected?.name || "［申請人］";
-    const body =
+    const legacyBody =
       `上記の建物は${who}が単独で全額出資したものです。\n` +
       `従って${who}の単独名義での表題登記を申請することに対し異議ありません。`;
 
     return renderStatementCommon({
       titleText: "申述書",
-      defaultBody: body,
+      defaultBody: linkedDocumentContext?.blocks?.['statement.body'] || legacyBody,
     });
   }
 

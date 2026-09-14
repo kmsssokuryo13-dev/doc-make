@@ -381,6 +381,7 @@ export const normalizeDocumentInstance = (
     active: typeof safeRaw.active === "boolean" ? safeRaw.active : true,
     printEnabled: typeof safeRaw.printEnabled === "boolean" ? safeRaw.printEnabled : true,
     selectionOverrides: cloneRecord(safeRaw.selectionOverrides),
+    selectionOverrideBaselines: cloneRecord(safeRaw.selectionOverrideBaselines),
     contentOverrides: {
       blocks: cloneRecord(content.blocks),
       fields: cloneRecord(content.fields),
@@ -399,6 +400,76 @@ export const normalizeDocumentInstance = (
   };
 };
 
+/**
+ * 全文固定の内容を利用者が確認した時だけ、現在のDocumentContextを新しい基準にする。
+ * 本文編集のたびに自動更新すると古いデータを誤って確認済みにするため、明示操作専用。
+ */
+export const acknowledgeDetachedDocumentSource = (
+  application,
+  { documentInstanceId = "", sourceSnapshot = null } = {}
+) => {
+  if (!isRecord(application) || !documentInstanceId || !isRecord(sourceSnapshot)) {
+    return { next: application, changed: false };
+  }
+  let changed = false;
+  const documentInstances = (Array.isArray(application.documentInstances)
+    ? application.documentInstances
+    : []).map(instance => {
+      if (instance?.id !== documentInstanceId ||
+          !["detached", "legacy-detached"].includes(instance?.editMode) ||
+          isBlankDocumentHtml(instance?.detachedHtml)) {
+        return instance;
+      }
+      changed = true;
+      return {
+        ...instance,
+        editMode: "detached",
+        detachedSourceSnapshot: cloneRecord(sourceSnapshot),
+      };
+    });
+  return changed
+    ? { next: { ...application, documentInstances }, changed: true }
+    : { next: application, changed: false };
+};
+
+/** 書類固有の選択を利用者が確認した時だけ、現在の正本値を基準として記録する。 */
+export const acknowledgeSelectionOverrideSources = (
+  application,
+  {
+    documentInstanceId = "",
+    selectionOverrideSources = null,
+  } = {}
+) => {
+  if (!isRecord(application) || !documentInstanceId || !isRecord(selectionOverrideSources)) {
+    return { next: application, changed: false };
+  }
+  let changed = false;
+  const documentInstances = (Array.isArray(application.documentInstances)
+    ? application.documentInstances
+    : []).map(instance => {
+      if (instance?.id !== documentInstanceId || !isRecord(instance?.selectionOverrides)) {
+        return instance;
+      }
+      const baselines = { ...cloneRecord(instance.selectionOverrideBaselines) };
+      let instanceChanged = false;
+      Object.keys(instance.selectionOverrides).forEach(key => {
+        if (!hasOwn(selectionOverrideSources, key)) return;
+        const sourceValue = cloneJsonValue(selectionOverrideSources[key]);
+        if (sourceValue === undefined) return;
+        if (!jsonValuesEqual(baselines[key], sourceValue) || !hasOwn(baselines, key)) {
+          baselines[key] = sourceValue;
+          instanceChanged = true;
+        }
+      });
+      if (!instanceChanged) return instance;
+      changed = true;
+      return { ...instance, selectionOverrideBaselines: baselines };
+    });
+  return changed
+    ? { next: { ...application, documentInstances }, changed: true }
+    : { next: application, changed: false };
+};
+
 const DERIVED_BUILDING_BEFORE_TYPES = new Set([
   "建物表題部変更登記",
   "建物表題部更正登記",
@@ -407,13 +478,19 @@ const DERIVED_BUILDING_BEFORE_TYPES = new Set([
   "建物合体登記",
 ]);
 
+const getCanonicalTitleBuildingId = (application) => {
+  const subject = normalizeApplicationSubject(application);
+  if (subject.primaryBuildingId) return subject.primaryBuildingId;
+  return subject.afterBuildingIds.length === 1 ? subject.afterBuildingIds[0] : "";
+};
+
 const legacySelectionMatchesApplication = (application, key, value) => {
   const firstBuildingId = application?.targetBuildingIds?.[0] || "";
   if (key === "applicantPersonIds") {
     return jsonValuesEqual(value, application?.applicantPersonIds || []);
   }
   if (key === "targetPropBuildingId" && BUILDING_TITLE_TYPES.has(application?.type)) {
-    return value === firstBuildingId;
+    return value === getCanonicalTitleBuildingId(application);
   }
   if (key === "targetBeforeBuildingId" && DERIVED_BUILDING_BEFORE_TYPES.has(application?.type)) {
     return value === firstBuildingId;
@@ -434,12 +511,18 @@ const mergeLegacyPick = (
     acceptCustomText = true,
     acceptDirectValues = true,
     intentionalFields = new Set(),
+    sourceSnapshotAtEdit = null,
+    selectionOverrideSourcesAtEdit = null,
   } = {}
 ) => {
   if (!isRecord(rawPick)) return instance;
 
   const selectionOverrides = { ...instance.selectionOverrides };
+  const selectionOverrideBaselines = { ...cloneRecord(instance.selectionOverrideBaselines) };
   const layoutOverrides = { ...instance.layoutOverrides };
+  const sourceValuesAtEdit = isRecord(selectionOverrideSourcesAtEdit)
+    ? selectionOverrideSourcesAtEdit
+    : {};
 
   for (const [key, value] of Object.entries(rawPick)) {
     if (LEGACY_PICK_META_KEYS.has(key)) continue;
@@ -448,12 +531,14 @@ const mergeLegacyPick = (
     const targetOverrides = LAYOUT_OVERRIDE_KEYS.has(key)
       ? layoutOverrides
       : selectionOverrides;
+    const isSelectionOverride = targetOverrides === selectionOverrides;
     const isIntentionalFieldEdit = intentionalFields.has(key);
     const alreadyOverridden = hasOwn(targetOverrides, key);
     const matchesApplication = legacySelectionMatchesApplication(application, key, cloned);
     if (matchesApplication === true) {
       if (!alreadyOverridden || isIntentionalFieldEdit) {
         delete targetOverrides[key];
+        if (isSelectionOverride) delete selectionOverrideBaselines[key];
       }
       continue;
     }
@@ -469,14 +554,20 @@ const mergeLegacyPick = (
         jsonValuesEqual(cloned, LEGACY_DOCUMENT_PICK_DEFAULTS[key])) {
       if (!alreadyOverridden || isIntentionalFieldEdit) {
         delete targetOverrides[key];
+        if (isSelectionOverride) delete selectionOverrideBaselines[key];
       }
       continue;
     }
     targetOverrides[key] = cloned;
+    if (isSelectionOverride && isIntentionalFieldEdit && hasOwn(sourceValuesAtEdit, key)) {
+      const sourceValue = cloneJsonValue(sourceValuesAtEdit[key]);
+      if (sourceValue !== undefined) selectionOverrideBaselines[key] = sourceValue;
+    }
   }
 
   let editMode = instance.editMode;
   let detachedHtml = instance.detachedHtml;
+  let detachedSourceSnapshot = instance.detachedSourceSnapshot;
   const isDetached = ["detached", "legacy-detached"].includes(instance.editMode);
   const isIntentionalTextEdit = intentionalFields.has("customText");
   if (hasOwn(rawPick, "customText") &&
@@ -485,9 +576,16 @@ const mergeLegacyPick = (
     if (isBlankDocumentHtml(rawPick.customText)) {
       editMode = "linked";
       detachedHtml = null;
+      detachedSourceSnapshot = null;
     } else {
-      editMode = instance.editMode === "detached" ? "detached" : "legacy-detached";
+      // 基準値はlinkedから全文固定へ切り替える瞬間だけ採取する。
+      // 既に古くなった固定HTMLを少し編集しただけで、最新確認済みにしない。
+      const isFirstDetach = instance.editMode === "linked" && isRecord(sourceSnapshotAtEdit);
+      editMode = isFirstDetach || instance.editMode === "detached"
+        ? "detached"
+        : "legacy-detached";
       detachedHtml = String(rawPick.customText);
+      if (isFirstDetach) detachedSourceSnapshot = cloneRecord(sourceSnapshotAtEdit);
     }
   }
 
@@ -498,9 +596,11 @@ const mergeLegacyPick = (
       ? rawPick.printOn
       : instance.printEnabled,
     selectionOverrides,
+    selectionOverrideBaselines,
     layoutOverrides,
     editMode,
     detachedHtml,
+    detachedSourceSnapshot,
   };
 };
 
@@ -580,12 +680,23 @@ export const rebindLegacyPickApplicationIds = ({
 export const hydrateDocumentInstances = (
   applications,
   docPick = {},
-  { legacyPickIntentFields = {}, preferApplicationValues = false } = {}
+  {
+    legacyPickIntentFields = {},
+    detachedSourceSnapshots = {},
+    selectionOverrideSourceValuesByPick = {},
+    preferApplicationValues = false,
+  } = {}
 ) => {
   const globalIndexes = new Map();
   const applicationList = Array.isArray(applications) ? applications : [];
   const intentFieldsByPick = isRecord(legacyPickIntentFields)
     ? legacyPickIntentFields
+    : {};
+  const sourceSnapshotsByPick = isRecord(detachedSourceSnapshots)
+    ? detachedSourceSnapshots
+    : {};
+  const selectionSourcesByPick = isRecord(selectionOverrideSourceValuesByPick)
+    ? selectionOverrideSourceValuesByPick
     : {};
   const previousKeyOwners = new Map();
   applicationList.forEach((application, applicationIndex) => {
@@ -681,6 +792,14 @@ export const hydrateDocumentInstances = (
             (typeof rawExisting.legacyInstanceKey === "string" &&
               rawExisting.legacyInstanceKey.length > 0));
         const legacyMarkerMatches = legacyPick?._raApplied === application.id;
+        const sourceSnapshotAtEdit = [legacyInstanceKey, previousLegacyKey]
+          .filter(key => typeof key === "string" && key)
+          .map(key => sourceSnapshotsByPick[key])
+          .find(isRecord) || null;
+        const selectionOverrideSourcesAtEdit = [legacyInstanceKey, previousLegacyKey]
+          .filter(key => typeof key === "string" && key)
+          .map(key => selectionSourcesByPick[key])
+          .find(isRecord) || null;
         hydrated.push({
           ...mergeLegacyPick(current, legacyPick, application, {
             allowNewOverrides: !hasPriorLegacyBinding,
@@ -688,6 +807,8 @@ export const hydrateDocumentInstances = (
             acceptCustomText: !hasPriorLegacyBinding,
             acceptDirectValues: !hasPriorLegacyBinding,
             intentionalFields,
+            sourceSnapshotAtEdit,
+            selectionOverrideSourcesAtEdit,
           }),
           active: true,
           legacyInstanceKey: nextLegacyInstanceKey,
@@ -749,8 +870,11 @@ export const projectDocumentInstancesToLegacyDocPick = (site = {}) => {
 
         const basePick = cloneRecord(LEGACY_DOCUMENT_PICK_DEFAULTS);
         const firstBuildingId = application.targetBuildingIds?.[0] || "";
-        if (BUILDING_TITLE_TYPES.has(application.type) && firstBuildingId) {
-          basePick.targetPropBuildingId = firstBuildingId;
+        const canonicalTitleBuildingId = BUILDING_TITLE_TYPES.has(application.type)
+          ? getCanonicalTitleBuildingId(application)
+          : "";
+        if (canonicalTitleBuildingId) {
+          basePick.targetPropBuildingId = canonicalTitleBuildingId;
         }
         if (DERIVED_BUILDING_BEFORE_TYPES.has(application.type) && firstBuildingId) {
           basePick.targetBeforeBuildingId = firstBuildingId;
