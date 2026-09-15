@@ -690,14 +690,8 @@ ${styles}
     }));
   }, [printInstances]);
 
+  // 要確認事項は注意情報として表示するのみで、印刷/PDF保存の停止条件にはしない。
   const printSingleDoc = (docKey, title) => {
-    const blocked = blockingPrintInstances.find(instance => instance.key === docKey);
-    if (blocked) {
-      setActiveInstanceId(blocked.identity);
-      setShowPrintPanel(false);
-      alert(`「${blocked.name}」に未解決の確認項目があります。書類設定を確認してください。`);
-      return;
-    }
     const el = document.getElementById("print-area");
     if (!el) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -776,12 +770,6 @@ ${styles}
           {step < 3 ? <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition-all">次へ進む</button>
           : <button onClick={() => {
               if (!printInstances.length) { alert("印刷対象がありません。"); return; }
-              if (blockingPrintInstances.length > 0) {
-                const firstBlocked = blockingPrintInstances[0];
-                setActiveInstanceId(firstBlocked.identity);
-                alert(`「${firstBlocked.name}」に未解決の確認項目があります。書類設定を確認してください。`);
-                return;
-              }
               setShowPrintPanel(true);
             }} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Printer size={18} /> 印刷実行</button>}
         </div>
@@ -2255,6 +2243,11 @@ ${styles}
             <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b', lineHeight: '1.5' }}>
               各ボタンをクリックすると印刷ウィンドウが開きます。<br/>印刷先を「PDFに保存」にして保存してください。
             </p>
+            {blockingPrintInstances.length > 0 && (
+              <p data-testid="print-review-notice" style={{ margin: '0 0 16px 0', padding: '8px 10px', fontSize: '12px', color: '#9f1239', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', lineHeight: '1.5' }}>
+                要確認事項が残っている書類があります（出力は可能です）：{blockingPrintInstances.map(instance => printDocEntries.find(entry => entry.key === instance.key)?.label || instance.name).join('、')}
+              </p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {printDocEntries.map(entry => (
                 <button
