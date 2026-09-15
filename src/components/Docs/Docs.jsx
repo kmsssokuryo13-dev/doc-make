@@ -32,6 +32,11 @@ import {
   shouldShowFontSizeControl,
 } from '../../documentTextEditing.js';
 import {
+  buildIssueGuidanceList,
+  countIssuesBySeverity,
+  GUIDANCE_KINDS,
+} from '../../documentIssueGuidance.js';
+import {
   buildSelectionResetPatch,
   getSelectionOverrideKeys,
   hasSelectionOverride,
@@ -62,7 +67,22 @@ const getDocumentContextStatusStyle = (context) => {
   return DOCUMENT_CONTEXT_STATUS[context?.status] || DOCUMENT_CONTEXT_STATUS.current;
 };
 
-const DocumentContextSummary = ({ context }) => {
+// P3: issue種別ごとの「確認する場所」を表す小さな補助ボタン。押しても値は変更しない。
+const GUIDANCE_ACTION_LABELS = {
+  [GUIDANCE_KINDS.STEP1]: 'Step1で確認',
+  [GUIDANCE_KINDS.CASE_INFO]: '案件情報で確認',
+  [GUIDANCE_KINDS.DETAIL_SETTINGS]: '個別設定を確認',
+  [GUIDANCE_KINDS.FULLTEXT]: '全文固定を確認',
+};
+
+const guidanceActionLabel = (info) => {
+  if (info?.kind === GUIDANCE_KINDS.STEP3_SELECT) {
+    return info.targetTestId === 'contractor-select' ? '工事人の選択を確認' : '単独出資者の選択を確認';
+  }
+  return GUIDANCE_ACTION_LABELS[info?.kind] || '';
+};
+
+const DocumentContextSummary = ({ context, guidanceEnabled = false, onIssueAction = null }) => {
   if (!context?.supported) return null;
   const status = getDocumentContextStatusStyle(context);
   const building = context.data?.building;
@@ -96,7 +116,57 @@ const DocumentContextSummary = ({ context }) => {
           </>
         )}
       </dl>
-      {context.issues?.length > 0 && (
+      {/* P3: 対象4帳票は件数と確認導線付きで表示する。非対象帳票は従来の一覧のまま。 */}
+      {guidanceEnabled ? (() => {
+        const counts = countIssuesBySeverity(context);
+        if (counts.total === 0) {
+          return (
+            <p className="border-t border-current/10 pt-2 text-[9px] font-bold text-emerald-700" data-testid="summary-no-issues">
+              確認事項なし
+            </p>
+          );
+        }
+        const guided = buildIssueGuidanceList(context);
+        return (
+          <div className="border-t border-current/10 pt-2 space-y-1.5" data-testid="summary-issue-guidance">
+            <div className="flex items-center gap-1.5" data-testid="summary-issue-counts">
+              {counts.blocking > 0 && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-black">
+                  要確認 {counts.blocking}件
+                </span>
+              )}
+              {counts.warning > 0 && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-black">
+                  確認推奨 {counts.warning}件
+                </span>
+              )}
+            </div>
+            <ul className="space-y-1.5 text-[9px] leading-relaxed">
+              {guided.map((item, index) => {
+                const label = guidanceActionLabel(item.guidance);
+                return (
+                  <li key={`${item.code}-${index}`} className={item.severity === 'warning' ? 'text-amber-700' : 'text-rose-700'}>
+                    <span>{item.severity === 'blocking' ? '⚠ ' : '● '}{item.message}</span>
+                    {item.guidance.tab && (
+                      <span className="text-slate-400">（{item.guidance.tab}）</span>
+                    )}
+                    {label && onIssueAction && (
+                      <button
+                        type="button"
+                        onClick={() => onIssueAction(item.guidance)}
+                        className="ml-1 px-1.5 py-0.5 rounded bg-white/70 hover:bg-white border border-current/20 text-[8px] font-bold"
+                        data-testid={`issue-action-${item.guidance.kind}`}
+                      >
+                        {label}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })() : context.issues?.length > 0 && (
         <ul className="border-t border-current/10 pt-2 space-y-1 text-[9px] leading-relaxed text-rose-700">
           {context.issues.map((issue, index) => (
             <li key={`${issue.code}-${index}`} className={issue.severity === 'warning' ? 'text-amber-700' : ''}>
@@ -262,6 +332,42 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const resetSelectionOverride = (key) => {
     const patch = buildSelectionResetPatch(key, activeDocumentContext);
     if (patch) handlePickChange(activeInstanceKey, patch);
+  };
+
+  // P3: issue導線は「確認箇所を見せる」だけ。siteData / selectionOverrides / customText /
+  // acknowledge状態を変更せず、保存も発生させない。
+  const scrollToTestId = (testId) => {
+    if (typeof document === 'undefined') return;
+    requestAnimationFrame(() => {
+      const element = document.querySelector(`[data-testid="${testId}"]`);
+      if (element && typeof element.scrollIntoView === 'function') {
+        element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    });
+  };
+  const handleIssueGuidanceAction = (info) => {
+    switch (info?.kind) {
+      case GUIDANCE_KINDS.STEP1:
+        setStep(1);
+        return;
+      case GUIDANCE_KINDS.CASE_INFO:
+        // Editorのタブ選択はEditorのlocal stateで、既存のdeep-link手段がない。
+        // 新しい遷移方式を作らず、既存の戻る導線と同じ案件情報画面までに留める。
+        navigate('/');
+        return;
+      case GUIDANCE_KINDS.DETAIL_SETTINGS:
+        setDetailSettingsOpen(true);
+        scrollToTestId('document-detail-settings');
+        return;
+      case GUIDANCE_KINDS.FULLTEXT:
+        scrollToTestId('fulltext-edit-control');
+        return;
+      case GUIDANCE_KINDS.STEP3_SELECT:
+        if (info.targetTestId) scrollToTestId(info.targetTestId);
+        return;
+      default:
+        return;
+    }
   };
 
   // 個別設定が既にある書類は、開いた時点で内容を見失わないよう展開しておく。
@@ -1067,7 +1173,11 @@ ${styles}
               {activeInstance && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
-                  <DocumentContextSummary context={activeDocumentContext} />
+                  <DocumentContextSummary
+                    context={activeDocumentContext}
+                    guidanceEnabled={usesSelectionCleanup}
+                    onIssueAction={handleIssueGuidanceAction}
+                  />
 
                   {/* P2: Step1と重複する対象建物・申請人・申述人の再選択を個別設定へ集約する。
                       通常はStep1/案件データを正本として使い、ここを開いた時だけ書類固有に上書きする。 */}
