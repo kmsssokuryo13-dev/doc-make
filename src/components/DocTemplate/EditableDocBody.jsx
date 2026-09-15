@@ -39,20 +39,30 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
     return () => { if (focusedRef.current) flush(); };
   }, [flush]);
 
-  if (!editable) {
-    if (hasCustom) return <div className="doc-editable" style={{ pointerEvents: 'auto' }} dangerouslySetInnerHTML={{ __html: customHtml }} />;
-    return <div className="doc-editable" style={{ pointerEvents: 'auto' }}>{children}</div>;
-  }
+  // 同一instanceで編集可→不可へ切り替えた時も、未保存の入力を失わない。
+  useEffect(() => {
+    if (!editable) {
+      focusedRef.current = false;
+      flush();
+    }
+  }, [editable, flush]);
 
+  // Hooksは条件returnより前で常に同じ順序で呼ぶ（editableの切替に対応するため）。
   useLayoutEffect(() => {
+    if (!editable) return;
     if (focusedRef.current && containerRef.current &&
         document.activeElement !== containerRef.current) {
       focusedRef.current = false;
     }
-    if (editable && !hasCustom && containerRef.current && captureRef.current && !focusedRef.current) {
+    if (!hasCustom && containerRef.current && captureRef.current && !focusedRef.current) {
       containerRef.current.innerHTML = captureRef.current.innerHTML;
     }
   });
+
+  if (!editable) {
+    if (hasCustom) return <div className="doc-editable" style={{ pointerEvents: 'auto' }} dangerouslySetInnerHTML={{ __html: customHtml }} />;
+    return <div className="doc-editable" style={{ pointerEvents: 'auto' }}>{children}</div>;
+  }
 
   if (hasCustom) {
     return (

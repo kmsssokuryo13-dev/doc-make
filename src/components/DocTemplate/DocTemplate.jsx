@@ -10,13 +10,16 @@ import {
 import { EditableDocBody } from './EditableDocBody.jsx';
 import { DraggableStamp } from './DraggableStamp.jsx';
 import { DraggableSignerStamp } from './DraggableSignerStamp.jsx';
+import { isDocumentBodyEditable } from '../../documentTextEditing.js';
 
 export const DocTemplate = ({
   name, siteData, instanceKey, pick, onPickChange,
   onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners,
-  documentContext
+  documentContext, textEditingEnabled = false
 }) => {
   const linkedDocumentContext = documentContext?.supported ? documentContext : null;
+  // 建物表題4帳票は明示的な全文編集中だけ本文を編集可能にし、他帳票は現行どおり。
+  const bodyEditable = isDocumentBodyEditable({ documentName: name, isPrint, textEditingEnabled });
 
   const allApplicants = useMemo(
     () => (siteData.people || []).filter(p => (p.roles || []).includes("申請人")),
@@ -353,7 +356,7 @@ export const DocTemplate = ({
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
           <div style={{ position: 'relative' }}>
             <EditableDocBody
-              editable={!isPrint}
+              editable={bodyEditable}
               customHtml={pick.customText}
               onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
             >
@@ -1048,7 +1051,7 @@ export const DocTemplate = ({
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
           <div style={{ position: 'relative' }}>
             <EditableDocBody
-              editable={!isPrint}
+              editable={bodyEditable}
               customHtml={pick.customText}
               onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
             >
@@ -1854,7 +1857,7 @@ export const DocTemplate = ({
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
           <div style={{ position: 'relative' }}>
             <EditableDocBody
-              editable={!isPrint}
+              editable={bodyEditable}
               customHtml={pick.customText}
               onCustomHtmlChange={(html) => onPickChange?.({ customText: html })}
             >

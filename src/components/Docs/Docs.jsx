@@ -14,6 +14,7 @@ import {
   acknowledgeSelectionOverrideSources,
   createStableDocumentInstanceId,
   getDocumentTemplateKey,
+  isBlankDocumentHtml,
   LEGACY_DOCUMENT_PICK_DEFAULTS,
   MAX_DOCUMENT_COPIES_PER_APPLICATION,
   normalizeDocumentCount,
@@ -24,6 +25,10 @@ import {
   buildDocumentContextsForInstances,
   getDocumentContextPrintBlockers,
 } from '../../documentContext.js';
+import {
+  canApplySelectionFontSize,
+  isExplicitTextEditDocument,
+} from '../../documentTextEditing.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
@@ -112,6 +117,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const [activeInstanceId, setActiveInstanceId] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [showPrintPanel, setShowPrintPanel] = useState(false);
+  // 全文編集モードは永続editModeとは別の一時UI state。書類切替・Step移動で終了する。
+  const [textEditInstanceId, setTextEditInstanceId] = useState("");
 
   const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
 
@@ -194,6 +201,11 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     [allInstances, activeInstanceId]
   );
   const activeInstanceKey = activeInstance?.key || "";
+  const isTextEditing = step === 3 && !!activeInstance && textEditInstanceId === activeInstance.identity;
+
+  useEffect(() => {
+    setTextEditInstanceId("");
+  }, [activeInstanceId, step]);
 
   const activePick = {
     ...DEFAULT_PICK,
@@ -2117,12 +2129,61 @@ ${styles}
                     );
                   })()}
 
+                  {(() => {
+                    if (!isExplicitTextEditDocument(activeInstance.name)) return null;
+                    const hasCustomText = !isBlankDocumentHtml(activePick.customText);
+                    return (
+                      <div className="border-t pt-2 space-y-1.5 font-sans font-bold" data-testid="fulltext-edit-control">
+                        {isTextEditing ? (
+                          <>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-black text-amber-700">全文編集中</span>
+                              <button
+                                type="button"
+                                // 押下時に本文のblur保存でレイアウトが動きクリックを取り逃がさないよう、
+                                // フォーカスを移さず終了し、未保存の入力はEditableDocBody側で保存する。
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => setTextEditInstanceId("")}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-bold rounded"
+                              >
+                                編集を終了
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-amber-700 leading-relaxed">本文を変更すると最新の案件データとは自動連動しなくなります。</p>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setTextEditInstanceId(activeInstance.identity)}
+                            className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"
+                          >
+                            {hasCustomText ? '全文編集を再開' : '全文編集を開始'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="border-t pt-2">
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">文字サイズ（選択テキスト）</label>
+                    {(() => {
+                      if (!isExplicitTextEditDocument(activeInstance.name)) {
+                        return <label className="block text-[10px] font-bold text-gray-500 mb-1">文字サイズ（選択テキスト）</label>;
+                      }
+                      return (
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                          {isTextEditing ? '文字サイズ（選択文字にも適用可）' : '帳票全体の文字サイズ'}
+                        </label>
+                      );
+                    })()}
                     <select
                       className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                       value={activePick.fontScale || 100}
                       onMouseDown={() => {
+                        // 読み取り専用の本文では選択文字HTMLを書き換えず、customTextを生成しない。
+                        if (!canApplySelectionFontSize({ documentName: activeInstance.name, textEditingEnabled: isTextEditing })) {
+                          window.__savedFontRange = null;
+                          return;
+                        }
                         const sel = window.getSelection();
                         if (sel.rangeCount > 0 && sel.toString().length > 0) {
                           const range = sel.getRangeAt(0);
@@ -2138,8 +2199,11 @@ ${styles}
                       }}
                       onChange={e => {
                         const pct = Number(e.target.value);
-                        const savedRange = window.__savedFontRange;
+                        const savedRange = canApplySelectionFontSize({ documentName: activeInstance.name, textEditingEnabled: isTextEditing })
+                          ? window.__savedFontRange
+                          : null;
                         if (!savedRange || savedRange.toString().length === 0) {
+                          window.__savedFontRange = null;
                           handlePickChange(activeInstanceKey, { fontScale: pct });
                           return;
                         }
@@ -2186,7 +2250,13 @@ ${styles}
                         <option key={v} value={v}>{v === 100 ? '100%（標準）' : `${v}%`}</option>
                       ))}
                     </select>
-                    <p className="text-[9px] text-gray-400 mt-1">テキストを選択してからサイズを変更</p>
+                    <p className="text-[9px] text-gray-400 mt-1">
+                      {!isExplicitTextEditDocument(activeInstance.name)
+                        ? 'テキストを選択してからサイズを変更'
+                        : isTextEditing
+                          ? 'テキストを選択すると選択文字だけに適用し、全文固定として保存します'
+                          : '選択文字だけ変更する場合は全文編集を開始してください'}
+                    </p>
                   </div>
 
                   <div className="border-t pt-2 space-y-2 font-sans font-bold">
@@ -2222,10 +2292,10 @@ ${styles}
             <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scrollbar bg-slate-200 shadow-inner rounded-xl">
               {activeInstance ? (
                 <div className="p-10">
-                  <div className="document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden">
+                  <div className={`document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden ${isTextEditing ? 'ring-2 ring-amber-400' : ''}`} data-text-editing={isTextEditing ? 'true' : 'false'}>
                     <DocTemplate key={activeInstance.identity} name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                        instanceKey={activeInstanceKey}
-                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} documentContext={activeDocumentContext} />
+                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} documentContext={activeDocumentContext} textEditingEnabled={isTextEditing} />
                   </div>
                 </div>
               ) : <div className="flex items-center text-slate-400 italic h-full font-bold">書類を選択してください</div>}
