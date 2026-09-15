@@ -28,6 +28,8 @@ import {
 import {
   canApplySelectionFontSize,
   isExplicitTextEditDocument,
+  resolveFontSizeChange,
+  shouldShowFontSizeControl,
 } from '../../documentTextEditing.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
@@ -2164,17 +2166,22 @@ ${styles}
                     );
                   })()}
 
-                  <div className="border-t pt-2">
-                    {(() => {
-                      if (!isExplicitTextEditDocument(activeInstance.name)) {
-                        return <label className="block text-[10px] font-bold text-gray-500 mb-1">文字サイズ（選択テキスト）</label>;
-                      }
+                  {(() => {
+                    const isTargetDocument = isExplicitTextEditDocument(activeInstance.name);
+                    // P1: fontScaleはDocTemplateの描画処理から参照されないため、対象4帳票のread-only時は
+                    // 効かない文書全体スケールのUIを出さない。全体スケーリングの仕様はP4で決定する。
+                    if (!shouldShowFontSizeControl({ documentName: activeInstance.name, textEditingEnabled: isTextEditing })) {
                       return (
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                          {isTextEditing ? '文字サイズ（選択文字にも適用可）' : '帳票全体の文字サイズ'}
-                        </label>
+                        <div className="border-t pt-2" data-testid="font-size-control-hint">
+                          <p className="text-[9px] text-gray-400">文字サイズを個別調整する場合は全文編集を開始してください</p>
+                        </div>
                       );
-                    })()}
+                    }
+                    return (
+                  <div className="border-t pt-2" data-testid="font-size-control">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                      {isTargetDocument ? '選択文字のサイズ' : '文字サイズ（選択テキスト）'}
+                    </label>
                     <select
                       className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
                       value={activePick.fontScale || 100}
@@ -2202,9 +2209,17 @@ ${styles}
                         const savedRange = canApplySelectionFontSize({ documentName: activeInstance.name, textEditingEnabled: isTextEditing })
                           ? window.__savedFontRange
                           : null;
-                        if (!savedRange || savedRange.toString().length === 0) {
+                        const decision = resolveFontSizeChange({
+                          documentName: activeInstance.name,
+                          textEditingEnabled: isTextEditing,
+                          hasSelection: !!savedRange && savedRange.toString().length > 0,
+                          fontScale: pct,
+                        });
+                        if (decision.action !== 'applySelection') {
                           window.__savedFontRange = null;
-                          handlePickChange(activeInstanceKey, { fontScale: pct });
+                          // 対象4帳票で選択文字がない場合はpatchがnullになり、何も保存しない。
+                          // controlled valueが元の値へ戻るだけで、fontScale/customTextは生成しない。
+                          if (decision.patch) handlePickChange(activeInstanceKey, decision.patch);
                           return;
                         }
                         // Find the contenteditable element from the saved range
@@ -2242,7 +2257,7 @@ ${styles}
                         const clone = editableEl.cloneNode(true);
                         clone.querySelectorAll('[contenteditable="false"]').forEach(el => el.remove());
                         const customHtml = clone.innerHTML;
-                        handlePickChange(activeInstanceKey, { fontScale: 100, customText: customHtml });
+                        handlePickChange(activeInstanceKey, { ...decision.patch, customText: customHtml });
                         window.__savedFontRange = null;
                       }}
                     >
@@ -2251,13 +2266,13 @@ ${styles}
                       ))}
                     </select>
                     <p className="text-[9px] text-gray-400 mt-1">
-                      {!isExplicitTextEditDocument(activeInstance.name)
-                        ? 'テキストを選択してからサイズを変更'
-                        : isTextEditing
-                          ? 'テキストを選択すると選択文字だけに適用し、全文固定として保存します'
-                          : '選択文字だけ変更する場合は全文編集を開始してください'}
+                      {isTargetDocument
+                        ? '本文中の文字を選択してからサイズを変更（選択文字だけに適用し、全文固定として保存します）'
+                        : 'テキストを選択してからサイズを変更'}
                     </p>
                   </div>
+                    );
+                  })()}
 
                   <div className="border-t pt-2 space-y-2 font-sans font-bold">
                     {activeDocumentContext?.issues?.some(issue =>

@@ -8,8 +8,11 @@ import { build } from 'esbuild';
 import { buildDocumentContext } from '../src/documentContext.js';
 import {
   canApplySelectionFontSize,
+  canFallbackToDocumentFontScale,
   isDocumentBodyEditable,
   isExplicitTextEditDocument,
+  resolveFontSizeChange,
+  shouldShowFontSizeControl,
 } from '../src/documentTextEditing.js';
 import {
   getDocumentTemplateKey,
@@ -344,7 +347,7 @@ test('4/5. 既存customTextは通常read-onlyで内容を維持し、全文編�
   }
 });
 
-test('7/8. 選択文字の文字サイズ変更は全文編集中だけ許可し、通常時はfontScaleだけにする', () => {
+test('7/8. 選択文字の文字サイズ変更は全文編集中だけ許可する', () => {
   TARGET_DOCUMENTS.forEach(documentName => {
     assert.equal(canApplySelectionFontSize({ documentName }), false, documentName);
     assert.equal(canApplySelectionFontSize({ documentName, textEditingEnabled: true }), true, documentName);
@@ -355,9 +358,143 @@ test('7/8. 選択文字の文字サイズ変更は全文編集中だけ許可し
   const fontBlock = docsSource.slice(docsSource.indexOf('value={activePick.fontScale || 100}'), docsSource.indexOf("'100%（標準）'"));
   const mouseDown = fontBlock.slice(fontBlock.indexOf('onMouseDown'), fontBlock.indexOf('onChange'));
   const onChange = fontBlock.slice(fontBlock.indexOf('onChange'));
-  // 範囲保存・適用の両方で判定し、判定不可ならcustomTextを作らずfontScaleだけ保存する。
+  // 範囲保存時に判定し、保存経路はresolveFontSizeChangeの判断だけに従う。
   assert.match(mouseDown, /canApplySelectionFontSize\(\{ documentName: activeInstance\.name, textEditingEnabled: isTextEditing \}\)/);
-  assert.match(onChange, /canApplySelectionFontSize\(\{ documentName: activeInstance\.name, textEditingEnabled: isTextEditing \}\)[\s\S]*?: null;[\s\S]*?handlePickChange\(activeInstanceKey, \{ fontScale: pct \}\);\s*return;/);
+  assert.match(onChange, /resolveFontSizeChange\(\{[\s\S]*?documentName: activeInstance\.name,[\s\S]*?textEditingEnabled: isTextEditing,[\s\S]*?hasSelection:[\s\S]*?\}\);/);
+  // fontScaleを直接組み立てて保存する経路が残っていないこと。
+  assert.doesNotMatch(onChange, /handlePickChange\(activeInstanceKey, \{ fontScale:/);
+  assert.match(onChange, /if \(decision\.patch\) handlePickChange\(activeInstanceKey, decision\.patch\);/);
+});
+
+// ---- 2026-09-15 実装レビュー補正: read-only時の文字サイズUIを出さない ----
+
+test('R1. 対象4帳票のread-only時は文字サイズselectを表示しない', () => {
+  const docsSource = readFileSync(path.join(ROOT, 'src/components/Docs/Docs.jsx'), 'utf8');
+  TARGET_DOCUMENTS.forEach(documentName => {
+    assert.equal(shouldShowFontSizeControl({ documentName }), false, documentName);
+    assert.equal(shouldShowFontSizeControl({ documentName, textEditingEnabled: true }), true, documentName);
+  });
+  // 表示判定がselectを含むブロック全体を覆っていること。
+  const guardIndex = docsSource.indexOf('shouldShowFontSizeControl({ documentName: activeInstance.name, textEditingEnabled: isTextEditing })');
+  const selectIndex = docsSource.indexOf('value={activePick.fontScale || 100}');
+  assert.notEqual(guardIndex, -1);
+  assert.ok(guardIndex < selectIndex, '文字サイズselectより前で表示判定していること');
+  // read-only時に返すのは補助文だけで、selectもfontScale保存もない。
+  const shownIndex = docsSource.indexOf('data-testid="font-size-control"');
+  assert.ok(guardIndex < shownIndex && shownIndex < selectIndex);
+  const hintBlock = docsSource.slice(guardIndex, shownIndex);
+  assert.match(hintBlock, /文字サイズを個別調整する場合は全文編集を開始してください/);
+  assert.doesNotMatch(hintBlock, /<select/);
+  assert.doesNotMatch(hintBlock, /handlePickChange/);
+  // 効かない「帳票全体の文字サイズ」表記が残っていないこと。
+  assert.doesNotMatch(docsSource, /帳票全体の文字サイズ/);
+});
+
+test('R2. 対象4帳票のread-only時はfontScale/customTextを保存する経路がない', () => {
+  TARGET_DOCUMENTS.forEach(documentName => {
+    [90, 100, 110].forEach(fontScale => {
+      // read-onlyではUIを出さないが、万一呼ばれても何も保存しない。
+      assert.deepEqual(
+        resolveFontSizeChange({ documentName, textEditingEnabled: false, hasSelection: false, fontScale }),
+        { action: 'none', patch: null },
+        `${documentName}/${fontScale}`
+      );
+      // 選択があっても本文read-onlyなら適用しない。
+      assert.deepEqual(
+        resolveFontSizeChange({ documentName, textEditingEnabled: false, hasSelection: true, fontScale }),
+        { action: 'none', patch: null },
+        `${documentName}/${fontScale}/selected`
+      );
+    });
+  });
+});
+
+test('R3. 対象4帳票の全文編集中に文字選択があれば選択文字サイズを適用しcustomTextを保存する', () => {
+  TARGET_DOCUMENTS.forEach(documentName => {
+    const decision = resolveFontSizeChange({ documentName, textEditingEnabled: true, hasSelection: true, fontScale: 110 });
+    assert.equal(decision.action, 'applySelection', documentName);
+    // 現行P1挙動どおり、選択文字へ適用した結果はfontScale:100 + customTextで保存する。
+    assert.deepEqual(decision.patch, { fontScale: 100 }, documentName);
+    assert.deepEqual({ ...decision.patch, customText: '<p>x</p>' }, { fontScale: 100, customText: '<p>x</p>' }, documentName);
+  });
+
+  const docsSource = readFileSync(path.join(ROOT, 'src/components/Docs/Docs.jsx'), 'utf8');
+  const onChange = docsSource.slice(docsSource.indexOf('value={activePick.fontScale || 100}'), docsSource.indexOf("'100%（標準）'"));
+  assert.match(onChange, /handlePickChange\(activeInstanceKey, \{ \.\.\.decision\.patch, customText: customHtml \}\);/);
+  assert.match(onChange, /wrapper\.style\.fontSize = pct \+ '%';/);
+});
+
+test('R4. 対象4帳票の全文編集中でも文字選択がなければfontScale/customTextを保存しない', () => {
+  TARGET_DOCUMENTS.forEach(documentName => {
+    [90, 105, 110].forEach(fontScale => {
+      const decision = resolveFontSizeChange({ documentName, textEditingEnabled: true, hasSelection: false, fontScale });
+      assert.deepEqual(decision, { action: 'none', patch: null }, `${documentName}/${fontScale}`);
+    });
+    assert.equal(canFallbackToDocumentFontScale(documentName), false, documentName);
+  });
+
+  // 全文編集中の補助文で、文字選択が必要なことが分かること。
+  const docsSource = readFileSync(path.join(ROOT, 'src/components/Docs/Docs.jsx'), 'utf8');
+  assert.match(docsSource, /'選択文字のサイズ' : '文字サイズ（選択テキスト）'/);
+  assert.match(docsSource, /本文中の文字を選択してからサイズを変更/);
+  // 選択なしでの新規alert/confirmは足さない。
+  const fontBlock = docsSource.slice(docsSource.indexOf('data-testid="font-size-control"'), docsSource.indexOf("'100%（標準）'"));
+  assert.doesNotMatch(fontBlock, /window\.(alert|confirm)\(/);
+});
+
+test('R5. 非対象帳票は従来の文字サイズUI・挙動を維持する', () => {
+  const others = ['委任状（保存）', '上申書', '土地所在図'];
+  others.forEach(documentName => {
+    assert.equal(shouldShowFontSizeControl({ documentName }), true, documentName);
+    assert.equal(canFallbackToDocumentFontScale(documentName), true, documentName);
+    // 選択なしなら従来どおりfontScaleだけ保存する。
+    assert.deepEqual(
+      resolveFontSizeChange({ documentName, hasSelection: false, fontScale: 95 }),
+      { action: 'saveFontScale', patch: { fontScale: 95 } },
+      documentName
+    );
+    // 選択ありなら従来どおり選択文字へ適用する。
+    assert.equal(resolveFontSizeChange({ documentName, hasSelection: true, fontScale: 95 }).action, 'applySelection', documentName);
+  });
+  // ラベル・補助文の従来表記を維持していること。
+  const docsSource = readFileSync(path.join(ROOT, 'src/components/Docs/Docs.jsx'), 'utf8');
+  assert.match(docsSource, /'文字サイズ（選択テキスト）'/);
+  assert.match(docsSource, /'テキストを選択してからサイズを変更'/);
+});
+
+test('R6. 既存保存済みfontScaleは読込・互換処理で破棄しない', () => {
+  TARGET_DOCUMENTS.forEach(documentName => {
+    const key = getDocumentTemplateKey(documentName);
+    const instanceKey = `${documentName}__1`;
+    const site = {
+      ...baseSite(),
+      registrationApplications: [{
+        id: 'ra-1',
+        type: '建物表題登記',
+        targetBuildingIds: ['b1'],
+        applicantPersonIds: ['p1'],
+        documents: { [documentName]: 1 },
+        documentInstances: [{
+          id: `doc-${key}`,
+          templateKey: key,
+          documentName,
+          copyIndex: 1,
+          printEnabled: true,
+          selectionOverrides: {},
+          contentOverrides: { blocks: {}, fields: {} },
+          layoutOverrides: { fontScale: 92 },
+          editMode: 'linked',
+          detachedHtml: null,
+        }],
+      }],
+      docPick: { [instanceKey]: { fontScale: 92, printOn: true } },
+    };
+    const reconciled = reconcileSiteDocumentCompatibility(site);
+    const instance = reconciled.registrationApplications[0].documentInstances[0];
+    // 値を削除・migrationせず、そのまま保持する。
+    assert.equal(instance.layoutOverrides.fontScale, 92, documentName);
+    assert.equal(reconciled.docPick[instanceKey].fontScale, 92, documentName);
+  });
 });
 
 test('「編集を終了」は押下時に本文からフォーカスを移さず、入力途中の本文はeditable切替で保存する', () => {
