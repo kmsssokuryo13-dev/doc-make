@@ -31,6 +31,15 @@ import {
   resolveFontSizeChange,
   shouldShowFontSizeControl,
 } from '../../documentTextEditing.js';
+import {
+  buildSelectionResetPatch,
+  getSelectionOverrideKeys,
+  hasSelectionOverride,
+  SELECTION_OVERRIDE_LABELS,
+  shouldShowContractorSelect,
+  shouldShowSoleApplicantSelect,
+  usesSelectionCleanupUi,
+} from '../../documentSelectionUi.js';
 import { StepBadge } from '../ui/StepBadge.jsx';
 import { CountRow } from '../ui/CountRow.jsx';
 import { DocRow } from '../ui/DocRow.jsx';
@@ -121,6 +130,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const [showPrintPanel, setShowPrintPanel] = useState(false);
   // 全文編集モードは永続editModeとは別の一時UI state。書類切替・Step移動で終了する。
   const [textEditInstanceId, setTextEditInstanceId] = useState("");
+  // P2: 書類固有の例外設定をまとめる折りたたみ領域。既定は閉じる（overrideがあれば展開）。
+  const [detailSettingsOpen, setDetailSettingsOpen] = useState(false);
 
   const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
 
@@ -225,6 +236,38 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const activeDocumentContext = activeInstance
     ? documentContextsByIdentity[activeInstance.identity] || null
     : null;
+
+  // P2: 個別設定(selectionOverrides)の有無はdocumentInstanceが正本。
+  // 読み取り専用で参照し、v8Compatibilityの投影方式は変更しない。
+  const activeDocumentInstance = useMemo(() => {
+    if (!activeInstance?.documentInstanceId) return null;
+    const application = (siteData?.registrationApplications || [])
+      .find(ra => ra?.id === activeInstance.raId);
+    return (application?.documentInstances || [])
+      .find(instance => instance?.id === activeInstance.documentInstanceId) || null;
+  }, [siteData, activeInstance]);
+  const activeOverrideKeys = useMemo(
+    () => getSelectionOverrideKeys(activeDocumentInstance),
+    [activeDocumentInstance]
+  );
+  const usesSelectionCleanup = usesSelectionCleanupUi({
+    documentName: activeInstance?.name,
+    context: activeDocumentContext,
+  });
+  const showContractorSelect = shouldShowContractorSelect({
+    documentName: activeInstance?.name,
+    context: activeDocumentContext,
+    documentInstance: activeDocumentInstance,
+  });
+  const resetSelectionOverride = (key) => {
+    const patch = buildSelectionResetPatch(key, activeDocumentContext);
+    if (patch) handlePickChange(activeInstanceKey, patch);
+  };
+
+  // 個別設定が既にある書類は、開いた時点で内容を見失わないよう展開しておく。
+  useEffect(() => {
+    setDetailSettingsOpen(getSelectionOverrideKeys(activeDocumentInstance).length > 0);
+  }, [activeInstanceId, step]);
 
   useEffect(() => {
     if (!siteId || !siteData) return;
@@ -1025,10 +1068,183 @@ ${styles}
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4 font-bold">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">書類設定</h4>
                   <DocumentContextSummary context={activeDocumentContext} />
+
+                  {/* P2: Step1と重複する対象建物・申請人・申述人の再選択を個別設定へ集約する。
+                      通常はStep1/案件データを正本として使い、ここを開いた時だけ書類固有に上書きする。 */}
+                  {usesSelectionCleanup && (() => {
+                    const documentName = activeInstance.name;
+                    const isStatementDoc = documentName === "申述書（共有）" || documentName === "申述書（単独）";
+                    const usesApplicantOverride = documentName === "委任状（表題）" || documentName === "工事完了引渡証明書（表題）";
+                    const people = siteData?.people || [];
+                    const buildings = naturalSortList(siteData.proposedBuildings || [], 'houseNum');
+                    const selectedBuildingId = activeDocumentContext?.selection?.targetBuildingId || "";
+                    const buildingOverridden = hasSelectionOverride(activeDocumentInstance, 'targetPropBuildingId');
+                    const applicantOverridden = hasSelectionOverride(activeDocumentInstance, 'applicantPersonIds');
+                    const statementOverridden = hasSelectionOverride(activeDocumentInstance, 'statementPersonIds');
+                    const currentApplicantIds = activeDocumentContext?.selection?.applicantPersonIds || [];
+                    const overrideSummary = activeOverrideKeys
+                      .map(key => SELECTION_OVERRIDE_LABELS[key] || '個別設定')
+                      .join('・');
+
+                    const toggleApplicant = (id) => {
+                      const next = new Set(currentApplicantIds);
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      if (next.size === 0) return;
+                      handlePickChange(activeInstanceKey, { applicantPersonIds: Array.from(next) });
+                    };
+
+                    return (
+                      <div className="border-t pt-3 space-y-2" data-testid="document-detail-settings">
+                        <button
+                          type="button"
+                          onClick={() => setDetailSettingsOpen(open => !open)}
+                          className="w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg bg-slate-50 hover:bg-slate-100"
+                          data-testid="detail-settings-toggle"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-black text-slate-500">個別設定</span>
+                            {activeOverrideKeys.length > 0 && (
+                              <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-black" data-testid="detail-settings-active-badge">
+                                個別設定中
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">{detailSettingsOpen ? '閉じる' : '開く'}</span>
+                        </button>
+
+                        {/* 折りたたんでいても、個別設定中の項目は見失わないよう常に表示する。 */}
+                        {activeOverrideKeys.length > 0 && (
+                          <p className="text-[9px] text-blue-700 leading-relaxed px-1" data-testid="selection-override-summary">
+                            この書類だけの設定: {overrideSummary}
+                          </p>
+                        )}
+
+                        {detailSettingsOpen && (
+                          <div className="space-y-3 pt-1" data-testid="detail-settings-body">
+                            <div data-testid="detail-target-building">
+                              <label className="block text-[10px] font-bold text-gray-500 mb-1">この書類だけ対象建物を変更</label>
+                              <select
+                                className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
+                                value={selectedBuildingId}
+                                onChange={e => handlePickChange(activeInstanceKey, { targetPropBuildingId: e.target.value })}
+                              >
+                                {/* 空のoverrideを新規作成させないため、選択できる「(未選択)」は置かない。
+                                    Step1側で対象建物が未確定な時だけ、状態を偽らないようdisabledの
+                                    プレースホルダを出す。Step1へ戻す操作は下の解除ボタンで行う。 */}
+                                {!selectedBuildingId && (
+                                  <option value="" disabled>(Step1で対象建物が未確定)</option>
+                                )}
+                                {buildings.map(pb => (
+                                  <option key={pb.id} value={pb.id}>{pb.houseNum || "(家屋番号未入力)"}</option>
+                                ))}
+                              </select>
+                              {buildingOverridden ? (
+                                <button
+                                  type="button"
+                                  onClick={() => resetSelectionOverride('targetPropBuildingId')}
+                                  className="mt-1.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+                                  data-testid="reset-target-building"
+                                >
+                                  Step1の対象建物に戻す
+                                </button>
+                              ) : (
+                                <p className="text-[9px] text-slate-400 mt-1">Step1の対象建物を自動使用しています。</p>
+                              )}
+                            </div>
+
+                            {usesApplicantOverride && (
+                              <div className="border-t pt-3" data-testid="detail-applicants">
+                                <label className="block text-[10px] font-bold text-gray-500 mb-1">この書類だけ申請人を変更</label>
+                                {people.length === 0 ? (
+                                  <p className="text-[10px] text-slate-400">申請人が登録されていません。</p>
+                                ) : (
+                                  <>
+                                    <DraggableApplicantList
+                                      candidates={people}
+                                      selectedIds={currentApplicantIds}
+                                      onToggle={toggleApplicant}
+                                      onReorder={(newIds) => handlePickChange(activeInstanceKey, { applicantPersonIds: newIds })}
+                                      minOne
+                                    />
+                                    {applicantOverridden ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => resetSelectionOverride('applicantPersonIds')}
+                                        className="mt-2 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+                                        data-testid="reset-applicants"
+                                      >
+                                        Step1の申請人に戻す
+                                      </button>
+                                    ) : (
+                                      <p className="text-[9px] text-slate-400 mt-1">Step1の申請人と順序を自動使用しています。</p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {isStatementDoc && (() => {
+                              const others = people.filter(p => (p.roles || []).includes("その他"));
+                              const confirmPeople = (activeDocumentContext?.data?.confirmation?.applicants || [])
+                                .map(item => item.person).filter(Boolean);
+                              const contextApplicants = activeDocumentContext?.data?.applicants || [];
+                              const currentStatementPeople = activeDocumentContext?.data?.statementPeople || [];
+                              const seen = new Set();
+                              const candidates = [];
+                              for (const p of [...contextApplicants, ...others, ...confirmPeople, ...currentStatementPeople]) {
+                                if (!seen.has(p.id)) { seen.add(p.id); candidates.push(p); }
+                              }
+                              const currentStatementIds = activeDocumentContext?.selection?.statementPersonIds || [];
+                              const toggleStatementPerson = (id) => {
+                                const next = new Set(currentStatementIds);
+                                if (next.has(id)) next.delete(id);
+                                else next.add(id);
+                                if (next.size === 0) return;
+                                handlePickChange(activeInstanceKey, { statementPersonIds: Array.from(next) });
+                              };
+                              return (
+                                <div className="border-t pt-3" data-testid="detail-statement-people">
+                                  <label className="block text-[10px] font-bold text-gray-500 mb-1">申述人（署名・押印する人）</label>
+                                  {candidates.length === 0 ? (
+                                    <p className="text-[10px] text-slate-400">「申請人」「その他」または確認済証建築申請人が登録されていません。</p>
+                                  ) : (
+                                    <>
+                                      <p className="text-[9px] text-slate-400 mb-1">※既定はStep1の申請人。その他・確認済証建築申請人も追加できます。</p>
+                                      <DraggableApplicantList
+                                        candidates={candidates}
+                                        selectedIds={currentStatementIds}
+                                        onToggle={toggleStatementPerson}
+                                        onReorder={(newIds) => handlePickChange(activeInstanceKey, { statementPersonIds: newIds })}
+                                        minOne
+                                      />
+                                      {statementOverridden && (
+                                        <button
+                                          type="button"
+                                          onClick={() => resetSelectionOverride('statementPersonIds')}
+                                          className="mt-2 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+                                          data-testid="reset-statement-people"
+                                        >
+                                          Step1の申請人に戻す
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {activeInstance.name !== "委任状（地目変更）" && activeInstance.name !== "委任状（滅失）" && activeInstance.name !== "滅失証明書（滅失）" && activeInstance.name !== "滅失証明書（表題部変更）" && activeInstance.name !== "非登載証明書" && activeInstance.name !== "委任状（表題）" && activeInstance.name !== "委任状（保存）" && activeInstance.name !== "工事完了引渡証明書（表題）" && activeInstance.name !== "申述書（共有）" && activeInstance.name !== "申述書（単独）" && (
                     <div className="space-y-2 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showMain ?? true} onChange={e => handlePickChange(activeInstanceKey, { showMain: e.target.checked })} />主建物を表示</label><label className="flex items-center gap-2"><input type="checkbox" checked={activePick.showAnnex ?? true} onChange={e => handlePickChange(activeInstanceKey, { showAnnex: e.target.checked })} />附属建物を表示</label></div>
                   )}
                   {(() => {
+  // P2: 対象4帳票はStep1の申請人をそのまま使う。変更は個別設定へ移した。
+  if (usesSelectionCleanup) return null;
+
   const isStatement = activeInstance && (activeInstance.name === "申述書（共有）" || activeInstance.name === "申述書（単独）");
   if (isStatement) return null;
 
@@ -1241,7 +1457,9 @@ ${styles}
   );
 })()}
 
-                  {(activeInstance.name === "委任状（表題）" || activeInstance.name === "委任状（保存）") && (
+                  {/* P2: 委任状（表題）の対象建物は個別設定へ移動。非対象の委任状（保存）は従来どおり。 */}
+                  {(activeInstance.name === "委任状（保存）" ||
+                    (activeInstance.name === "委任状（表題）" && !usesSelectionCleanup)) && (
                     <div className="border-t pt-4">
                       <label className="block text-[10px] font-bold text-gray-500 mb-1">予定家屋番号選択</label>
                       <select
@@ -1504,6 +1722,8 @@ ${styles}
                           <p className="text-[9px] text-slate-400">※申請建物タブの確認済証情報内「建築申請人」から自動参照されます。</p>
                         </div>
 
+                        {/* P2: 対象建物はStep1を正本とし、変更は個別設定へ移した。 */}
+                        {!usesSelectionCleanup && (
                         <div>
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
                           <select
@@ -1517,9 +1737,15 @@ ${styles}
                             ))}
                           </select>
                         </div>
+                        )}
 
-                        {activeInstance.name === "申述書（単独）" && (
-                          <div>
+                        {/* P2: 申請人1名なら自動解決。複数名・要選択issue・override時だけ表示する。 */}
+                        {activeInstance.name === "申述書（単独）" && shouldShowSoleApplicantSelect({
+                          documentName: activeInstance.name,
+                          context: activeDocumentContext,
+                          documentInstance: activeDocumentInstance,
+                        }) && (
+                          <div data-testid="sole-applicant-select">
                             <label className="block text-[10px] font-bold text-gray-500 mb-1">
                               申請人（単独出資者）
                             </label>
@@ -1534,10 +1760,21 @@ ${styles}
                               ))}
                             </select>
                             <p className="text-[9px] text-slate-400 mt-1">※未選択の場合、文中は「［申請人］」表示になります</p>
+                            {usesSelectionCleanup && hasSelectionOverride(activeDocumentInstance, 'statementApplicantPersonId') && (
+                              <button
+                                type="button"
+                                onClick={() => resetSelectionOverride('statementApplicantPersonId')}
+                                className="mt-1.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+                                data-testid="reset-sole-applicant"
+                              >
+                                自動設定に戻す
+                              </button>
+                            )}
                           </div>
                         )}
 
-                        {(() => {
+                        {/* P2: 申述人の変更は個別設定へ移した。通常時は主UIに出さない。 */}
+                        {!usesSelectionCleanup && (() => {
                           const people = siteData?.people || [];
                           const usesContext = activeDocumentContext?.supported === true;
                           const applicants = usesContext
@@ -1866,10 +2103,13 @@ ${styles}
                     </div>
                   )}
 
-                  {activeInstance.name === "工事完了引渡証明書（表題）"&& (
+                  {/* 工事人も対象建物も自動解決できている通常時は、区切り枠ごと出さない。 */}
+                  {activeInstance.name === "工事完了引渡証明書（表題）" && (showContractorSelect || !usesSelectionCleanup) && (
                     <div className="border-t pt-4">
                       <div className="space-y-3">
-                        {(() => {
+                        {/* P2: 対象建物から工事人が1名に解決できる通常時はselectを出さない。
+                            解決できない/曖昧/要選択issue/override時だけ表示する。 */}
+                        {showContractorSelect && (() => {
                           const usesContext = activeDocumentContext?.supported === true;
                           const people = siteData?.people || [];
                           const linkedIds = activeDocumentContext?.data?.building?.contractorPersonIds || [];
@@ -1883,7 +2123,7 @@ ${styles}
                             if (!seen.has(person.id)) { seen.add(person.id); candidates.push(person); }
                           }
                           return (
-                            <div>
+                            <div data-testid="contractor-select">
                               <label className="block text-[10px] font-bold text-gray-500 mb-1">工事人を選択</label>
                               <select
                                 className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-black bg-white"
@@ -1895,9 +2135,21 @@ ${styles}
                                   <option key={person.id} value={person.id}>{person.name || "(名前未入力)"}</option>
                                 ))}
                               </select>
+                              {usesSelectionCleanup && hasSelectionOverride(activeDocumentInstance, 'targetContractorPersonId') && (
+                                <button
+                                  type="button"
+                                  onClick={() => resetSelectionOverride('targetContractorPersonId')}
+                                  className="mt-1.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-slate-600"
+                                  data-testid="reset-contractor"
+                                >
+                                  自動設定に戻す
+                                </button>
+                              )}
                             </div>
                           );
                         })()}
+                        {/* P2: 対象建物はStep1を正本とし、変更は個別設定へ移した。 */}
+                        {!usesSelectionCleanup && (
                         <div>
                           <label className="block text-[10px] font-bold text-gray-500 mb-1">対象建物選択</label>
                           <select
@@ -1911,6 +2163,7 @@ ${styles}
                             ))}
                           </select>
                         </div>
+                        )}
                       </div>
                     </div>
                   )}
