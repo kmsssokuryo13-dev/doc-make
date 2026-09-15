@@ -19,10 +19,14 @@ export const GUIDANCE_KINDS = Object.freeze({
 });
 
 // Step3内の既存selectで確認できるissue。P2の表示条件と同じcodeを正本にする。
-// ただし *_DUPLICATE_ID は「同じ人物IDが複数存在する」データ不整合で、
-// Step3のselectでは解決できないため案件情報側へ回す。
+// ただし次の2つはselectに選び直せる候補が存在しないため案件情報側へ回す。
+// - CONTRACTOR_DUPLICATE_ID: 同じ人物IDが複数存在するデータ不整合。
+// - CONTRACTOR_REQUIRED: 対象建物のcontractorPersonIdsが0件、かつ案件内に
+//   「工事人」roleの人物も0名の場合だけ発行される（documentContext.jsの実条件）。
+//   この状態では工事人selectの候補が空になる。
+const CONTRACTOR_SELECT_EXCLUDED_CODES = Object.freeze(['CONTRACTOR_DUPLICATE_ID', 'CONTRACTOR_REQUIRED']);
 const CONTRACTOR_SELECT_CODES = Object.freeze(
-  CONTRACTOR_SELECTION_ISSUE_CODES.filter(code => code !== 'CONTRACTOR_DUPLICATE_ID')
+  CONTRACTOR_SELECTION_ISSUE_CODES.filter(code => !CONTRACTOR_SELECT_EXCLUDED_CODES.includes(code))
 );
 const SOLE_APPLICANT_SELECT_CODES = Object.freeze(
   SOLE_APPLICANT_SELECTION_ISSUE_CODES.filter(code => code !== 'SOLE_APPLICANT_DUPLICATE_ID')
@@ -43,6 +47,14 @@ const PERSON_DUPLICATE_CODES = Object.freeze([
 // 持分はpersonのshare / shareOverridesで、関係人タブで編集する。
 // pathは application.* / building.* / document.* と散らばるためcodeで判定する。
 const SHARE_CODES = Object.freeze(['SHARE_REQUIRED', 'SHARE_INVALID', 'SHARE_TOTAL_MISMATCH']);
+
+// 関係人タブで人物そのものを直す必要があるissue。
+// pathがbuilding.*でも確認先は関係人になるため、path判定より先にcodeで判定する。
+const CASE_INFO_PEOPLE_CODES = Object.freeze([
+  ...PERSON_DUPLICATE_CODES,
+  ...SHARE_CODES,
+  'CONTRACTOR_REQUIRED',
+]);
 
 // Editorのタブ名。activeTabはEditorのlocal stateでdeep-link手段がないため、
 // 遷移は案件情報画面までとし、タブ名は文言ヒントとしてのみ使う。
@@ -75,8 +87,8 @@ export const classifyIssueGuidance = (issue) => {
     return guidance(GUIDANCE_KINDS.NONE);
   }
 
-  // 人物IDの重複・持分は案件情報側でしか直せない。
-  if (PERSON_DUPLICATE_CODES.includes(code) || SHARE_CODES.includes(code)) {
+  // 人物IDの重複・持分・工事人の不在は案件情報（関係人）側でしか直せない。
+  if (CASE_INFO_PEOPLE_CODES.includes(code)) {
     return guidance(GUIDANCE_KINDS.CASE_INFO, { tab: '関係人' });
   }
 

@@ -17,6 +17,7 @@ import {
   GUIDANCE_KINDS,
   hasNoIssues,
 } from '../src/documentIssueGuidance.js';
+import { CONTRACTOR_SELECTION_ISSUE_CODES } from '../src/documentSelectionUi.js';
 
 // Step3 P3（2026-09-15 Decision）: 既存issueを分類し、確認導線だけを付ける。
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -314,11 +315,16 @@ test('7. CONTRACTOR系issueは既存工事人selectへ誘導し、Summaryへ複�
   assert.equal(info.kind, GUIDANCE_KINDS.STEP3_SELECT);
   assert.equal(info.targetTestId, 'contractor-select');
 
-  ['CONTRACTOR_REQUIRED', 'CONTRACTOR_NOT_FOUND', 'LEGACY_CONTRACTOR_FALLBACK'].forEach(code => {
+  ['CONTRACTOR_NOT_FOUND', 'LEGACY_CONTRACTOR_FALLBACK'].forEach(code => {
     const g = classifyIssueGuidance({ code, scope: 'source', path: 'building.contractorPersonIds' });
     assert.equal(g.kind, GUIDANCE_KINDS.STEP3_SELECT, code);
     assert.equal(g.targetTestId, 'contractor-select', code);
   });
+  // 人物ID重複はselectで選び直せないため案件情報（関係人）。
+  assert.deepEqual(
+    classifyIssueGuidance({ code: 'CONTRACTOR_DUPLICATE_ID', scope: 'source', path: 'site.people' }),
+    { kind: GUIDANCE_KINDS.CASE_INFO, tab: '関係人' }
+  );
   // 氏名・住所未入力は案件情報側。
   ['CONTRACTOR_NAME_REQUIRED', 'CONTRACTOR_ADDRESS_REQUIRED'].forEach(code => {
     assert.equal(classifyIssueGuidance({ code, scope: 'source', path: 'people.c1.name' }).kind, GUIDANCE_KINDS.CASE_INFO, code);
@@ -332,6 +338,41 @@ test('7. CONTRACTOR系issueは既存工事人selectへ誘導し、Summaryへ複�
   assert.doesNotMatch(summaryBlock, /<select/);
   assert.doesNotMatch(summaryBlock, /handlePickChange/);
   assert.match(DOCS_SOURCE, /case GUIDANCE_KINDS\.STEP3_SELECT:\s*\n\s*if \(info\.targetTestId\) scrollToTestId\(info\.targetTestId\);/);
+});
+
+test('7b. 工事人role人物が0名のCONTRACTOR_REQUIREDは案件情報（関係人）へ誘導する', () => {
+  const name = '工事完了引渡証明書（表題）';
+  // 対象建物のcontractorPersonIdsが0件、かつ案件内に「工事人」roleの人物も0名。
+  const site = makeSite({
+    buildings: [building('b1', '101番1', [])],
+    people: [
+      person('p1', '架空 太郎', ['申請人']),
+      person('p2', '架空 花子', ['申請人']),
+    ],
+  });
+  const context = contextFor(site, name);
+  assert.ok(codes(context).includes('CONTRACTOR_REQUIRED'), '実contextでCONTRACTOR_REQUIREDが出ること');
+
+  const issue = context.issues.find(i => i.code === 'CONTRACTOR_REQUIRED');
+  // 1. CASE_INFO / 関係人 へ分類する。
+  assert.deepEqual(classifyIssueGuidance(issue), { kind: GUIDANCE_KINDS.CASE_INFO, tab: '関係人' });
+  // 2. STEP3_SELECT にはしない（空のselectへ誘導しない）。
+  assert.notEqual(classifyIssueGuidance(issue).kind, GUIDANCE_KINDS.STEP3_SELECT);
+  assert.equal(classifyIssueGuidance(issue).targetTestId, undefined);
+
+  // Summary表示でも「案件情報で確認」になる。
+  const shown = buildIssueGuidanceList(context).find(i => i.code === 'CONTRACTOR_REQUIRED');
+  assert.ok(shown);
+  assert.equal(shown.guidance.kind, GUIDANCE_KINDS.CASE_INFO);
+  assert.equal(shown.guidance.tab, '関係人');
+
+  // 選択候補が本当に無いことを確認する（P2のselect候補源が全て空）。
+  assert.deepEqual(context.data.building?.contractorPersonIds, []);
+  assert.equal(context.data.contractor, null);
+  assert.equal((site.people || []).filter(p => (p.roles || []).includes('工事人')).length, 0);
+
+  // P2側の表示条件定数そのものは変更しない。
+  assert.ok(CONTRACTOR_SELECTION_ISSUE_CODES.includes('CONTRACTOR_REQUIRED'));
 });
 
 test('8. SOLE_APPLICANT系issueは既存単独出資者selectへ誘導する', () => {
