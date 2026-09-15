@@ -37,6 +37,11 @@ import {
   GUIDANCE_KINDS,
 } from '../../documentIssueGuidance.js';
 import {
+  buildStampPositionResetPatch,
+  canRelinkDocumentText,
+  hasAnyStampAdjustment,
+} from '../../documentLayoutUi.js';
+import {
   buildSelectionResetPatch,
   getSelectionOverrideKeys,
   hasSelectionOverride,
@@ -202,6 +207,8 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   const [textEditInstanceId, setTextEditInstanceId] = useState("");
   // P2: 書類固有の例外設定をまとめる折りたたみ領域。既定は閉じる（overrideがあれば展開）。
   const [detailSettingsOpen, setDetailSettingsOpen] = useState(false);
+  // P4: 印影位置等のレイアウト二次操作。一時UI stateで永続化せず、書類切替で閉じる。
+  const [layoutSettingsOpen, setLayoutSettingsOpen] = useState(false);
 
   const orderedDocs = useMemo(() => siteData ? getOrderedDocs(siteData.applications || {}) : [], [siteData?.applications]);
 
@@ -373,6 +380,11 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
   // 個別設定が既にある書類は、開いた時点で内容を見失わないよう展開しておく。
   useEffect(() => {
     setDetailSettingsOpen(getSelectionOverrideKeys(activeDocumentInstance).length > 0);
+  }, [activeInstanceId, step]);
+
+  // P4: レイアウト調整は書類切替・Step移動で閉じる（位置調整の有無はbadgeで分かる）。
+  useEffect(() => {
+    setLayoutSettingsOpen(false);
   }, [activeInstanceId, step]);
 
   useEffect(() => {
@@ -2532,13 +2544,12 @@ ${styles}
                   {(() => {
                     const isTargetDocument = isExplicitTextEditDocument(activeInstance.name);
                     // P1: fontScaleはDocTemplateの描画処理から参照されないため、対象4帳票のread-only時は
-                    // 効かない文書全体スケールのUIを出さない。全体スケーリングの仕様はP4で決定する。
+                    // 効かない文書全体スケールのUIを出さない。
+                    // P4: 帳票全体スケールは対象4帳票では実装しないと確定。既存fontScaleは互換保持のみ。
                     if (!shouldShowFontSizeControl({ documentName: activeInstance.name, textEditingEnabled: isTextEditing })) {
-                      return (
-                        <div className="border-t pt-2" data-testid="font-size-control-hint">
-                          <p className="text-[9px] text-gray-400">文字サイズを個別調整する場合は全文編集を開始してください</p>
-                        </div>
-                      );
+                      // P4: 通常read-only時は文字サイズselectもヒントも出さない。
+                      // 「全文編集を開始」ボタン自体が導線として残るため、常設の説明文は不要。
+                      return null;
                     }
                     return (
                   <div className="border-t pt-2" data-testid="font-size-control">
@@ -2637,10 +2648,23 @@ ${styles}
                     );
                   })()}
 
-                  <div className="border-t pt-2 space-y-2 font-sans font-bold">
-                    {activeDocumentContext?.issues?.some(issue =>
+                  {/* P4: 中身が全て非表示になる通常状態では、区切り枠だけが残らないようにする。 */}
+                  {(() => {
+                    const showDetachedAck = !!activeDocumentContext?.issues?.some(issue =>
                       issue.scope === 'detached' && issue.severity === 'blocking'
-                    ) && (
+                    );
+                    const showOverrideAck = !!activeDocumentContext?.issues?.some(issue =>
+                      issue.scope === 'selection-override' && issue.severity === 'blocking'
+                    );
+                    const showResetText = !usesSelectionCleanup || canRelinkDocumentText({
+                      editMode: activeDocumentContext?.editMode,
+                      hasCustomText: !isBlankDocumentHtml(activePick.customText),
+                    });
+                    const showResetStamps = !usesSelectionCleanup;
+                    if (!showDetachedAck && !showOverrideAck && !showResetText && !showResetStamps) return null;
+                    return (
+                  <div className="border-t pt-2 space-y-2 font-sans font-bold" data-testid="document-secondary-actions">
+                    {showDetachedAck && (
                       <button
                         type="button"
                         onClick={handleAcknowledgeDetachedSource}
@@ -2649,9 +2673,7 @@ ${styles}
                         現在の全文を確認済みにする
                       </button>
                     )}
-                    {activeDocumentContext?.issues?.some(issue =>
-                      issue.scope === 'selection-override' && issue.severity === 'blocking'
-                    ) && (
+                    {showOverrideAck && (
                       <button
                         type="button"
                         onClick={handleAcknowledgeSelectionOverrides}
@@ -2660,9 +2682,64 @@ ${styles}
                         現在の個別設定を確認済みにする
                       </button>
                     )}
-                    <button onClick={handleResetDocumentText} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> {activeDocumentContext?.editMode && activeDocumentContext.editMode !== 'linked' ? '最新データ連動へ切替' : '文言をリセット'}</button>
-                    <button onClick={() => handlePickChange(activeInstanceKey, { stampPositions: null, signerStampPositions: null })} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 位置をリセット</button>
+                    {/* P4: 対象4帳票はlinked+customTextなしだと戻す対象が無いので常時表示しない。
+                        detached等で意味がある時だけ「最新データ連動へ切替」として残す。 */}
+                    {showResetText && (
+                      <button onClick={handleResetDocumentText} data-testid="reset-document-text" className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> {activeDocumentContext?.editMode && activeDocumentContext.editMode !== 'linked' ? '最新データ連動へ切替' : '文言をリセット'}</button>
+                    )}
+                    {/* P4: 対象4帳票の位置リセットはレイアウト調整へ移動。非対象帳票は従来どおり常時表示。 */}
+                    {showResetStamps && (
+                      <button onClick={() => handlePickChange(activeInstanceKey, buildStampPositionResetPatch())} className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"><ResetIcon size={12} /> 位置をリセット</button>
+                    )}
                   </div>
+                    );
+                  })()}
+
+                  {/* P4: 印影位置等の二次操作は通常閉じた折りたたみへ退避する。
+                      保存済みの位置調整は閉じたままでも見失わないようbadgeで示す。 */}
+                  {usesSelectionCleanup && (() => {
+                    const stampAdjusted = hasAnyStampAdjustment(activePick);
+                    return (
+                      <div className="border-t pt-3 space-y-2" data-testid="document-layout-settings">
+                        <button
+                          type="button"
+                          onClick={() => setLayoutSettingsOpen(open => !open)}
+                          className="w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg bg-slate-50 hover:bg-slate-100"
+                          data-testid="layout-settings-toggle"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-black text-slate-500">レイアウト調整</span>
+                            {stampAdjusted && (
+                              <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-black" data-testid="layout-settings-active-badge">
+                                位置調整あり
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">{layoutSettingsOpen ? '閉じる' : '開く'}</span>
+                        </button>
+
+                        {layoutSettingsOpen && (
+                          <div className="space-y-2 pt-1" data-testid="layout-settings-body">
+                            <p className="text-[9px] text-slate-400 leading-relaxed px-1">
+                              印影はプレビュー上でドラッグして位置を調整できます。
+                            </p>
+                            {stampAdjusted ? (
+                              <button
+                                type="button"
+                                onClick={() => handlePickChange(activeInstanceKey, buildStampPositionResetPatch())}
+                                className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"
+                                data-testid="reset-stamp-positions"
+                              >
+                                <ResetIcon size={12} /> 位置をリセット
+                              </button>
+                            ) : (
+                              <p className="text-[9px] text-slate-400 px-1">現在、位置の調整はありません。</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

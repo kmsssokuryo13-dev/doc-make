@@ -379,13 +379,16 @@ test('R1. 対象4帳票のread-only時は文字サイズselectを表示しない
   const selectIndex = docsSource.indexOf('value={activePick.fontScale || 100}');
   assert.notEqual(guardIndex, -1);
   assert.ok(guardIndex < selectIndex, '文字サイズselectより前で表示判定していること');
-  // read-only時に返すのは補助文だけで、selectもfontScale保存もない。
+  // read-only時は何も描画しない（P4で常時ヒントも撤去）。selectもfontScale保存もない。
   const shownIndex = docsSource.indexOf('data-testid="font-size-control"');
   assert.ok(guardIndex < shownIndex && shownIndex < selectIndex);
   const hintBlock = docsSource.slice(guardIndex, shownIndex);
-  assert.match(hintBlock, /文字サイズを個別調整する場合は全文編集を開始してください/);
+  assert.match(hintBlock, /return null;/);
   assert.doesNotMatch(hintBlock, /<select/);
   assert.doesNotMatch(hintBlock, /handlePickChange/);
+  // P4: 常時表示の文字サイズヒント自体を撤去している。
+  assert.doesNotMatch(docsSource, /文字サイズを個別調整する場合は全文編集を開始してください/);
+  assert.doesNotMatch(docsSource, /data-testid="font-size-control-hint"/);
   // 効かない「帳票全体の文字サイズ」表記が残っていないこと。
   assert.doesNotMatch(docsSource, /帳票全体の文字サイズ/);
 });

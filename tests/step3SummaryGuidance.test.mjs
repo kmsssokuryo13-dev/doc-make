@@ -451,7 +451,8 @@ test('12. P1の全文編集UIに回帰がない', () => {
   assert.match(DOCS_SOURCE, /全文編集を再開/);
   assert.match(DOCS_SOURCE, /編集を終了/);
   assert.match(DOCS_SOURCE, /選択文字のサイズ/);
-  assert.match(DOCS_SOURCE, /data-testid="font-size-control-hint"/);
+  // P4: read-only時の常時ヒントは撤去。全文編集中の「選択文字のサイズ」は維持する。
+  assert.doesNotMatch(DOCS_SOURCE, /data-testid="font-size-control-hint"/);
 });
 
 test('13. 要確認があっても印刷を止めない', () => {
