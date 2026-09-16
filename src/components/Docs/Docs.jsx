@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, RotateCcw as ResetIcon, Loader2 } from 'lucide-react';
 import { naturalSortList, stableSortKeys, getOrderedDocs, formatWareki } from '../../utils.js';
@@ -41,6 +41,7 @@ import {
   canRelinkDocumentText,
   hasAnyStampAdjustment,
 } from '../../documentLayoutUi.js';
+import { isSignerStampAutoAlignDocument } from '../../signerStampAlignment.js';
 import {
   buildSelectionResetPatch,
   getSelectionOverrideKeys,
@@ -805,6 +806,38 @@ export const Docs = ({ sites, setSites, contractors, scriveners }) => {
     next.push({ i: index, dx: nextDx, dy: nextDy });
     handlePickChange(activeInstanceKey, { signerStampPositions: next });
   };
+
+  // 署名者印影の自動配置。書類切替後に前の書類の非同期計測が書き込まれないよう、
+  // 現在プレビュー中のinstanceKeyと一致する通知だけを受け付ける。
+  const activeInstanceKeyRef = useRef(activeInstanceKey);
+  activeInstanceKeyRef.current = activeInstanceKey;
+  const handlePickChangeRef = useRef(handlePickChange);
+  handlePickChangeRef.current = handlePickChange;
+
+  const handleSignerStampBaselineChange = useCallback((instanceKey, baseRatio) => {
+    if (!instanceKey || instanceKey !== activeInstanceKeyRef.current) return;
+    if (!Number.isFinite(baseRatio)) return;
+    // 保存するのはfallback再現用のレイアウト情報だけ。本文・人物・確認状態は触らない。
+    handlePickChangeRef.current(instanceKey, { signerStampBaseRatio: baseRatio });
+  }, []);
+
+  // 注意はどのinstanceのものかを一緒に持つ。描画時にキーを照合するため、
+  // 書類切替のeffect順序に関係なく前の書類の注意が残らない。
+  const [signerStampNotice, setSignerStampNotice] = useState({ key: '', notices: [] });
+  const handleSignerStampNoticeChange = useCallback((instanceKey, notices) => {
+    if (!instanceKey || instanceKey !== activeInstanceKeyRef.current) return;
+    const next = Array.isArray(notices) ? notices : [];
+    setSignerStampNotice(prev => (
+      prev.key === instanceKey &&
+      prev.notices.length === next.length &&
+      prev.notices.every((item, i) => item === next[i])
+        ? prev
+        : { key: instanceKey, notices: next }
+    ));
+  }, []);
+  const activeSignerStampNotices = signerStampNotice.key === activeInstanceKey
+    ? signerStampNotice.notices
+    : [];
 
   const printInstances = useMemo(() => allInstances.filter(inst => (siteData?.docPick?.[inst.key]?.printOn ?? true)), [allInstances, siteData?.docPick]);
   const blockingPrintInstances = useMemo(() => getDocumentContextPrintBlockers({
@@ -2648,6 +2681,37 @@ ${styles}
                     );
                   })()}
 
+                  {/* 署名者印影の自動配置の注意。非阻害で、印刷/PDF出力の禁止条件にはしない。
+                      印刷本文へ混入しないよう、プレビュー本文ではなく左パネルに出す。 */}
+                  {isSignerStampAutoAlignDocument(activeInstance.name) && activeSignerStampNotices.length > 0 && (
+                    <div
+                      className="border-t pt-2 space-y-1.5 font-sans"
+                      data-testid="signer-stamp-notice"
+                    >
+                      {activeSignerStampNotices.map(notice => (
+                        <p
+                          key={notice}
+                          className="text-[9px] leading-relaxed text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 font-bold"
+                        >
+                          {notice}
+                        </p>
+                      ))}
+                      <p className="text-[9px] text-slate-400 leading-relaxed px-1">
+                        印影はプレビュー上でドラッグして手修正できます。本文側を直す場合は全文編集を使ってください。
+                      </p>
+                      {usesSelectionCleanup && !layoutSettingsOpen && (
+                        <button
+                          type="button"
+                          onClick={() => setLayoutSettingsOpen(true)}
+                          className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-[9px] font-bold rounded"
+                          data-testid="signer-stamp-notice-open-layout"
+                        >
+                          レイアウト調整を開く
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* P4: 中身が全て非表示になる通常状態では、区切り枠だけが残らないようにする。 */}
                   {(() => {
                     const showDetachedAck = !!activeDocumentContext?.issues?.some(issue =>
@@ -2750,7 +2814,9 @@ ${styles}
                   <div className={`document-container w-[210mm] h-[297mm] bg-white shadow-2xl font-serif leading-relaxed text-slate-900 border border-slate-100 relative overflow-hidden ${isTextEditing ? 'ring-2 ring-amber-400' : ''}`} data-text-editing={isTextEditing ? 'true' : 'false'}>
                     <DocTemplate key={activeInstance.identity} name={activeInstance.name} siteData={siteData} instanceIndex={activeInstance.index}
                        instanceKey={activeInstanceKey}
-                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} documentContext={activeDocumentContext} textEditingEnabled={isTextEditing} />
+                      pick={activePick} onPickChange={(p) => handlePickChange(activeInstanceKey, p)} onStampPosChange={handleStampPosChange} onSignerStampPosChange={handleSignerStampPosChange} isPrint={false} scriveners={scriveners} documentContext={activeDocumentContext} textEditingEnabled={isTextEditing}
+                      onSignerStampBaselineChange={handleSignerStampBaselineChange}
+                      onSignerStampNoticeChange={handleSignerStampNoticeChange} />
                   </div>
                 </div>
               ) : <div className="flex items-center text-slate-400 italic h-full font-bold">書類を選択してください</div>}

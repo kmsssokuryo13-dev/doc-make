@@ -33,6 +33,9 @@ export const LEGACY_DOCUMENT_PICK_DEFAULTS = Object.freeze({
   customText: null,
   stampPositions: null,
   signerStampPositions: null,
+  // 署名欄を判別できなくなった時に、最後に確定した自動基準Xを再現するための
+  // 最小限のレイアウト情報（コンテナ幅に対する比率）。業務データではない。
+  signerStampBaseRatio: null,
   printOn: true,
   targetPropBuildingId: "",
   targetBeforeBuildingId: "",
@@ -68,6 +71,8 @@ const LAYOUT_OVERRIDE_KEYS = new Set([
   "showAnnex",
   "stampPositions",
   "signerStampPositions",
+  // fallback再現用の基準位置。selectionOverrides側へ入れず、レイアウト情報として扱う。
+  "signerStampBaseRatio",
   "itemOffsets",
   "fontScale",
 ]);

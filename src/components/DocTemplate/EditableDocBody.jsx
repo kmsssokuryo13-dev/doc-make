@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { isBlankDocumentHtml } from '../../v8Compatibility.js';
+import { DOC_CAPTURE_ATTR } from '../../signerStampAlignment.js';
 
 export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, children }) => {
   const containerRef = useRef(null);
@@ -83,7 +84,8 @@ export const EditableDocBody = ({ editable, customHtml, onCustomHtmlChange, chil
 
   return (
     <>
-      <div ref={captureRef} style={{ display: 'none' }}>{children}</div>
+      {/* 編集用の初期HTMLを取るためだけの非表示DOM。レイアウト計測の対象から除外する目印を付ける。 */}
+      <div ref={captureRef} style={{ display: 'none' }} {...{ [DOC_CAPTURE_ATTR]: '1' }}>{children}</div>
       <div
         ref={containerRef}
         contentEditable

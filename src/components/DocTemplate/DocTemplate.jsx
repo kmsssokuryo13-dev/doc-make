@@ -11,12 +11,42 @@ import { EditableDocBody } from './EditableDocBody.jsx';
 import { DraggableStamp } from './DraggableStamp.jsx';
 import { DraggableSignerStamp } from './DraggableSignerStamp.jsx';
 import { isDocumentBodyEditable } from '../../documentTextEditing.js';
+import {
+  buildSignerBlockAttributes,
+  buildSignerRowAttributes,
+  getSignerBlockKey,
+  isSignerStampAutoAlignDocument,
+} from '../../signerStampAlignment.js';
+import { useSignerStampAlignment } from './useSignerStampAlignment.js';
 
 export const DocTemplate = ({
   name, siteData, instanceKey, pick, onPickChange,
   onStampPosChange, onSignerStampPosChange, isPrint, instanceIndex, scriveners,
-  documentContext, textEditingEnabled = false
+  documentContext, textEditingEnabled = false,
+  onSignerStampBaselineChange, onSignerStampNoticeChange,
 }) => {
+  // 署名者印影の自動配置は、今回の先行対象2帳票だけで有効化する。
+  // 対象外帳票はrefも目印も付けず、従来の右端固定のまま動かさない。
+  const signerAutoAlignEnabled = isSignerStampAutoAlignDocument(name);
+  const signerBlockKey = signerAutoAlignEnabled ? getSignerBlockKey(name) : '';
+  const signerBlockAttributes = buildSignerBlockAttributes(name);
+  const {
+    originRef: signerAlignOriginRef,
+    stampColumnRef: signerStampColumnRef,
+    placement: signerStampPlacement,
+  } = useSignerStampAlignment({
+    enabled: signerAutoAlignEnabled,
+    blockKey: signerBlockKey,
+    instanceKey,
+    storedBaseRatio: Number.isFinite(pick?.signerStampBaseRatio) ? pick.signerStampBaseRatio : null,
+    onBaselineChange: onSignerStampBaselineChange,
+    onNoticeChange: onSignerStampNoticeChange,
+  });
+  // 自動配置が有効な間は印影列の左端を基準Xへ置く。
+  // 計測前の初回描画と対象外帳票は従来どおり右端に揃える。
+  const signerStampColumnAnchorStyle = signerAutoAlignEnabled && signerStampPlacement
+    ? { left: `${signerStampPlacement.renderX}px` }
+    : { right: 0 };
   const linkedDocumentContext = documentContext?.supported ? documentContext : null;
   // 建物表題4帳票は明示的な全文編集中だけ本文を編集可能にし、他帳票は現行どおり。
   const bodyEditable = isDocumentBodyEditable({ documentName: name, isPrint, textEditingEnabled });
@@ -1049,7 +1079,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={bodyEditable}
               customHtml={pick.customText}
@@ -1098,15 +1128,20 @@ export const DocTemplate = ({
               </div>
 
               <h2 style={{ fontSize: '11pt', margin: '2mm 0 1mm 0', fontWeight: 'bold' }}>委任者</h2>
-              <div style={{ fontSize: '11pt' }}>
+              {/* 自動配置の余白Gは、この署名欄コンテナの通常本文サイズ(11pt)の2em相当を使う。
+                  内部の一部だけ拡縮された文字やふりがなで基準を切り替えない。 */}
+              <div style={{ fontSize: '11pt' }} {...(signerBlockAttributes || {})}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', paddingRight: 'calc(1em + 26.6mm)' }}>
                   {signers.map((p, i) => (
-                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>{signerRenderer ? renderOwnerWithDecedent(p, () => signerRenderer(p)) : renderOwnerWithDecedent(p, formatApplicantLine)}</div>
+                    <div key={p.id || i} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }} {...(buildSignerRowAttributes(name, i) || {})}>{signerRenderer ? renderOwnerWithDecedent(p, () => signerRenderer(p)) : renderOwnerWithDecedent(p, formatApplicantLine)}</div>
                   ))}
                 </div>
               </div>
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
+            <div
+              ref={signerAutoAlignEnabled ? signerStampColumnRef : undefined}
+              style={{ position: 'absolute', bottom: 0, ...signerStampColumnAnchorStyle, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}
+            >
               {signers.map((p, i) => {
                 const pos = getSignerPos(i);
                 return (
