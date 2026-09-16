@@ -25,7 +25,7 @@ export const DocTemplate = ({
   documentContext, textEditingEnabled = false,
   onSignerStampBaselineChange, onSignerStampNoticeChange,
 }) => {
-  // 署名者印影の自動配置は、今回の先行対象2帳票だけで有効化する。
+  // 署名者印影の自動配置は、完全一致で列挙した対象帳票だけで有効化する。
   // 対象外帳票はrefも目印も付けず、従来の右端固定のまま動かさない。
   const signerAutoAlignEnabled = isSignerStampAutoAlignDocument(name);
   const signerBlockKey = signerAutoAlignEnabled ? getSignerBlockKey(name) : '';

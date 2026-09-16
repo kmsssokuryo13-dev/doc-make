@@ -1,4 +1,4 @@
-// 署名者印影の自動配置（仕様書v1.3 / 先行実装Task Packet 2026-09-16）。
+// 署名者印影の自動配置（仕様書v1.3 / Pilot 2026-09-16 + 委任状8種展開 2026-09-16）。
 //
 // 目的:
 //   署名者情報として実際に描画された全表示行のうち、最も右まで伸びる行の右端を求め、
@@ -17,11 +17,26 @@
 
 import { getDocumentTemplateKey } from './v8Compatibility.js';
 
-// 今回の先行実装で自動配置を有効化する帳票。
+// 自動配置を有効化する帳票。
 // 名称の前方一致や「委任状すべて」による暗黙の展開はしない（完全一致のみ）。
+// これらはいずれも DocTemplate の renderDelegationCommon を共有しており、
+// 署名欄の目印・原点ref・印影列refは同じ共通rendererが付ける。帳票ごとに
+// 自動配置のロジックを複製しない。
 export const SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS = Object.freeze([
+  // 先行実装（Pilot）で本番反映済み。
   '委任状（表題）',
   '委任状（保存）',
+  // 段階展開（2026-09-16）。委任状（住所変更）は renderSignerMultiLine の複数行型、
+  // 残り7帳票は通常の署名者行に加えて renderOwnerWithDecedent の
+  // 被相続人/相続人2行になり得る。どちらも表示行をすべて比較する。
+  '委任状（住所変更）',
+  '委任状（地目変更）',
+  '委任状（滅失）',
+  '委任状（表題部変更）',
+  '委任状（表題部更正）',
+  '委任状（合併）',
+  '委任状（分割）',
+  '委任状（合体）',
 ]);
 
 const AUTO_ALIGN_DOCUMENT_SET = new Set(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS);
