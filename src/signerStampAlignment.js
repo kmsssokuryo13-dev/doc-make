@@ -1,4 +1,4 @@
-// 署名者印影の自動配置（仕様書v1.3 / Pilot 2026-09-16 + 委任状8種展開 2026-09-16）。
+// 署名者印影の自動配置（仕様書v1.3 / Pilot + 委任状8種 + 証明書4種展開 2026-09-16）。
 //
 // 目的:
 //   署名者情報として実際に描画された全表示行のうち、最も右まで伸びる行の右端を求め、
@@ -19,9 +19,9 @@ import { getDocumentTemplateKey } from './v8Compatibility.js';
 
 // 自動配置を有効化する帳票。
 // 名称の前方一致や「委任状すべて」による暗黙の展開はしない（完全一致のみ）。
-// これらはいずれも DocTemplate の renderDelegationCommon を共有しており、
-// 署名欄の目印・原点ref・印影列refは同じ共通rendererが付ける。帳票ごとに
-// 自動配置のロジックを複製しない。
+// 委任状10帳票は DocTemplate の renderDelegationCommon を、証明書4帳票は
+// 各個別branchから呼ぶ局所helperを共有しており、署名欄の目印・原点ref・
+// 印影列refはそこで付ける。計測・配置・fallbackのロジックを帳票ごとに複製しない。
 export const SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS = Object.freeze([
   // 先行実装（Pilot）で本番反映済み。
   '委任状（表題）',
@@ -37,6 +37,13 @@ export const SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS = Object.freeze([
   '委任状（合併）',
   '委任状（分割）',
   '委任状（合体）',
+  // 証明書展開（2026-09-16）。いずれも単独工事人1名の署名欄で、
+  // 住所 / 氏名 / 代表者の3行を同じ署名欄の候補行として比較する。
+  // 通常本文は12ptだが、余白Gはcomputed font-sizeから算出するのでここでは扱わない。
+  '工事完了引渡証明書（表題）',
+  '工事完了引渡証明書（表題部変更）',
+  '滅失証明書（滅失）',
+  '滅失証明書（表題部変更）',
 ]);
 
 const AUTO_ALIGN_DOCUMENT_SET = new Set(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS);

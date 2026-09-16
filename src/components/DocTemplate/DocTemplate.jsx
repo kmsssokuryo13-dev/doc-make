@@ -348,6 +348,52 @@ export const DocTemplate = ({
     );
   };
 
+  // ---- 証明書4帳票の工事人署名欄（共通の局所helper） ----
+  // 4帳票とも単独工事人1名で、住所・氏名・代表者の3行を同じ署名欄の候補行として比較する。
+  // 文言・行順・font-size(12pt)は変更していない。余白Gは既存coreがこのブロックの
+  // computed font-sizeから2emを算出するため、ここでpx値を持たない。
+  //
+  // 工事人が居ない場合も署名欄の目印だけは残し、署名者行を0件にする。
+  // こうすると既存coreが「判別不能」ではなく empty と判定し、不要な注意を出さずに
+  // 従来の空欄表示と従来位置のままになる。
+  const renderContractorSignerBlock = (contractor) => (
+    <div
+      style={contractor
+        ? { fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }
+        : { paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}
+      {...(signerBlockAttributes || {})}
+    >
+      {contractor ? (
+        <div {...(buildSignerRowAttributes(name, 0) || {})}>
+          <p style={{ margin: '0 0 2mm 0' }}>住所　{contractor.address || "　"}</p>
+          <p style={{ margin: '0 0 2mm 0' }}>氏名　{contractor.name || "　"}</p>
+          <p style={{ margin: '0' }}>　　　{contractor.representative || "　"}</p>
+        </div>
+      ) : (
+        <p style={{ margin: '0' }}>　</p>
+      )}
+    </div>
+  );
+
+  // 印影列。位置の読み書きは既存の signerStampPositions?.[0] のまま変更しない。
+  // 自動配置が有効な間だけ右端固定を基準Xへ置き換える。
+  const renderContractorSignerStampColumn = () => (
+    <div
+      ref={signerAutoAlignEnabled ? signerStampColumnRef : undefined}
+      style={{ position: 'absolute', bottom: 0, ...signerStampColumnAnchorStyle, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}
+    >
+      <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
+        <DraggableSignerStamp
+          index={0}
+          dx={(pick.signerStampPositions?.[0]?.dx || 0)}
+          dy={(pick.signerStampPositions?.[0]?.dy || 0)}
+          editable={!isPrint}
+          onChange={onSignerStampPosChange}
+        />
+      </div>
+    </div>
+  );
+
   // ---- 工事完了引渡証明書（表題） ----
   if (name === "工事完了引渡証明書（表題）") {
     const hasDetachedHtml = typeof pick?.customText === 'string' && pick.customText.length > 0;
@@ -384,7 +430,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={bodyEditable}
               customHtml={pick.customText}
@@ -448,29 +494,9 @@ export const DocTemplate = ({
               </div>
               <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-              {targetContractor ? (
-              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>住所　{targetContractor.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>氏名　{targetContractor.name || "　"}</p>
-                <p style={{ margin: '0' }}>　　　{targetContractor.representative || "　"}</p>
-              </div>
-              ) : (
-              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0' }}>　</p>
-              </div>
-              )}
+              {renderContractorSignerBlock(targetContractor)}
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
-            </div>
+            {renderContractorSignerStampColumn()}
           </div>
         </div>
       </div>
@@ -553,7 +579,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={!isPrint}
               customHtml={pick.customText}
@@ -610,29 +636,9 @@ export const DocTemplate = ({
               </div>
               <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-              {targetContractor ? (
-              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>住所　{targetContractor.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>氏名　{targetContractor.name || "　"}</p>
-                <p style={{ margin: '0' }}>　　　{targetContractor.representative || "　"}</p>
-              </div>
-              ) : (
-              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0' }}>　</p>
-              </div>
-              )}
+              {renderContractorSignerBlock(targetContractor)}
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
-            </div>
+            {renderContractorSignerStampColumn()}
           </div>
         </div>
       </div>
@@ -679,7 +685,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={!isPrint}
               customHtml={pick.customText}
@@ -729,29 +735,9 @@ export const DocTemplate = ({
 
               <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-              {targetContractor ? (
-              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>住所　{targetContractor.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>氏名　{targetContractor.name || "　"}</p>
-                <p style={{ margin: '0' }}>　　　{targetContractor.representative || "　"}</p>
-              </div>
-              ) : (
-              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0' }}>　</p>
-              </div>
-              )}
+              {renderContractorSignerBlock(targetContractor)}
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
-            </div>
+            {renderContractorSignerStampColumn()}
           </div>
         </div>
       </div>
@@ -841,7 +827,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={!isPrint}
               customHtml={pick.customText}
@@ -895,29 +881,9 @@ export const DocTemplate = ({
 
               <h2 style={{ fontSize: '11pt', margin: '0 0 2mm 0', fontWeight: 'bold' }}>工事人</h2>
 
-              {targetContractor ? (
-              <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0 0 2mm 0' }}>住所　{targetContractor.address || "　"}</p>
-                <p style={{ margin: '0 0 2mm 0' }}>氏名　{targetContractor.name || "　"}</p>
-                <p style={{ margin: '0' }}>　　　{targetContractor.representative || "　"}</p>
-              </div>
-              ) : (
-              <div style={{ paddingRight: 'calc(1em + 26.6mm)', marginTop: '5mm' }}>
-                <p style={{ margin: '0' }}>　</p>
-              </div>
-              )}
+              {renderContractorSignerBlock(targetContractor)}
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
-              <div style={{ position: 'relative', width: '26.6mm', height: '26.6mm' }}>
-                <DraggableSignerStamp
-                  index={0}
-                  dx={(pick.signerStampPositions?.[0]?.dx || 0)}
-                  dy={(pick.signerStampPositions?.[0]?.dy || 0)}
-                  editable={!isPrint}
-                  onChange={onSignerStampPosChange}
-                />
-              </div>
-            </div>
+            {renderContractorSignerStampColumn()}
           </div>
         </div>
       </div>
