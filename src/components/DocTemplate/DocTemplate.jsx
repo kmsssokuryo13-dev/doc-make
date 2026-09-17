@@ -1856,7 +1856,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={bodyEditable}
               customHtml={pick.customText}
@@ -1896,15 +1896,21 @@ export const DocTemplate = ({
               </div>
 
               <h2 style={{ fontSize: "11pt", margin: "2mm 0 1mm 0", fontWeight: "bold" }}>申述人</h2>
-              <div style={{ fontSize: "11pt" }}>
+              {/* 自動配置の余白Gは、この署名欄コンテナの通常本文サイズ(11pt)の2em相当を使う。
+                  申述人1人は「住所＋表示中の持分＋氏名」が同一行なので、行全体で1候補行になる。
+                  申述人が0名のときは署名者行の目印が0件になり、既存coreのempty判定に載る。 */}
+              <div style={{ fontSize: "11pt" }} {...(signerBlockAttributes || {})}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2mm", paddingRight: "calc(1em + 26.6mm)" }}>
                   {(statementPeople || []).map((p, i) => (
-                    <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }}>{formatStatementLine(p)}</div>
+                    <div key={p.id || i} style={{ display: "flex", alignItems: "center", minHeight: "26.6mm" }} {...(buildSignerRowAttributes(name, i) || {})}>{formatStatementLine(p)}</div>
                   ))}
                 </div>
               </div>
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
+            <div
+              ref={signerAutoAlignEnabled ? signerStampColumnRef : undefined}
+              style={{ position: 'absolute', bottom: 0, ...signerStampColumnAnchorStyle, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}
+            >
               {(statementPeople || []).map((p, i) => {
                 const pos = getSignerPos(i);
                 return (
