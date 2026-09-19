@@ -1,4 +1,4 @@
-// 署名者印影の自動配置（仕様書v1.3 / Pilot + 委任状8種 + 証明書4種 + 申述書2種展開）。
+// 署名者印影の自動配置（仕様書v1.3 / 委任状10種 + 証明書4種 + 申述書2種 + 売渡証明書）。
 //
 // 目的:
 //   署名者情報として実際に描画された全表示行のうち、最も右まで伸びる行の右端を求め、
@@ -20,8 +20,8 @@ import { getDocumentTemplateKey } from './v8Compatibility.js';
 // 自動配置を有効化する帳票。
 // 名称の前方一致や「委任状すべて」による暗黙の展開はしない（完全一致のみ）。
 // 委任状10帳票は renderDelegationCommon、証明書4帳票は個別branchから呼ぶ局所helper、
-// 申述書2帳票は renderStatementCommon を共有しており、署名欄の目印・原点ref・
-// 印影列refはそこで付ける。計測・配置・fallbackのロジックを帳票ごとに複製しない。
+// 申述書2帳票は renderStatementCommon、売渡証明書は自身のbranchで、署名欄の目印・
+// 原点ref・印影列refを付ける。計測・配置・fallbackのロジックを帳票ごとに複製しない。
 export const SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS = Object.freeze([
   // 先行実装（Pilot）で本番反映済み。
   '委任状（表題）',
@@ -48,6 +48,10 @@ export const SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS = Object.freeze([
   // 「住所＋表示中の持分＋氏名」の同一行1本になる。行全体を1つの候補行として比較する。
   '申述書（共有）',
   '申述書（単独）',
+  // 売渡証明書展開（2026-09-18）。売主1人につき住所行と氏名行の2行を
+  // それぞれ別の候補行として比較する。署名欄の通常本文は12pt。
+  // 署名者印影を持たない非登載証明書は対象外のまま。
+  '売渡証明書',
 ]);
 
 const AUTO_ALIGN_DOCUMENT_SET = new Set(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS);

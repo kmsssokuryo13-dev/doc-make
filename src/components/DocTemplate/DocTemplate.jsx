@@ -1978,7 +1978,7 @@ export const DocTemplate = ({
         </h1>
 
         <div style={{ position: 'absolute', inset: 0, padding: DOC_PAGE_PADDING, boxSizing: 'border-box', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={signerAutoAlignEnabled ? signerAlignOriginRef : undefined}>
             <EditableDocBody
               editable={!isPrint}
               customHtml={pick.customText}
@@ -2006,24 +2006,34 @@ export const DocTemplate = ({
               </div>
 
               <div style={{ fontSize: '11pt', marginTop: '6mm' }}>
-                {displaySellers.length > 0 ? displaySellers.map((p, i) => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm', marginTop: i > 0 ? '4mm' : '0' }}>
-                    <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
-                      <p style={{ margin: '0 0 2mm 0' }}>{p.address || "　"}</p>
-                      <p style={{ margin: '0' }}>{p.name || "　"}</p>
+                {/* 自動配置の余白Gは売主情報の通常本文サイズ(12pt)の2em相当を使うため、
+                    署名欄の目印は12ptのラッパーに付ける。このラッパーはfont-sizeだけを持ち、
+                    売主行のminHeight・売主間4mm・paddingRightの1em(12pt基準)は変えない。
+                    売主0名のときは空行にrow markerを付けず、既存coreのempty判定に載せる
+                    （空の住所/氏名行と印影1個は従来どおり残す）。 */}
+                <div style={{ fontSize: '12pt' }} {...(signerBlockAttributes || {})}>
+                  {displaySellers.length > 0 ? displaySellers.map((p, i) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm', marginTop: i > 0 ? '4mm' : '0' }} {...(buildSignerRowAttributes(name, i) || {})}>
+                      <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
+                        <p style={{ margin: '0 0 2mm 0' }}>{p.address || "　"}</p>
+                        <p style={{ margin: '0' }}>{p.name || "　"}</p>
+                      </div>
                     </div>
-                  </div>
-                )) : (
-                  <div style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>
-                    <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
-                      <p style={{ margin: '0 0 2mm 0' }}>　</p>
-                      <p style={{ margin: '0' }}>　</p>
+                  )) : (
+                    <div style={{ display: 'flex', alignItems: 'center', minHeight: '26.6mm' }}>
+                      <div style={{ fontSize: '12pt', paddingRight: 'calc(1em + 26.6mm)' }}>
+                        <p style={{ margin: '0 0 2mm 0' }}>　</p>
+                        <p style={{ margin: '0' }}>　</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </EditableDocBody>
-            <div style={{ position: 'absolute', bottom: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}>
+            <div
+              ref={signerAutoAlignEnabled ? signerStampColumnRef : undefined}
+              style={{ position: 'absolute', bottom: 0, ...signerStampColumnAnchorStyle, display: 'flex', flexDirection: 'column', gap: '2mm', pointerEvents: 'auto' }}
+            >
               {(displaySellers.length > 0 ? displaySellers : [null]).map((p, i) => {
                 const pos = getSignerPos(i);
                 return (

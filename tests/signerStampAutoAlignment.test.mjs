@@ -216,14 +216,16 @@ const CERTIFICATE_DOCUMENTS = [
 // 申述書展開（2026-09-17）で有効化する2帳票。共通の renderStatementCommon を使い、
 // 申述人1人が「住所＋表示中の持分＋氏名」の同一行1本になる。
 const STATEMENT_DOCUMENTS = ['申述書（共有）', '申述書（単独）'];
-// 今回も自動配置を有効化しない帳票。
-const NON_TARGET_DOCUMENTS = ['非登載証明書', '売渡証明書'];
+// 売渡証明書展開（2026-09-18）。売主1人につき住所行・氏名行の2行が候補になる。
+const SALE_DOCUMENTS = ['売渡証明書'];
+// 今回も自動配置を有効化しない帳票（署名者印影を持たない）。
+const NON_TARGET_DOCUMENTS = ['非登載証明書'];
 
 // ---------------------------------------------------------------------------
 // 1. 対象帳票のガード（R-AC01）
 // ---------------------------------------------------------------------------
 
-test('1. 自動配置の対象は委任状10＋証明書4＋申述書2＝16帳票だけ', () => {
+test('1. 自動配置の対象は委任状10＋証明書4＋申述書2＋売渡証明書＝17帳票だけ', () => {
   // 一覧そのものを完全一致で固定する。追加・順序変更はここが落ちる。
   assert.deepEqual([...SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS], [
     '委任状（表題）',
@@ -242,18 +244,20 @@ test('1. 自動配置の対象は委任状10＋証明書4＋申述書2＝16帳�
     '滅失証明書（表題部変更）',
     '申述書（共有）',
     '申述書（単独）',
+    '売渡証明書',
   ]);
-  assert.equal(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS.length, 16);
-  assert.equal(new Set(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS).size, 16, '重複なし');
+  assert.equal(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS.length, 17);
+  assert.equal(new Set(SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS).size, 17, '重複なし');
   assert.deepEqual(
     [...SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS].slice().sort(),
-    [...DELEGATION_DOCUMENTS, ...CERTIFICATE_DOCUMENTS, ...STATEMENT_DOCUMENTS].slice().sort()
+    [...DELEGATION_DOCUMENTS, ...CERTIFICATE_DOCUMENTS, ...STATEMENT_DOCUMENTS, ...SALE_DOCUMENTS].slice().sort()
   );
   assert.equal(DELEGATION_DOCUMENTS.length, 10);
   assert.equal(CERTIFICATE_DOCUMENTS.length, 4);
   assert.equal(STATEMENT_DOCUMENTS.length, 2);
+  assert.equal(SALE_DOCUMENTS.length, 1);
 
-  for (const name of [...DELEGATION_DOCUMENTS, ...CERTIFICATE_DOCUMENTS, ...STATEMENT_DOCUMENTS]) {
+  for (const name of [...DELEGATION_DOCUMENTS, ...CERTIFICATE_DOCUMENTS, ...STATEMENT_DOCUMENTS, ...SALE_DOCUMENTS]) {
     assert.equal(isSignerStampAutoAlignDocument(name), true, name);
   }
   for (const other of NON_TARGET_DOCUMENTS) {
@@ -261,7 +265,7 @@ test('1. 自動配置の対象は委任状10＋証明書4＋申述書2＝16帳�
   }
 });
 
-test('1b. 対象16帳票はいずれも既知のtemplateKeyを持ち、署名欄keyが重複しない', () => {
+test('1b. 対象17帳票はいずれも既知のtemplateKeyを持ち、署名欄keyが重複しない', () => {
   const keys = SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS.map(getSignerBlockKey);
   for (const [i, key] of keys.entries()) {
     assert.ok(key, SIGNER_STAMP_AUTO_ALIGN_DOCUMENTS[i]);
@@ -286,13 +290,15 @@ test('2. 名称の前方一致や「委任状」全般への暗黙の展開を�
   assert.equal(isSignerStampAutoAlignDocument('工事完了引渡証明書（表題）2'), false);
   assert.equal(isSignerStampAutoAlignDocument('滅失証明書'), false);
   assert.equal(isSignerStampAutoAlignDocument('非登載証明書'), false, '署名者印影を持たない証明書は対象外');
-  assert.equal(isSignerStampAutoAlignDocument('売渡証明書'), false);
+  assert.equal(isSignerStampAutoAlignDocument('売渡証明書'), true);
+  assert.equal(isSignerStampAutoAlignDocument('売渡証明書2'), false, '前方一致では広げない');
+  assert.equal(isSignerStampAutoAlignDocument('売渡'), false);
   // 「申述書なら全部」への暗黙の展開もしない。
   assert.equal(isSignerStampAutoAlignDocument('申述書'), false);
   assert.equal(isSignerStampAutoAlignDocument('申述書（共有）2'), false);
   assert.equal(isSignerStampAutoAlignDocument('申述書（相続）'), false);
 
-  assert.equal(buildSignerBlockAttributes('売渡証明書'), null);
+  assert.equal(buildSignerBlockAttributes('非登載証明書'), null);
   assert.equal(buildSignerRowAttributes('非登載証明書', 0), null);
   assert.deepEqual(buildSignerBlockAttributes('委任状（表題）'), { [SIGNER_BLOCK_ATTR]: TITLE_KEY });
   assert.deepEqual(buildSignerRowAttributes('委任状（保存）', 2), { [SIGNER_ROW_ATTR]: '2' });
@@ -655,11 +661,10 @@ test('24. 先行2帳票の署名欄には内部的な目印が入り、表示文
 });
 
 test('25. 対象外帳票には目印を付けず、印影列も従来の右端固定のまま', () => {
-  for (const name of ['売渡証明書']) {
+  for (const name of ['非登載証明書']) {
     const html = renderDoc(name);
     assert.ok(!html.includes(SIGNER_BLOCK_ATTR), `${name}に署名欄目印を付けない`);
     assert.ok(!html.includes(SIGNER_ROW_ATTR), `${name}に署名者行目印を付けない`);
-    assert.ok(html.includes('right:0'), `${name}の印影列は従来どおり右端固定`);
   }
 });
 
@@ -1291,16 +1296,17 @@ test('64. Pilot2帳票は今回の展開後も同じ経路・同じ目印のま�
 });
 
 test('65. 対象外帳票には今回も目印・baseline保存・注意が出ない', () => {
-  for (const name of ['非登載証明書', '売渡証明書']) {
+  for (const name of ['非登載証明書']) {
     assert.equal(isSignerStampAutoAlignDocument(name), false, name);
     assert.equal(buildSignerBlockAttributes(name), null, name);
     assert.equal(buildSignerRowAttributes(name, 0), null, name);
   }
-  for (const name of ['売渡証明書']) {
+  for (const name of ['非登載証明書']) {
     const html = renderDoc(name);
     assert.ok(!html.includes(SIGNER_BLOCK_ATTR), `${name}に署名欄目印を付けない`);
     assert.ok(!html.includes(SIGNER_ROW_ATTR), `${name}に署名者行目印を付けない`);
-    assert.ok(html.includes('right:0'), `${name}の印影列は従来どおり右端固定`);
+    // 非登載証明書はそもそも署名者印影列を持たない従来構成のまま。
+    assert.ok(!html.includes('stamp-drag-handle') || !html.includes(SIGNER_BLOCK_ATTR), name);
   }
   // 注意の描画自体が対象帳票ガードの内側にある。
   assert.ok(DOCS_SOURCE.includes('isSignerStampAutoAlignDocument(activeInstance.name) && activeSignerStampNotices.length > 0'));
@@ -1604,14 +1610,24 @@ test('79. 証明書4帳票の個別branchにorigin/block/row/印影列のrefが�
     (DOC_TEMPLATE_SOURCE.match(/\{renderContractorSignerBlock\(targetContractor\)\}/g) || []).length, 4);
   assert.equal(
     (DOC_TEMPLATE_SOURCE.match(/\{renderContractorSignerStampColumn\(\)\}/g) || []).length, 4);
-  // originは委任状(1)＋証明書4帳票(4)＋申述書共通renderer(1)＝6箇所だけ。対象外帳票には付けない。
+  // originは委任状(1)＋証明書4帳票(4)＋申述書共通renderer(1)＋売渡証明書(1)＝7箇所だけ。対象外帳票には付けない。
   assert.equal(
-    (DOC_TEMPLATE_SOURCE.match(/ref=\{signerAutoAlignEnabled \? signerAlignOriginRef : undefined\}/g) || []).length, 6);
+    (DOC_TEMPLATE_SOURCE.match(/ref=\{signerAutoAlignEnabled \? signerAlignOriginRef : undefined\}/g) || []).length, 7);
   assert.equal(
-    (DOC_TEMPLATE_SOURCE.match(/ref=\{signerAutoAlignEnabled \? signerStampColumnRef : undefined\}/g) || []).length, 3,
-    '委任状共通renderer＋証明書共通helper＋申述書共通rendererの3箇所');
-  // 対象外帳票のoriginにはrefを付けていない（非登載証明書・売渡証明書）。
-  assert.ok(DOC_TEMPLATE_SOURCE.includes("<div style={{ position: 'relative' }}>"));
+    (DOC_TEMPLATE_SOURCE.match(/ref=\{signerAutoAlignEnabled \? signerStampColumnRef : undefined\}/g) || []).length, 4,
+    '委任状共通renderer＋証明書共通helper＋申述書共通renderer＋売渡証明書の4箇所');
+  // 署名者印影を持つ帳票のoriginはすべて接続済みで、未接続のoriginは残っていない。
+  assert.equal(
+    (DOC_TEMPLATE_SOURCE.match(/<div style=\{\{ position: 'relative' \}\}>/g) || []).length, 0);
+  // 対象外の非登載証明書には署名者印影そのものが無い（refを付ける場所が無い）。
+  const nonListedBranch = DOC_TEMPLATE_SOURCE.slice(
+    DOC_TEMPLATE_SOURCE.indexOf('if (name === "非登載証明書")'),
+    DOC_TEMPLATE_SOURCE.indexOf('// ---- 委任状系（書類ごとにテンプレ分割） ----')
+  );
+  assert.ok(nonListedBranch.length > 0);
+  assert.ok(!nonListedBranch.includes('DraggableSignerStamp'), '非登載証明書に署名者印影は無い');
+  assert.ok(!nonListedBranch.includes('signerAlignOriginRef'), '非登載証明書にoriginを接続しない');
+  assert.ok(!nonListedBranch.includes('signerBlockAttributes'), '非登載証明書に署名欄目印を付けない');
 });
 
 test('80. 証明書の印影は1個・index 0で、既存のsignerStampPositions?.[0]参照を変えていない', () => {
@@ -1762,11 +1778,10 @@ test('89. 対象外帳票には今回も目印・ref・注意が出ない', () =
     assert.equal(buildSignerBlockAttributes(name), null, name);
     assert.equal(buildSignerRowAttributes(name, 0), null, name);
   }
-  for (const name of ['売渡証明書']) {
+  for (const name of ['非登載証明書']) {
     const html = renderDoc(name);
     assert.ok(!html.includes(SIGNER_BLOCK_ATTR), `${name}に署名欄目印を付けない`);
     assert.ok(!html.includes(SIGNER_ROW_ATTR), `${name}に署名者行目印を付けない`);
-    assert.ok(html.includes('right:0'), `${name}の印影列は従来どおり右端固定`);
   }
 });
 
@@ -2255,18 +2270,487 @@ test('117. 既存14帳票の対象判定と代表描画に回帰がない', () =
   assert.ok(lossCert.includes(`${SIGNER_BLOCK_ATTR}="${LOSS_CERT_KEY}"`));
 });
 
-test('118. 対象外帳票（売渡証明書・非登載証明書）へ目印・ref・注意が波及しない', () => {
+test('118. 対象外帳票（非登載証明書）へ目印・ref・注意が波及しない', () => {
   for (const name of NON_TARGET_DOCUMENTS) {
     assert.equal(isSignerStampAutoAlignDocument(name), false, name);
     assert.equal(buildSignerBlockAttributes(name), null, name);
     assert.equal(buildSignerRowAttributes(name, 0), null, name);
   }
-  const sale = renderStatementDoc('売渡証明書');
-  assert.ok(!sale.includes(SIGNER_BLOCK_ATTR), '売渡証明書に署名欄目印を付けない');
-  assert.ok(!sale.includes(SIGNER_ROW_ATTR), '売渡証明書に署名者行目印を付けない');
-  assert.ok(sale.includes('right:0'), '売渡証明書の印影列は従来どおり右端固定');
   // 非登載証明書は署名者印影自体を持たない従来構成のまま。
   const nonListed = renderDoc('非登載証明書');
   assert.ok(!nonListed.includes(SIGNER_BLOCK_ATTR));
   assert.ok(!nonListed.includes(SIGNER_ROW_ATTR));
+  assert.ok(!nonListed.includes('DraggableSignerStamp'));
+});
+
+// ---------------------------------------------------------------------------
+// 10. 売渡証明書への展開（SALE-AC01〜SALE-AC20）
+//
+// 売渡証明書は自身のbranchで描画される。売主1人につき「住所行」「氏名行」の
+// 2行が別々の候補行になり、署名欄の通常本文は12pt。
+// 計測・配置・fallback・保存coreは既存のものをそのまま再利用しているので、
+// ここで固定するのは接続・12pt基準・売主0名の既存挙動・legacy editingの保全。
+// ---------------------------------------------------------------------------
+
+const SALE_KEY = getDocumentTemplateKey('売渡証明書');
+// 売主情報の通常本文は12pt。
+const SALE_FONT_PX = 16;
+const GAP_12PT_SALE = SALE_FONT_PX * SIGNER_STAMP_GAP_EM;
+
+// 12ptの署名欄ブロック（委任状の11ptと別サイズであることを明示する）。
+const saleBlock = (rows) => new FakeElement({
+  attrs: { [SIGNER_BLOCK_ATTR]: SALE_KEY },
+  box: rect(0, 600),
+  fontSize: `${SALE_FONT_PX}px`,
+  children: rows,
+});
+
+// 実DOMと同じ構成: 1売主rowの中に <p>住所</p><p>氏名</p> が別段落で入る。
+const sellerRow = (index, { addressRight, nameRight, addressRects, nameRects }) =>
+  signerRow(index, [
+    new FakeText(`架空県架空市売町${index + 1}丁目${index + 1}番`,
+      addressRects || [rect(0, addressRight)]),
+    new FakeText(`架空 売主${index + 1}`,
+      nameRects || [rect(0, nameRight, 22)]),
+  ]);
+
+const measureSale = (sellers) =>
+  measureSignerBlock(
+    buildOrigin({ blocks: [saleBlock(sellers.map((sp, i) => sellerRow(i, sp)))] }),
+    SALE_KEY
+  );
+
+test('119. 売渡証明書: 1売主で住所行が最長ならその実表示右端＋12pt基準2emを使う', () => {
+  const m = measureSale([{ addressRight: 430, nameRight: 260 }]);
+  assert.equal(m.found, true);
+  assert.equal(m.rowCount, 1, '売主1名なので署名者行は1つ');
+  assert.equal(m.lineCount, 2, '住所行と氏名行の2候補');
+  assert.equal(m.maxRight, 430);
+  assert.ok(Math.abs(m.gap - GAP_12PT_SALE) < 0.01, '余白は12pt基準の2em');
+  assert.ok(Math.abs(m.baseX - (430 + GAP_12PT_SALE)) < 0.01);
+});
+
+test('120. 売渡証明書: 1売主で氏名行が最長なら氏名行へ基準が切り替わる', () => {
+  const m = measureSale([{ addressRight: 260, nameRight: 418 }]);
+  assert.equal(m.maxRight, 418);
+  assert.ok(Math.abs(m.baseX - (418 + GAP_12PT_SALE)) < 0.01);
+  // 住所固定・氏名固定にしない。
+  const other = measureSale([{ addressRight: 418, nameRight: 260 }]);
+  assert.ok(Math.abs(m.baseX - other.baseX) < 0.01, 'どちらが最長でも同じ基準Xになる');
+});
+
+test('121. 売渡証明書: 住所行と氏名行を足し合わせない', () => {
+  const m = measureSale([{ addressRight: 300, nameRight: 240 }]);
+  assert.equal(m.maxRight, 300);
+  assert.notEqual(m.maxRight, 300 + 240, '別行の幅を合算しない');
+});
+
+test('122. 売渡証明書: 折返しは各実表示rectを比較し、別行として扱う', () => {
+  // 住所が2行に折り返された場合、返るrectそれぞれを候補にする。
+  const m = measureSale([{
+    addressRects: [rect(0, 520), rect(0, 180, 22)],
+    nameRight: 260,
+  }]);
+  assert.equal(m.maxRight, 520);
+  assert.notEqual(m.maxRight, 520 + 180);
+});
+
+test('123. 売渡証明書: 複数売主は全売主の住所/氏名行の最大rightを共通Xにする', () => {
+  const m = measureSale([
+    { addressRight: 300, nameRight: 250 },
+    { addressRight: 280, nameRight: 452 },
+  ]);
+  assert.equal(m.rowCount, 2);
+  assert.equal(m.lineCount, 4, '2売主×2行');
+  assert.equal(m.maxRight, 452);
+  const placement = resolveSignerStampPlacement({ measurement: m, stampWidth: STAMP_WIDTH });
+  assert.ok(Math.abs(placement.baseX - (452 + GAP_12PT_SALE)) < 0.01);
+  // 印影列は全売主共通の1コンテナなので、基準Xが1つ＝全員のXが揃う。
+  assert.equal(placement.renderX, placement.baseX);
+  assert.equal(isSignerStampAutoAligned(placement), true);
+  assert.deepEqual(buildSignerStampNotices(placement), []);
+});
+
+test('124. 売渡証明書: 売主Aが最長／売主Bが最長で基準が切り替わる', () => {
+  const a = measureSale([{ addressRight: 460, nameRight: 250 }, { addressRight: 280, nameRight: 300 }]);
+  const b = measureSale([{ addressRight: 280, nameRight: 300 }, { addressRight: 460, nameRight: 250 }]);
+  assert.equal(a.maxRight, 460, 'A最長');
+  assert.equal(b.maxRight, 460, 'B最長');
+  assert.ok(Math.abs(a.baseX - b.baseX) < 0.01);
+});
+
+test('125. 売渡証明書: 3名以上でも同じ原則で1つのXに揃う', () => {
+  const m = measureSale([
+    { addressRight: 300, nameRight: 250 },
+    { addressRight: 410, nameRight: 260 },
+    { addressRight: 288, nameRight: 355 },
+  ]);
+  assert.equal(m.rowCount, 3);
+  assert.equal(m.lineCount, 6);
+  assert.equal(m.maxRight, 410);
+  const placement = resolveSignerStampPlacement({ measurement: m, stampWidth: STAMP_WIDTH });
+  assert.equal(placement.renderX, placement.baseX);
+});
+
+test('126. 売渡証明書: 余白は12pt基準で、委任状の11pt値を流用しない', () => {
+  const sale = measureSale([{ addressRight: 300, nameRight: 250 }]);
+  assert.ok(Math.abs(sale.gap - GAP_12PT_SALE) < 0.01);
+  assert.notEqual(Math.round(sale.gap), Math.round(GAP_11PT));
+  // 委任状側は11pt基準のまま。
+  const deleg = measureSignerBlock(
+    buildOrigin({ blocks: [signerBlock(TITLE_KEY, [signerRow(0, [new FakeText('行', [rect(0, 300)])])])] }),
+    TITLE_KEY
+  );
+  assert.ok(Math.abs(deleg.gap - GAP_11PT) < 0.01);
+});
+
+test('127. 売渡証明書: 売主0名は署名者行0件のemptyで、注意も保存もしない', () => {
+  // 目印はあるが、空の住所/氏名行にはrow markerを付けない構造。
+  const emptyBlock = new FakeElement({
+    attrs: { [SIGNER_BLOCK_ATTR]: SALE_KEY },
+    box: rect(0, 600),
+    fontSize: `${SALE_FONT_PX}px`,
+    children: [new FakeText('　', [rect(0, 20)]), new FakeText('　', [rect(0, 20, 22)])],
+  });
+  const measured = measureSignerBlock(buildOrigin({ blocks: [emptyBlock] }), SALE_KEY);
+  assert.equal(measured.found, false);
+  assert.equal(measured.empty, true, '判別不能ではなくempty');
+  assert.equal(measured.rowCount, 0);
+
+  const placement = resolveSignerStampPlacement({ measurement: measured, stampWidth: STAMP_WIDTH });
+  assert.equal(placement.source, 'empty');
+  assert.equal(placement.identified, true);
+  assert.equal(placement.widthShortage, false);
+  assert.equal(placement.renderX, 654 - STAMP_WIDTH, '空印影は従来の右端位置のまま');
+  assert.equal(placement.baseRatio, null, '基準を新規保存しない');
+  assert.deepEqual(buildSignerStampNotices(placement), [], '不要な注意を出さない');
+
+  // 保存済み基準があっても上書きしない。
+  const withStored = resolveSignerStampPlacement({
+    measurement: measureSignerBlock(buildOrigin({ blocks: [emptyBlock] }), SALE_KEY),
+    storedBaseRatio: 0.49, stampWidth: STAMP_WIDTH,
+  });
+  assert.equal(withStored.source, 'empty');
+  assert.equal(withStored.baseRatio, null);
+  assert.deepEqual(buildSignerStampNotices(withStored), []);
+});
+
+test('128. 売渡証明書: 目印が消えたら保持基準、基準なしは従来右端へ仮配置する', () => {
+  const pasted = buildOrigin({
+    blocks: [new FakeElement({ box: rect(0, 600), children: [new FakeText('貼り付けられた本文', [rect(0, 500)])] })],
+  });
+  const lost = measureSignerBlock(pasted, SALE_KEY);
+  assert.equal(lost.found, false);
+  assert.equal(lost.empty, false);
+
+  const stored = resolveSignerStampPlacement({ measurement: lost, storedBaseRatio: 0.64, stampWidth: STAMP_WIDTH });
+  assert.equal(stored.source, 'stored');
+  assert.ok(Math.abs(stored.baseX - 0.64 * 654) < 0.01);
+  assert.equal(stored.baseRatio, null, 'fallback中は基準を上書き保存しない');
+  assert.deepEqual(buildSignerStampNotices(stored), [SIGNER_STAMP_NOTICE_UNIDENTIFIED]);
+
+  const legacy = resolveSignerStampPlacement({ measurement: lost, storedBaseRatio: null, stampWidth: STAMP_WIDTH });
+  assert.equal(legacy.source, 'legacy-right');
+  assert.equal(legacy.renderX, 654 - STAMP_WIDTH);
+  assert.equal(isSignerStampAutoAligned(legacy), false);
+});
+
+test('129. 売渡証明書: 横幅不足は非阻害の注意だけで、印影を紙面内に留める', () => {
+  const m = measureSale([{ addressRight: 610, nameRight: 260 }]);
+  const placement = resolveSignerStampPlacement({ measurement: m, stampWidth: STAMP_WIDTH });
+  assert.equal(placement.identified, true, '署名欄は判別できている');
+  assert.equal(placement.widthShortage, true);
+  assert.equal(isSignerStampAutoAligned(placement), false);
+  assert.deepEqual(buildSignerStampNotices(placement), [SIGNER_STAMP_NOTICE_WIDTH_SHORTAGE]);
+  // 自動縮小・gap圧縮をしないので基準Xは収まらないまま、描画だけ紙面内に留める。
+  assert.ok(placement.baseX > placement.containerWidth - STAMP_WIDTH);
+  assert.equal(placement.renderX, 654 - STAMP_WIDTH);
+});
+
+test('130. 売渡証明書: 目印を保てる編集後DOMの実表示で再計測する', () => {
+  const before = measureSale([{ addressRight: 300, nameRight: 250 }]);
+  assert.equal(before.maxRight, 300);
+  const after = measureSignerBlock(buildOrigin({
+    blocks: [saleBlock([signerRow(0, [
+      new FakeText('架空県架空市売町一丁目1番（編集後）', [rect(0, 462)]),
+      new FakeText('架空 売主一', [rect(0, 250, 22)]),
+    ])])],
+  }), SALE_KEY);
+  assert.equal(after.maxRight, 462, '編集後の表示行で再計測する');
+  assert.ok(Math.abs(after.baseX - (462 + GAP_12PT_SALE)) < 0.01);
+});
+
+test('131. 売渡証明書の署名欄keyは既存16帳票と混ざらない', () => {
+  const origin = buildOrigin({ blocks: [saleBlock([sellerRow(0, { addressRight: 400, nameRight: 250 })])] });
+  assert.equal(measureSignerBlock(origin, SALE_KEY).found, true);
+  for (const key of [TITLE_KEY, SAVE_KEY, ADDRESS_KEY, COMPLETION_TITLE_KEY, LOSS_CERT_KEY, STATEMENT_SHARED_KEY, STATEMENT_SOLE_KEY]) {
+    assert.equal(measureSignerBlock(origin, key).found, false, key);
+  }
+  assert.equal(SALE_KEY, 'certificate.sale');
+});
+
+// --- 実描画（SSR）での接続 ---------------------------------------------------
+
+const salePerson = (id, name, address, roles = ['その他']) => ({
+  id, name, address, roles, share: '', shareOverrides: {},
+});
+const saleBuilding = {
+  id: 'slb1', address: '架空県架空市五丁目5番地', houseNum: '505番5', kind: '居宅', struct: '木造２階建',
+  floorAreas: [{ id: 'slf1', floor: '１階', area: '80.00' }], annexes: [], additionalCauses: [],
+  registrationCause: '新築', registrationDate: { era: '令和', year: '8', month: '5', day: '6' },
+  ownerPersonIds: ['sl1'], contractorPersonIds: [],
+  confirmApplicantPersonIds: [], confirmApplicantNames: [],
+};
+const buildSaleSite = (people) => reconcileSiteDocumentCompatibility({
+  id: 'site-sale',
+  people,
+  land: [], buildings: [], proposedBuildings: [saleBuilding],
+  registrationApplications: [{
+    id: 'rsl1', type: '建物表題登記',
+    targetBuildingIds: [saleBuilding.id], targetLandIds: [],
+    applicantPersonIds: people.filter(p => (p.roles || []).includes('申請人')).map(p => p.id),
+    subject: { beforeBuildingIds: [], afterBuildingIds: [saleBuilding.id], landIds: [], primaryBuildingId: saleBuilding.id },
+    documents: { '売渡証明書': 1, '非登載証明書': 1 },
+  }],
+  docPick: {},
+});
+// 買主(申請人) 1名 + 売主(その他) 2名。
+const saleSite = buildSaleSite([
+  salePerson('sl1', '架空 買主', '架空県架空市買町1番', ['申請人']),
+  salePerson('se1', '架空 売主一', '架空県架空市売町一丁目1番1号'),
+  salePerson('se2', '架空 売主二', '架空県架空市売町二丁目2番2号'),
+]);
+// 売主候補0名（その他roleなし）。
+const saleSiteNoSeller = buildSaleSite([
+  salePerson('sl1', '架空 買主', '架空県架空市買町1番', ['申請人']),
+]);
+
+const renderSaleDoc = (name, { pick = {}, isPrint = false, siteData = saleSite } = {}) =>
+  realReact.renderToStaticMarkup(
+    realReact.React.createElement(realReact.DocTemplate, {
+      name, siteData, instanceKey: `${name}__1`, instanceIndex: 1,
+      pick: { ...LEGACY_DOCUMENT_PICK_DEFAULTS, ...pick },
+      isPrint, scriveners: [], documentContext: null,
+    })
+  );
+
+const saleBlockHtml = (html) => {
+  const start = html.indexOf(`${SIGNER_BLOCK_ATTR}="${SALE_KEY}"`);
+  if (start < 0) return '';
+  const end = html.indexOf('position:absolute;bottom:0', start);
+  return html.slice(start, end < 0 ? html.length : end);
+};
+
+test('132. 売渡証明書の署名欄・売主行に目印が入り、行数は売主数と一致する', () => {
+  const html = renderSaleDoc('売渡証明書');
+  assert.ok(html.includes(`${SIGNER_BLOCK_ATTR}="${SALE_KEY}"`), '署名欄目印');
+  assert.ok(html.includes(`${SIGNER_ROW_ATTR}="0"`), '売主行0');
+  assert.ok(html.includes(`${SIGNER_ROW_ATTR}="1"`), '売主行1');
+  const rows = html.match(new RegExp(`${SIGNER_ROW_ATTR}="\\d+"`, 'g')) || [];
+  assert.equal(rows.length, 2, '売主2名分');
+  const block = saleBlockHtml(html);
+  assert.ok(block.includes('架空県架空市売町一丁目1番1号'), '売主1の住所');
+  assert.ok(block.includes('架空 売主一'), '売主1の氏名');
+  assert.ok(block.includes('架空 売主二'), '売主2の氏名');
+  assert.ok(!block.includes('架空 買主'), '買主は署名欄へ含めない');
+});
+
+test('133. 売渡証明書: 署名欄は12pt、売主行の表示内容・順序・縦レイアウトを変えていない', () => {
+  const html = renderSaleDoc('売渡証明書');
+  const block = saleBlockHtml(html);
+  // gap基準の12ptラッパー。
+  assert.ok(block.startsWith(`${SIGNER_BLOCK_ATTR}="${SALE_KEY}"`));
+  assert.ok(html.includes('font-size:12pt'), '売主情報は12ptのまま');
+  // 住所→氏名の順。
+  const addrAt = block.indexOf('架空県架空市売町一丁目1番1号');
+  const nameAt = block.indexOf('架空 売主一');
+  assert.ok(addrAt > 0 && nameAt > 0 && addrAt < nameAt, '住所→氏名の順');
+  // 既存のvertical layout（minHeight / 売主間4mm / paddingRight）を維持する。
+  assert.ok(block.includes('min-height:26.6mm'), '売主行のminHeight');
+  assert.ok(block.includes('margin-top:4mm'), '2人目以降の売主間4mm');
+  assert.ok(block.includes('padding-right:calc(1em + 26.6mm)'), '印影用の右余白');
+  // ソース側でも縦方向の値を変更していない。
+  assert.ok(DOC_TEMPLATE_SOURCE.includes("marginTop: i > 0 ? '4mm' : '0'"));
+  assert.ok(DOC_TEMPLATE_SOURCE.includes("<div style={{ fontSize: '11pt', marginTop: '6mm' }}>"));
+});
+
+test('134. 売渡証明書: 売主0名でも空の住所/氏名行と印影1個を維持し、行目印は付けない', () => {
+  const html = renderSaleDoc('売渡証明書', { siteData: saleSiteNoSeller });
+  assert.ok(html.includes(`${SIGNER_BLOCK_ATTR}="${SALE_KEY}"`), 'emptyと判定させるため目印は残す');
+  assert.ok(!html.includes(SIGNER_ROW_ATTR), '空行には売主行目印を付けない');
+  // 空の住所/氏名行（全角空白の段落2本）と印影1個が従来どおり残る。
+  const block = saleBlockHtml(html);
+  assert.equal((block.match(/min-height:26\.6mm/g) || []).length, 1, '空の売主行は1つ');
+  assert.equal((html.match(/stamp-drag-handle/g) || []).length, 2, '上部印影1個＋空の署名者印影1個');
+  assert.ok(html.includes('right:0'), '計測前は従来の右端');
+  assert.ok(!html.includes('架空 売主'), '売主を自動追加しない');
+});
+
+test('135. 売渡証明書: 売主選択・並び順の既存ロジックを変えていない', () => {
+  // saleSellerPersonIds が空なら候補全員（default-all semantics）。
+  assert.ok(DOC_TEMPLATE_SOURCE.includes('const sellerIds = Array.isArray(pick?.saleSellerPersonIds) ? pick.saleSellerPersonIds : [];'));
+  assert.ok(DOC_TEMPLATE_SOURCE.includes('? sellerIds.map(id => sellerCandidates.find(p => p.id === id)).filter(Boolean)'));
+  assert.ok(DOC_TEMPLATE_SOURCE.includes(': sellerCandidates;'));
+  // 空配列＝全員表示のまま（0名と再解釈しない）。
+  const all = renderSaleDoc('売渡証明書', { pick: { saleSellerPersonIds: [] } });
+  assert.equal((all.match(new RegExp(`${SIGNER_ROW_ATTR}="\\d+"`, 'g')) || []).length, 2);
+  // 明示選択は選んだ売主だけ。
+  const only2 = renderSaleDoc('売渡証明書', { pick: { saleSellerPersonIds: ['se2'] } });
+  assert.equal((only2.match(new RegExp(`${SIGNER_ROW_ATTR}="\\d+"`, 'g')) || []).length, 1);
+  const only2Block = saleBlockHtml(only2);
+  assert.ok(only2Block.includes('架空 売主二'));
+  assert.ok(!only2Block.includes('架空 売主一'));
+  // 並び順は指定順のまま（auto-alignのために並べ替えない）。
+  const reordered = saleBlockHtml(renderSaleDoc('売渡証明書', { pick: { saleSellerPersonIds: ['se2', 'se1'] } }));
+  assert.ok(reordered.indexOf('架空 売主二') < reordered.indexOf('架空 売主一'), '指定順を維持する');
+});
+
+test('136. 売渡証明書: 印影はindex方式のまま、manual dx/dyが自動基準へ加算される', () => {
+  assert.ok(DOC_TEMPLATE_SOURCE.includes('const getSignerPos = (idx) => {'));
+  assert.ok(DOC_TEMPLATE_SOURCE.includes('list.find(p => p?.i === idx)'));
+  // [null] fallbackも従来どおり。
+  assert.ok(DOC_TEMPLATE_SOURCE.includes('(displaySellers.length > 0 ? displaySellers : [null]).map((p, i) => {'));
+  const html = renderSaleDoc('売渡証明書', { pick: { signerStampPositions: [{ i: 1, dx: 19, dy: -8 }] } });
+  assert.ok(html.includes('left:19px'), '手動dx');
+  assert.ok(html.includes('top:-8px'), '手動dy');
+});
+
+test('137. 売渡証明書: 帳票上部のDraggableStampは売主数に関係なく1個のまま', () => {
+  for (const siteData of [saleSite, saleSiteNoSeller]) {
+    const html = renderSaleDoc('売渡証明書', { siteData });
+    const tops = html.match(/right:calc\(20mm - 0px\)/g) || [];
+    assert.equal(tops.length, 1, '上部印影は1個');
+    assert.ok(!/right:calc\(48\.6mm/.test(html), '売主数に連動させない');
+  }
+  // 上部印影は従来どおり stampPositions 側（index 0）で読む。
+  const moved = renderSaleDoc('売渡証明書', { pick: { stampPositions: [{ i: 0, dx: 11, dy: 4 }] } });
+  assert.ok(/right:calc\(20mm - 11px\)/.test(moved));
+});
+
+test('138. 売渡証明書: 通常時から本文編集可能なlegacy editingを維持する', () => {
+  // P1の明示全文編集対象へ追加しない。
+  assert.equal(isExplicitTextEditDocument('売渡証明書'), false);
+  assert.equal(isDocumentBodyEditable({ documentName: '売渡証明書', isPrint: false, textEditingEnabled: false }), true,
+    '通常時から編集可能');
+  assert.equal(isDocumentBodyEditable({ documentName: '売渡証明書', isPrint: true, textEditingEnabled: false }), false,
+    '印刷用DOMは編集不可');
+  // 売渡証明書branch内で editable={!isPrint}（P1の textEditingEnabled ではない）のまま。
+  const saleBranch = DOC_TEMPLATE_SOURCE.slice(
+    DOC_TEMPLATE_SOURCE.indexOf('if (name === "売渡証明書")'),
+    DOC_TEMPLATE_SOURCE.indexOf('if (name === "申述書（共有）")')
+  );
+  assert.ok(saleBranch.length > 0);
+  assert.ok(saleBranch.includes('editable={!isPrint}'), '売渡証明書は通常時から編集可能なまま');
+  assert.ok(!saleBranch.includes('bodyEditable'), 'P1の明示全文編集フラグを使わない');
+  // 通常描画では編集可能で、目印も入る（編集後DOMを再計測できる）。
+  const html = renderSaleDoc('売渡証明書');
+  assert.ok(html.includes('contenteditable="true"'), '通常時editable');
+  assert.ok(html.includes(`${SIGNER_BLOCK_ATTR}="${SALE_KEY}"`));
+  assert.ok(html.includes(`${SIGNER_ROW_ATTR}="0"`));
+});
+
+test('139. 売渡証明書: 計測前の初回描画は従来の右端で、印刷用DOMも同じ経路で描画する', () => {
+  for (const isPrint of [false, true]) {
+    const html = renderSaleDoc('売渡証明書', { isPrint });
+    assert.ok(html.includes('right:0'), `isPrint=${isPrint}`);
+    assert.ok(html.includes(`${SIGNER_BLOCK_ATTR}="${SALE_KEY}"`));
+  }
+  const html = renderSaleDoc('売渡証明書', { pick: { signerStampBaseRatio: 0.9 } });
+  assert.ok(!html.includes(SIGNER_STAMP_NOTICE_UNIDENTIFIED));
+  assert.ok(!html.includes(SIGNER_STAMP_NOTICE_WIDTH_SHORTAGE));
+  assert.ok(!html.includes('data-testid'));
+  // 印刷用DOMでは編集可能にしない。
+  assert.ok(!renderSaleDoc('売渡証明書', { isPrint: true }).includes('contenteditable="true"'));
+});
+
+// --- 保存境界 / 独立性 -------------------------------------------------------
+
+const saleInstanceOf = (siteObj) => {
+  for (const app of siteObj.registrationApplications || []) {
+    const hit = (app.documentInstances || []).find(i => i.templateKey === SALE_KEY && i.copyIndex === 1);
+    if (hit) return hit;
+  }
+  return null;
+};
+
+test('140. 売渡証明書: fallback基準はレイアウト情報として保存し、再読込で復元する', () => {
+  const saved = applyPick(saleSite, '売渡証明書', { signerStampBaseRatio: 0.59 });
+  assert.equal(saved.docPick?.['売渡証明書__1']?.signerStampBaseRatio, 0.59);
+  const inst = saleInstanceOf(saved);
+  assert.equal(inst.layoutOverrides.signerStampBaseRatio, 0.59);
+  assert.equal(Object.prototype.hasOwnProperty.call(inst.selectionOverrides, 'signerStampBaseRatio'), false);
+  const reloaded = reconcileSiteDocumentCompatibility(saved);
+  assert.equal(reloaded.docPick?.['売渡証明書__1']?.signerStampBaseRatio, 0.59);
+});
+
+test('141. 売渡証明書: resetは印影位置キーだけ初期化し、基準・本文・売主選択を残す', () => {
+  let saved = applyPick(saleSite, '売渡証明書', { signerStampBaseRatio: 0.43 });
+  saved = applyPick(saved, '売渡証明書', { signerStampPositions: [{ i: 0, dx: 26, dy: -9 }] });
+  saved = applyPick(saved, '売渡証明書', { stampPositions: [{ i: 0, dx: 6, dy: 6 }] });
+  saved = applyPick(saved, '売渡証明書', { customText: '<div>売渡証明書の固定本文</div>' });
+  saved = applyPick(saved, '売渡証明書', { saleSellerPersonIds: ['se2'] });
+
+  const patch = buildStampPositionResetPatch();
+  assert.deepEqual(Object.keys(patch).sort(), ['signerStampPositions', 'stampPositions']);
+  assert.equal(Object.prototype.hasOwnProperty.call(patch, 'signerStampBaseRatio'), false);
+
+  const after = applyPick(saved, '売渡証明書', patch);
+  const pick = after.docPick?.['売渡証明書__1'] || {};
+  assert.equal(pick.signerStampPositions, null);
+  assert.equal(pick.stampPositions, null);
+  assert.equal(pick.signerStampBaseRatio, 0.43, 'fallback基準は失わない');
+  assert.equal(pick.customText, '<div>売渡証明書の固定本文</div>', '本文は保全する');
+  assert.deepEqual(pick.saleSellerPersonIds, ['se2'], '売主選択は保全する');
+});
+
+test('142. 売渡証明書: 自動計測の保存は本文・売主選択・業務データを変更しない', () => {
+  const before = applyPick(saleSite, '売渡証明書', { saleSellerPersonIds: ['se1'] });
+  const after = applyPick(before, '売渡証明書', { signerStampBaseRatio: 0.37 });
+  assert.deepEqual(after.docPick?.['売渡証明書__1']?.saleSellerPersonIds, ['se1']);
+  assert.deepEqual(after.people, before.people);
+  assert.deepEqual(after.buildings, before.buildings);
+  assert.deepEqual(after.proposedBuildings, before.proposedBuildings);
+  const shape = (siteObj) => (siteObj.registrationApplications || [])
+    .flatMap(app => (app.documentInstances || []).map(i => [
+      i.templateKey, i.copyIndex, i.selectionOverrides, i.selectionOverrideBaselines,
+      i.editMode, i.detachedHtml, i.active, i.printEnabled, i.contentOverrides,
+    ]));
+  assert.deepEqual(shape(after), shape(before), 'レイアウト以外の書類状態を変えない');
+});
+
+test('143. 売渡証明書: fallback基準は他帳票・別案件へ漏れない', () => {
+  const saved = applyPick(saleSite, '売渡証明書', { signerStampBaseRatio: 0.68 });
+  assert.equal(saved.docPick?.['売渡証明書__1']?.signerStampBaseRatio, 0.68);
+  assert.equal(saved.docPick?.['非登載証明書__1']?.signerStampBaseRatio ?? null, null, '対象外帳票へ漏れない');
+  assert.equal(site.docPick?.['委任状（表題）__1']?.signerStampBaseRatio ?? null, null);
+  assert.equal(certSite.docPick?.['工事完了引渡証明書（表題）__1']?.signerStampBaseRatio ?? null, null);
+  assert.equal(statementSite.docPick?.['申述書（共有）__1']?.signerStampBaseRatio ?? null, null);
+});
+
+// --- 既存16帳票・対象外の回帰 ------------------------------------------------
+
+test('144. 既存16帳票の対象判定と代表描画に回帰がない', () => {
+  for (const name of [...DELEGATION_DOCUMENTS, ...CERTIFICATE_DOCUMENTS, ...STATEMENT_DOCUMENTS]) {
+    assert.equal(isSignerStampAutoAlignDocument(name), true, name);
+    assert.deepEqual(buildSignerBlockAttributes(name), { [SIGNER_BLOCK_ATTR]: getDocumentTemplateKey(name) }, name);
+  }
+  // 委任状（11pt）/ 証明書（12pt）/ 申述書（11pt）の代表を実描画で確認。
+  assert.ok(renderDoc('委任状（表題）').includes(`${SIGNER_BLOCK_ATTR}="${TITLE_KEY}"`));
+  assert.ok(renderDoc('委任状（表題）').includes('font-size:11pt'));
+  assert.ok(renderDoc('委任状（保存）').includes('ふりがな'));
+  assert.ok(renderCertDoc('工事完了引渡証明書（表題）').includes(`${SIGNER_BLOCK_ATTR}="${COMPLETION_TITLE_KEY}"`));
+  assert.ok(renderCertDoc('工事完了引渡証明書（表題）').includes('font-size:12pt'));
+  assert.ok(renderStatementDoc('申述書（共有）').includes(`${SIGNER_BLOCK_ATTR}="${STATEMENT_SHARED_KEY}"`));
+  assert.ok(renderStatementDoc('申述書（単独）').includes(`${SIGNER_BLOCK_ATTR}="${STATEMENT_SOLE_KEY}"`));
+});
+
+test('145. 非登載証明書は対象外のまま（署名者印影を持たない）', () => {
+  assert.equal(isSignerStampAutoAlignDocument('非登載証明書'), false);
+  assert.equal(buildSignerBlockAttributes('非登載証明書'), null);
+  assert.equal(buildSignerRowAttributes('非登載証明書', 0), null);
+  const html = renderSaleDoc('非登載証明書');
+  assert.ok(!html.includes(SIGNER_BLOCK_ATTR), '署名欄目印を付けない');
+  assert.ok(!html.includes(SIGNER_ROW_ATTR), '署名者行目印を付けない');
+  assert.ok(!html.includes(SIGNER_STAMP_NOTICE_UNIDENTIFIED));
+  assert.ok(!html.includes(SIGNER_STAMP_NOTICE_WIDTH_SHORTAGE));
 });
